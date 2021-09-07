@@ -7,7 +7,7 @@ env:
   enableDebugVis: False
 
   asset:
-    assetRoot: "../assets"
+    assetRoot: "assets"
     assetFileName: "mjcf/balance_bot.xml"
 
 sim:

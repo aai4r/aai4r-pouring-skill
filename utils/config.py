@@ -312,6 +312,9 @@ def get_args(benchmark=False, use_rlg_config=False, target_task="Humanoid", head
         description="RL Policy",
         custom_parameters=custom_parameters)
 
+    # set actual headless param
+    args.headless = headless
+
     # allignment with examples
     args.device_id = args.compute_device_id
     args.device = args.sim_device_type if args.use_gpu_pipeline else 'cpu'

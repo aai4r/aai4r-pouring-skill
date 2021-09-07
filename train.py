@@ -23,8 +23,8 @@ def train():
 
 if __name__ == '__main__':
     set_np_formatting()
-    target_task = 'Cartpole'
-    args = get_args(target_task=target_task, headless=True)
+    target_task = 'BallBalance'   # [BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, ShadowHandLSTM, ShadowHandFFOpenAI, ShadowHandFFOpenAITest, ShadowHandOpenAI, ShadowHandOpenAITest, Ingenuity]
+    args = get_args(target_task=target_task, headless=False)
 
     cfg, cfg_train, logdir = load_cfg(args)
     sim_params = parse_sim_params(args, cfg, cfg_train)

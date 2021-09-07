@@ -27,7 +27,7 @@ env:
     restitution: 0.0
 
   asset:
-    assetRoot: "../assets"
+    assetRoot: "assets"
     assetFileName: "mjcf/nv_ant.xml"
 
 sim:
