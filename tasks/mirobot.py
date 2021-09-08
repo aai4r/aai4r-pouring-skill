@@ -276,6 +276,7 @@ class MirobotCube(BaseTask):
     def compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf[:] = compute_franka_reward(
             self.reset_buf, self.progress_buf, self.actions,
+            self.mirobot_center_finger_pos, self.cube_pos, self.cube_rot,
             self.franka_grasp_pos, self.franka_grasp_rot,
             self.franka_lfinger_pos, self.franka_rfinger_pos,
             self.gripper_forward_axis, self.drawer_inward_axis, self.gripper_up_axis, self.drawer_up_axis,
@@ -305,9 +306,13 @@ class MirobotCube(BaseTask):
         vec = to_torch([0, 0, 1], device=self.device).repeat(len(self.franka_lfinger_rot), 1)
         self.mirobot_center_finger_pos += quat_apply(self.franka_lfinger_rot, vec * z_offset)
 
+        # cube info
+        self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
+        self.cube_rot = self.rigid_body_states[:, self.cube_handle][:, 3:7]
+
         dof_pos_scaled = (2.0 * (self.franka_dof_pos - self.franka_dof_lower_limits)
                           / (self.franka_dof_upper_limits - self.franka_dof_lower_limits) - 1.0)
-        to_target = self.franka_grasp_pos
+        to_target = self.mirobot_center_finger_pos - self.cube_pos
         self.obs_buf = torch.cat((dof_pos_scaled, self.franka_dof_vel * self.dof_vel_scale, to_target), dim=-1)
 
         return self.obs_buf
@@ -380,6 +385,16 @@ class MirobotCube(BaseTask):
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
+                # draw cube
+                px = (self.cube_pos[i] + quat_apply(self.cube_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.cube_pos[i] + quat_apply(self.cube_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.cube_pos[i] + quat_apply(self.cube_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.cube_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
                 # px = (self.franka_grasp_pos[i] + quat_apply(self.franka_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
                 # py = (self.franka_grasp_pos[i] + quat_apply(self.franka_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
                 # pz = (self.franka_grasp_pos[i] + quat_apply(self.franka_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
@@ -415,15 +430,20 @@ class MirobotCube(BaseTask):
 @torch.jit.script
 def compute_franka_reward(
     reset_buf, progress_buf, actions,
+    mirobot_center_finger_pos, cube_pos, cube_rot,
     franka_grasp_pos, franka_grasp_rot,
     franka_lfinger_pos, franka_rfinger_pos,
     gripper_forward_axis, drawer_inward_axis, gripper_up_axis, drawer_up_axis,
     num_envs, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
     finger_dist_reward_scale, action_penalty_scale, distX_offset, max_episode_length
 ):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
 
     # distance from hand to the cube
+    d = torch.norm(mirobot_center_finger_pos - cube_pos, p=2, dim=-1)
+    dist_reward = 1.0 / (1.0 + d ** 2)
+    dist_reward *= dist_reward
+    dist_reward = torch.where(d <= 0.02, dist_reward * 2, dist_reward)
 
     # # distance from hand to the drawer
     # d = torch.norm(franka_grasp_pos - drawer_grasp_pos, p=2, dim=-1)
@@ -456,7 +476,7 @@ def compute_franka_reward(
 
     # regularization on the actions (summed for each environment)
     action_penalty = torch.sum(actions ** 2, dim=-1)
-    rewards = -action_penalty
+    rewards = dist_reward_scale * dist_reward - action_penalty * action_penalty_scale
 
     # how far the cabinet has been opened out
     # open_reward = cabinet_dof_pos[:, 3]  # drawer_top_joint
@@ -482,6 +502,8 @@ def compute_franka_reward(
     #                         torch.ones_like(reset_buf), reset_buf)
     # reset_buf = torch.where(franka_rfinger_pos[:, 0] < drawer_grasp_pos[:, 0] - distX_offset,
     #                         torch.ones_like(reset_buf), reset_buf)
+
+    reset_buf = torch.where(d < 0.01, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
 
     return rewards, reset_buf
