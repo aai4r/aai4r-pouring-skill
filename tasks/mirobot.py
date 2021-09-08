@@ -39,8 +39,8 @@ class MirobotCube(BaseTask):
 
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
 
-        self.up_axis = "z"
-        self.up_axis_idx = 2
+        self.up_axis = "x"      # z
+        self.up_axis_idx = 0    # 2
 
         self.distX_offset = 0.04
         self.dt = 1/60.
@@ -83,6 +83,7 @@ class MirobotCube(BaseTask):
         self.num_bodies = self.rigid_body_states.shape[1]
 
         self.root_state_tensor = gymtorch.wrap_tensor(actor_root_state_tensor).view(self.num_envs, -1, 13)
+        self.cube_states = self.root_state_tensor[:, 1]
 
         self.num_dofs = self.gym.get_sim_dof_count(self.sim) // self.num_envs
         self.franka_dof_targets = torch.zeros((self.num_envs, self.num_dofs), dtype=torch.float, device=self.device)
@@ -169,11 +170,11 @@ class MirobotCube(BaseTask):
         franka_dof_props['effort'][7] = 200
 
         franka_start_pose = gymapi.Transform()
-        franka_start_pose.p = gymapi.Vec3(1.0, 0.0, 0.0)
+        franka_start_pose.p = gymapi.Vec3(0.3, 0.0, 0.0)
         franka_start_pose.r = gymapi.Quat(0.0, 0.0, 1.0, 0.0)
 
         cube_start_pose = gymapi.Transform()
-        cube_start_pose.p = gymapi.Vec3(*get_axis_params(0.2, self.up_axis_idx))
+        cube_start_pose.p = gymapi.Vec3(*get_axis_params(-0.1, self.up_axis_idx))
 
         # compute aggregate size
         num_franka_bodies = self.gym.get_asset_rigid_body_count(mirobot_asset)
@@ -215,6 +216,12 @@ class MirobotCube(BaseTask):
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
 
+            cube_state_pose = gymapi.Transform()
+            cube_state_pose.p.z = 0.025
+            self.default_cube_states.append([cube_state_pose.p.x, cube_state_pose.p.y, cube_state_pose.p.z,
+                                             cube_state_pose.r.x, cube_state_pose.r.y, cube_state_pose.r.z, cube_state_pose.r.w,
+                                             0, 0, 0, 0, 0, 0])
+
             if self.aggregate_mode > 0:
                 self.gym.end_aggregate(env_ptr)
 
@@ -226,6 +233,7 @@ class MirobotCube(BaseTask):
         self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "left_finger")
         self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "right_finger")
         self.cube_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cube_actor, "cube")
+        self.default_cube_states = to_torch(self.default_cube_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
 
         self.init_data()
 
@@ -310,7 +318,18 @@ class MirobotCube(BaseTask):
         self.franka_dof_vel[env_ids, :] = torch.zeros_like(self.franka_dof_vel[env_ids])
         self.franka_dof_targets[env_ids, :self.num_franka_dofs] = pos
 
-        # reset cabinet
+        # reset cube
+        cube_indices = self.global_indices[env_ids, 1].flatten()
+
+        pick = self.default_cube_states[env_ids]
+        xy_mask = to_torch([1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).repeat(len(pick), 1)
+        rand_cube_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_mask * 0.5
+        self.cube_states[env_ids] = self.default_cube_states[env_ids] + rand_cube_pos
+        self.gym.set_actor_root_state_tensor_indexed(self.sim,
+                                                     gymtorch.unwrap_tensor(self.root_state_tensor),
+                                                     gymtorch.unwrap_tensor(cube_indices), len(cube_indices))
+
+        # apply
         multi_env_ids_int32 = self.global_indices[env_ids, :1].flatten()
         self.gym.set_dof_position_target_tensor_indexed(self.sim,
                                                         gymtorch.unwrap_tensor(self.franka_dof_targets),
