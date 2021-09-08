@@ -5,7 +5,7 @@ env:
   episodeLength: 500
   enableDebugVis: False
 
-  startPositionNoise: 0.0
+  startPositionNoise: 0.1
   startRotationNoise: 0.0
 
   aggregateMode: 3
@@ -21,7 +21,8 @@ env:
 
   asset:
     assetRoot: "assets"
-    assetFileNameFranka: "urdf/mirobot_description/mirobot.urdf"
+    assetFileNameMirobot: "urdf/mirobot_description/mirobot.urdf"
+    assetFileNameCube: "urdf/objects/cube_multicolor.urdf"
 
 sim:
   substeps: 1

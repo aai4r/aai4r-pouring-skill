@@ -11,7 +11,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/base_link.dae"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/base_link.dae"/>
       </geometry>
       <material name="base_link_color">
         <color rgba="0.44 0.5 0.56 1"/>
@@ -20,7 +20,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/base_link.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/base_link.obj"/>
       </geometry>
     </collision>
   </link>
@@ -28,7 +28,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link1.dae"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link1.dae"/>
       </geometry>
       <material name="Link1_color">
         <color rgba="0.83 0.83 0.83 1"/>
@@ -37,7 +37,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link1.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link1.obj"/>
       </geometry>
     </collision>
   </link>
@@ -52,7 +52,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link2.dae"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link2.dae"/>
       </geometry>
       <material name="Link2_color">
         <color rgba="1 0.65 0 1"/>
@@ -61,7 +61,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link2.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link2.obj"/>
       </geometry>
     </collision>
   </link>
@@ -76,7 +76,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link3.dae"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link3.dae"/>
       </geometry>
       <material name="Link3_color">
         <color rgba="0.83 0.83 0.83 1"/>
@@ -85,7 +85,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link3.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link3.obj"/>
       </geometry>
     </collision>
   </link>
@@ -100,7 +100,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link4.dae"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link4.dae"/>
       </geometry>
       <material name="Link4_color">
         <color rgba="1 0.65 0 1"/>
@@ -109,7 +109,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link4.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link4.obj"/>
       </geometry>
     </collision>
   </link>
@@ -125,7 +125,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link5_align.dae"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link5_align.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -133,7 +133,7 @@
       <!-- It seems a collision bug of isaacgym because this URDF model works well in ROS rviz. -->
       <origin rpy="0 0 0" xyz="-0.04 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link5_align.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link5_align.obj"/>
       </geometry>
     </collision>
   </link>
@@ -150,7 +150,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link6.dae"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link6.dae"/>
       </geometry>
       <material name="Link6_color">
         <color rgba="0.83 0.83 0.83 1"/>
@@ -161,7 +161,7 @@
       <!-- It seems a collision bug of isaacgym because this URDF model works well in ROS rviz. -->
       <origin rpy="0 0 0" xyz="-0.04 0 0"/>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/Link6.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/Link6.obj"/>
       </geometry>
     </collision>
   </link>
@@ -177,12 +177,12 @@
   <link name="mirobot_hand">
     <visual>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/mirobot_hand.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_hand.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/mirobot_hand.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_hand.obj"/>
       </geometry>
     </collision>
   </link>
@@ -195,24 +195,24 @@
   <link name="left_finger">
     <visual>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/mirobot_leftfinger.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_leftfinger.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/mirobot_leftfinger.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_leftfinger.obj"/>
       </geometry>
     </collision>
   </link>
   <link name="right_finger">
     <visual>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/mirobot_rightfinger.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_rightfinger.obj"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="package://mirobot_description/meshes/mirobot_rightfinger.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_rightfinger.obj"/>
       </geometry>
     </collision>
   </link>

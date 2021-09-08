@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot name="object">
-  <link name="object">
+  <link name="cube">
     <visual>
       <origin xyz="0 0 0"/>
       <geometry>

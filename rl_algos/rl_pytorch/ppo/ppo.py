@@ -182,6 +182,7 @@ class PPO:
                     self.log(locals())
                 if it % log_interval == 0:
                     self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+                    print("log_dif: ", self.log_dir)
                 ep_infos.clear()
             self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(num_learning_iterations)))
 

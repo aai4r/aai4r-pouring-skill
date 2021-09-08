@@ -126,7 +126,7 @@ def retrieve_cfg(args, use_rlg_config=False):
         elif args.task == "Ingenuity":
             return os.path.join(args.logdir, "ingenuity"), "cfg/train/rlpt/pytorch_ppo_ingenuity.yaml", "cfg/ingenuity.yaml"
         elif args.task == "MirobotCube":
-            return os.path.join(args.logdir, "ingenuity"), "cfg/train/rlpt/pytorch_ppo_mirobot_cube.yaml", "cfg/mirobot_cube.yaml"
+            return os.path.join(args.logdir, "mirobot_cube"), "cfg/train/rlpt/pytorch_ppo_mirobot_cube.yaml", "cfg/mirobot_cube.yaml"
         else:
             warn_task_name()
 
@@ -275,7 +275,7 @@ def get_args(benchmark=False, use_rlg_config=False, target_task="Humanoid", head
             "help": "Can be BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, Ingenuity"},
         {"name": "--task_type", "type": str,
             "default": "Python", "help": "Choose Python or C++"},
-        {"name": "--rl_device", "type": str, "default": "cuda:0",
+        {"name": "--rl_device", "type": str, "default": "cpu",  # cuda:0
             "help": "Choose CPU or GPU device for inferencing policy network"},
         {"name": "--logdir", "type": str, "default": "logs/"},
         {"name": "--experiment", "type": str, "default": "Base",

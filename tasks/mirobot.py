@@ -112,10 +112,12 @@ class MirobotCube(BaseTask):
 
         asset_root = "../assets"
         mirobot_asset_file = "urdf/mirobot_description/mirobot.urdf"
+        cube_asset_file = "urdf/objects/cube_multicolor.urdf"
 
         if "asset" in self.cfg["env"]:
             asset_root = self.cfg["env"]["asset"].get("assetRoot", asset_root)
-            mirobot_asset_file = self.cfg["env"]["asset"].get("assetFileNameFranka", mirobot_asset_file)
+            mirobot_asset_file = self.cfg["env"]["asset"].get("assetFileNameMirobot", mirobot_asset_file)
+            cube_asset_file = self.cfg["env"]["asset"].get("assetFileNameCube", cube_asset_file)
 
         # load mirobot asset
         asset_options = gymapi.AssetOptions()
@@ -126,26 +128,32 @@ class MirobotCube(BaseTask):
         asset_options.thickness = 0.001
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
         asset_options.use_mesh_materials = True
-        franka_asset = self.gym.load_asset(self.sim, asset_root, mirobot_asset_file, asset_options)
+        mirobot_asset = self.gym.load_asset(self.sim, asset_root, mirobot_asset_file, asset_options)
 
-        franka_dof_stiffness = to_torch([400, 400, 400, 400, 400, 400, 1.0e6, 1.0e6], dtype=torch.float, device=self.device)
-        franka_dof_damping = to_torch([80, 80, 80, 80, 80, 80, 1.0e2, 1.0e2], dtype=torch.float, device=self.device)
+        # load cube asset
+        asset_options.flip_visual_attachments = False
+        asset_options.disable_gravity = False
+        asset_options.density = 400
+        cube_asset = self.gym.load_asset(self.sim, asset_root, cube_asset_file, asset_options)
 
-        self.num_franka_bodies = self.gym.get_asset_rigid_body_count(franka_asset)
-        self.num_franka_dofs = self.gym.get_asset_dof_count(franka_asset)
+        mirobot_dof_stiffness = to_torch([400, 400, 400, 400, 400, 400, 1.0e6, 1.0e6], dtype=torch.float, device=self.device)
+        mirobot_dof_damping = to_torch([80, 80, 80, 80, 80, 80, 1.0e2, 1.0e2], dtype=torch.float, device=self.device)
+
+        self.num_franka_bodies = self.gym.get_asset_rigid_body_count(mirobot_asset)
+        self.num_franka_dofs = self.gym.get_asset_dof_count(mirobot_asset)
 
         print("num franka bodies: ", self.num_franka_bodies)
         print("num franka dofs: ", self.num_franka_dofs)
 
         # set franka dof properties
-        franka_dof_props = self.gym.get_asset_dof_properties(franka_asset)
+        franka_dof_props = self.gym.get_asset_dof_properties(mirobot_asset)
         self.franka_dof_lower_limits = []
         self.franka_dof_upper_limits = []
         for i in range(self.num_franka_dofs):
             franka_dof_props['driveMode'][i] = gymapi.DOF_MODE_POS
             if self.physics_engine == gymapi.SIM_PHYSX:
-                franka_dof_props['stiffness'][i] = franka_dof_stiffness[i]
-                franka_dof_props['damping'][i] = franka_dof_damping[i]
+                franka_dof_props['stiffness'][i] = mirobot_dof_stiffness[i]
+                franka_dof_props['damping'][i] = mirobot_dof_damping[i]
             else:
                 franka_dof_props['stiffness'][i] = 7000.0
                 franka_dof_props['damping'][i] = 50.0
@@ -160,25 +168,24 @@ class MirobotCube(BaseTask):
         franka_dof_props['effort'][6] = 200
         franka_dof_props['effort'][7] = 200
 
-        # create prop assets
-        box_opts = gymapi.AssetOptions()
-        box_opts.density = 400
-        prop_asset = self.gym.create_box(self.sim, self.prop_width, self.prop_height, self.prop_width, box_opts)
-
         franka_start_pose = gymapi.Transform()
         franka_start_pose.p = gymapi.Vec3(1.0, 0.0, 0.0)
         franka_start_pose.r = gymapi.Quat(0.0, 0.0, 1.0, 0.0)
 
-        # compute aggregate size
-        num_franka_bodies = self.gym.get_asset_rigid_body_count(franka_asset)
-        num_franka_shapes = self.gym.get_asset_rigid_shape_count(franka_asset)
-        num_prop_bodies = self.gym.get_asset_rigid_body_count(prop_asset)
-        num_prop_shapes = self.gym.get_asset_rigid_shape_count(prop_asset)
-        max_agg_bodies = num_franka_bodies + num_prop_bodies
-        max_agg_shapes = num_franka_shapes + num_prop_shapes
+        cube_start_pose = gymapi.Transform()
+        cube_start_pose.p = gymapi.Vec3(*get_axis_params(0.2, self.up_axis_idx))
 
-        self.frankas = []
-        self.default_prop_states = []
+        # compute aggregate size
+        num_franka_bodies = self.gym.get_asset_rigid_body_count(mirobot_asset)
+        num_franka_shapes = self.gym.get_asset_rigid_shape_count(mirobot_asset)
+        num_cube_bodies = self.gym.get_asset_rigid_body_count(cube_asset)
+        num_cube_shapes = self.gym.get_asset_rigid_shape_count(cube_asset)
+        max_agg_bodies = num_franka_bodies + num_cube_bodies
+        max_agg_shapes = num_franka_shapes + num_cube_shapes
+
+        self.mirobots = []
+        self.cubes = []
+        self.default_cube_states = []
         self.prop_start = []
         self.envs = []
 
@@ -191,11 +198,19 @@ class MirobotCube(BaseTask):
             if self.aggregate_mode >= 3:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
 
-            franka_actor = self.gym.create_actor(env_ptr, franka_asset, franka_start_pose, "franka", i, 1, 0)
-            self.gym.set_actor_dof_properties(env_ptr, franka_actor, franka_dof_props)
+            mirobot_actor = self.gym.create_actor(env_ptr, mirobot_asset, franka_start_pose, "mirobot", i, 1, 0)
+            self.gym.set_actor_dof_properties(env_ptr, mirobot_actor, franka_dof_props)
 
             if self.aggregate_mode == 2:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
+
+            cube_pose = cube_start_pose
+            cube_pose.p.x += self.start_position_noise * (np.random.rand() - 0.5)
+            dz = 0.025
+            dy = np.random.rand() - 0.5
+            cube_pose.p.y += self.start_position_noise * dy
+            cube_pose.p.z = dz
+            cube_actor = self.gym.create_actor(env_ptr, cube_asset, cube_pose, "cube", i, 1, 0)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
@@ -204,18 +219,20 @@ class MirobotCube(BaseTask):
                 self.gym.end_aggregate(env_ptr)
 
             self.envs.append(env_ptr)
-            self.frankas.append(franka_actor)
+            self.mirobots.append(mirobot_actor)
+            self.cubes.append(cube_actor)
 
-        self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, franka_actor, "mirobot_hand")
-        self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, franka_actor, "left_finger")
-        self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, franka_actor, "right_finger")
+        self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "mirobot_hand")
+        self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "left_finger")
+        self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "right_finger")
+        self.cube_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cube_actor, "cube")
 
         self.init_data()
 
     def init_data(self):
-        hand = self.gym.find_actor_rigid_body_handle(self.envs[0], self.frankas[0], "mirobot_hand")
-        lfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.frankas[0], "left_finger")
-        rfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.frankas[0], "right_finger")
+        hand = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "mirobot_hand")
+        lfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "left_finger")
+        rfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "right_finger")
 
         hand_pose = self.gym.get_rigid_transform(self.envs[0], hand)
         lfinger_pose = self.gym.get_rigid_transform(self.envs[0], lfinger)
@@ -285,7 +302,7 @@ class MirobotCube(BaseTask):
     def reset(self, env_ids):
         env_ids_int32 = env_ids.to(dtype=torch.int32)
 
-        # reset franka
+        # reset mirobot
         pos = tensor_clamp(
             self.franka_default_dof_pos.unsqueeze(0) + 0.25 * (torch.rand((len(env_ids), self.num_franka_dofs), device=self.device) - 0.5),
             self.franka_dof_lower_limits, self.franka_dof_upper_limits)
@@ -294,7 +311,7 @@ class MirobotCube(BaseTask):
         self.franka_dof_targets[env_ids, :self.num_franka_dofs] = pos
 
         # reset cabinet
-        multi_env_ids_int32 = self.global_indices[env_ids, :2].flatten()
+        multi_env_ids_int32 = self.global_indices[env_ids, :1].flatten()
         self.gym.set_dof_position_target_tensor_indexed(self.sim,
                                                         gymtorch.unwrap_tensor(self.franka_dof_targets),
                                                         gymtorch.unwrap_tensor(multi_env_ids_int32), len(multi_env_ids_int32))
