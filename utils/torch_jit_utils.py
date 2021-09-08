@@ -8,6 +8,19 @@
 import torch
 import numpy as np
 from isaacgym.torch_utils import *
+import math
+
+
+@torch.jit.script
+def rad2deg(rad):
+    # type: (float) -> float
+    return rad * (180.0 / math.pi)
+
+
+@torch.jit.script
+def deg2rad(deg):
+    # type: (float) -> float
+    return deg * (math.pi / 180.0)
 
 
 @torch.jit.script

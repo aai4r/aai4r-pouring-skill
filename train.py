@@ -23,7 +23,10 @@ def train():
 
 if __name__ == '__main__':
     set_np_formatting()
-    target_task = 'BallBalance'   # [BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, ShadowHandLSTM, ShadowHandFFOpenAI, ShadowHandFFOpenAITest, ShadowHandOpenAI, ShadowHandOpenAITest, Ingenuity]
+
+    # [BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, ShadowHandLSTM, ShadowHandFFOpenAI, ShadowHandFFOpenAITest, ShadowHandOpenAI, ShadowHandOpenAITest, Ingenuity]
+    # [MirobotCube]
+    target_task = 'MirobotCube'
     args = get_args(target_task=target_task, headless=False)
 
     cfg, cfg_train, logdir = load_cfg(args)

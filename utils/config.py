@@ -125,6 +125,8 @@ def retrieve_cfg(args, use_rlg_config=False):
             return os.path.join(args.logdir, "shadow_hand"), "cfg/train/rlpt/pytorch_ppo_shadow_hand.yaml", "cfg/shadow_hand_test.yaml"
         elif args.task == "Ingenuity":
             return os.path.join(args.logdir, "ingenuity"), "cfg/train/rlpt/pytorch_ppo_ingenuity.yaml", "cfg/ingenuity.yaml"
+        elif args.task == "MirobotCube":
+            return os.path.join(args.logdir, "ingenuity"), "cfg/train/rlpt/pytorch_ppo_mirobot_cube.yaml", "cfg/mirobot_cube.yaml"
         else:
             warn_task_name()
 
