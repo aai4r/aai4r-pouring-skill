@@ -9,8 +9,8 @@ policy: # only works for MlpPolicy right now
   activation: selu # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
 learn:
   agent_name: mirobot_ppo
-  test: False
-  resume: 0
+  test: True
+  resume: 5000
   save_interval: 100 # check for potential saves every this many iterations
   print_log: True
 

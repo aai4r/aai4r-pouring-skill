@@ -22,7 +22,7 @@ env:
   asset:
     assetRoot: "assets"
     assetFileNameMirobot: "urdf/mirobot_description/mirobot.urdf"
-    assetFileNameCube: "urdf/objects/cube_multicolor.urdf"
+    assetFileNameCube: "urdf/objects/cube.urdf"
 
 sim:
   substeps: 1

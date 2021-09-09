@@ -113,7 +113,7 @@ class MirobotCube(BaseTask):
 
         asset_root = "../assets"
         mirobot_asset_file = "urdf/mirobot_description/mirobot.urdf"
-        cube_asset_file = "urdf/objects/cube_multicolor.urdf"
+        cube_asset_file = "urdf/objects/cube.urdf"
 
         if "asset" in self.cfg["env"]:
             asset_root = self.cfg["env"]["asset"].get("assetRoot", asset_root)
@@ -132,9 +132,10 @@ class MirobotCube(BaseTask):
         mirobot_asset = self.gym.load_asset(self.sim, asset_root, mirobot_asset_file, asset_options)
 
         # load cube asset
-        asset_options.flip_visual_attachments = False
+        asset_options = gymapi.AssetOptions()
+        asset_options.fix_base_link = False
         asset_options.disable_gravity = False
-        asset_options.density = 400
+        asset_options.density = 40
         cube_asset = self.gym.load_asset(self.sim, asset_root, cube_asset_file, asset_options)
 
         mirobot_dof_stiffness = to_torch([400, 400, 400, 400, 400, 400, 1.0e6, 1.0e6], dtype=torch.float, device=self.device)
@@ -199,7 +200,7 @@ class MirobotCube(BaseTask):
             if self.aggregate_mode >= 3:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
 
-            mirobot_actor = self.gym.create_actor(env_ptr, mirobot_asset, franka_start_pose, "mirobot", i, 1, 0)
+            mirobot_actor = self.gym.create_actor(env_ptr, mirobot_asset, franka_start_pose, "mirobot", i, 1)
             self.gym.set_actor_dof_properties(env_ptr, mirobot_actor, franka_dof_props)
 
             if self.aggregate_mode == 2:
@@ -211,7 +212,7 @@ class MirobotCube(BaseTask):
             dy = np.random.rand() - 0.5
             cube_pose.p.y += self.start_position_noise * dy
             cube_pose.p.z = dz
-            cube_actor = self.gym.create_actor(env_ptr, cube_asset, cube_pose, "cube", i, 1, 0)
+            cube_actor = self.gym.create_actor(env_ptr, cube_asset, cube_pose, "cube", i, 2)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
