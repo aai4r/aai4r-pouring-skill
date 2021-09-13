@@ -10,7 +10,7 @@ policy: # only works for MlpPolicy right now
 learn:
   agent_name: franka_ppo
   test: False
-  resume: 0
+  resume: z0
   save_interval: 100 # check for potential saves every this many iterations
   print_log: True
 

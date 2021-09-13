@@ -51,10 +51,10 @@ class MirobotCube(BaseTask):
         self.prop_length = 0.08
         self.prop_spacing = 0.09
 
-        num_obs = 26
+        num_obs = 19
         num_acts = 8
 
-        self.cfg["env"]["numObservations"] = 26
+        self.cfg["env"]["numObservations"] = 19
         self.cfg["env"]["numActions"] = 8
 
         self.cfg["device_type"] = device_type
@@ -73,7 +73,7 @@ class MirobotCube(BaseTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
         # create some wrapper tensors for different slices
-        self.franka_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), 0.035, 0.035], device=self.device)
+        self.franka_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), 0.017, 0.017], device=self.device)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.franka_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, :self.num_franka_dofs]
         self.franka_dof_pos = self.franka_dof_state[..., 0]
@@ -133,9 +133,9 @@ class MirobotCube(BaseTask):
 
         # load cube asset
         asset_options = gymapi.AssetOptions()
-        asset_options.fix_base_link = False
+        asset_options.fix_base_link = True
         asset_options.disable_gravity = False
-        asset_options.density = 40
+        asset_options.density = 400
         cube_asset = self.gym.load_asset(self.sim, asset_root, cube_asset_file, asset_options)
 
         mirobot_dof_stiffness = to_torch([400, 400, 400, 400, 400, 400, 1.0e6, 1.0e6], dtype=torch.float, device=self.device)
@@ -228,7 +228,7 @@ class MirobotCube(BaseTask):
             self.mirobots.append(mirobot_actor)
             self.cubes.append(cube_actor)
 
-        self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "mirobot_hand")
+        self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "Link6")
         self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "left_finger")
         self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "right_finger")
         self.cube_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cube_actor, "cube")
@@ -237,7 +237,7 @@ class MirobotCube(BaseTask):
         self.init_data()
 
     def init_data(self):
-        hand = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "mirobot_hand")
+        hand = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "Link6")
         lfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "left_finger")
         rfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "right_finger")
 
@@ -252,7 +252,7 @@ class MirobotCube(BaseTask):
         hand_pose_inv = hand_pose.inverse()
         grasp_pose_axis = 2
         franka_local_grasp_pose = hand_pose_inv * finger_pose
-        franka_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(0.06, grasp_pose_axis))
+        franka_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(-0.025, grasp_pose_axis))
         self.franka_local_grasp_pos = to_torch([franka_local_grasp_pose.p.x, franka_local_grasp_pose.p.y,
                                                 franka_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.franka_local_grasp_rot = to_torch([franka_local_grasp_pose.r.x, franka_local_grasp_pose.r.y,
@@ -295,10 +295,15 @@ class MirobotCube(BaseTask):
         )
 
     def compute_observations(self):
-
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+        hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
+        hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
+
+        self.mirobot_grasp_rot[:], self.mirobot_grasp_pos[:] = \
+            compute_grasp_transforms(hand_rot, hand_pos, self.franka_local_grasp_rot, self.franka_local_grasp_pos)
 
         self.franka_lfinger_pos = self.rigid_body_states[:, self.lfinger_handle][:, 0:3]
         self.franka_rfinger_pos = self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
@@ -306,10 +311,11 @@ class MirobotCube(BaseTask):
         self.franka_rfinger_rot = self.rigid_body_states[:, self.rfinger_handle][:, 3:7]
 
         z_offset = 0.025
-        self.mirobot_grasp_pos = (self.franka_lfinger_pos + self.franka_rfinger_pos) * 0.5
+        # self.mirobot_grasp_pos = (self.franka_lfinger_pos + self.franka_rfinger_pos) / 2.0
+        # self.mirobot_grasp_pos = hand_pos
         vec = to_torch([0, 0, 1], device=self.device).repeat(len(self.franka_lfinger_rot), 1)
-        self.mirobot_grasp_pos += quat_apply(self.franka_lfinger_rot, vec * z_offset)
-        self.mirobot_grasp_rot = self.franka_lfinger_rot
+        # self.mirobot_grasp_pos += quat_apply(self.franka_lfinger_rot, vec * z_offset)
+        # self.mirobot_grasp_rot = self.franka_lfinger_rot
 
         # cube info
         self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
@@ -320,15 +326,13 @@ class MirobotCube(BaseTask):
 
         dof_pos_scaled = (2.0 * (self.franka_dof_pos - self.franka_dof_lower_limits)
                           / (self.franka_dof_upper_limits - self.franka_dof_lower_limits) - 1.0)
-        to_target = self.mirobot_grasp_pos - self.cube_grasp_pos
-        self.obs_buf = torch.cat((dof_pos_scaled, self.franka_dof_vel * self.dof_vel_scale, to_target,
-                                  self.cube_pos, self.cube_rot), dim=-1)
+        to_target = self.cube_grasp_pos - self.mirobot_grasp_pos
+        self.obs_buf = torch.cat((dof_pos_scaled, self.franka_dof_vel * self.dof_vel_scale, to_target), dim=-1)
 
         return self.obs_buf
 
     def reset(self, env_ids):
         env_ids_int32 = env_ids.to(dtype=torch.int32)
-
         # reset mirobot
         pos = tensor_clamp(
             self.franka_default_dof_pos.unsqueeze(0) + 0.25 * (torch.rand((len(env_ids), self.num_franka_dofs), device=self.device) - 0.5),
@@ -362,6 +366,8 @@ class MirobotCube(BaseTask):
         self.reset_buf[env_ids] = 0
 
     def pre_physics_step(self, actions):
+        # act_grip_mean = actions[:, 6:8].mean(dim=-1)
+        # actions[:, 6], actions[:, 7] = act_grip_mean, act_grip_mean
         self.actions = actions.clone().to(self.device)
         targets = self.franka_dof_targets[:, :self.num_franka_dofs] + self.franka_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.franka_dof_targets[:, :self.num_franka_dofs] = tensor_clamp(
@@ -386,7 +392,16 @@ class MirobotCube(BaseTask):
             self.gym.refresh_rigid_body_state_tensor(self.sim)
 
             for i in range(self.num_envs):
-                # # cube grasp pose
+                # px = (self.hand_pos[i] + quat_apply(self.hand_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.hand_pos[i] + quat_apply(self.hand_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.hand_pos[i] + quat_apply(self.hand_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                #
+                # p0 = self.hand_pos[i].cpu().numpy()
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
+                # cube grasp pose
                 px = (self.cube_grasp_pos[i] + quat_apply(self.cube_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
                 py = (self.cube_grasp_pos[i] + quat_apply(self.cube_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
                 pz = (self.cube_grasp_pos[i] + quat_apply(self.cube_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
@@ -445,7 +460,9 @@ def compute_franka_reward(
     d = torch.norm(mirobot_grasp_pos - cube_grasp_pos, p=2, dim=-1)
     dist_reward = 1.0 / (1.0 + d ** 2)
     dist_reward *= dist_reward
-    dist_reward = torch.where(d <= 0.02, dist_reward * 2, dist_reward)
+    dist_reward = torch.where(d <= 0.02, dist_reward * 2,
+                              torch.where(d <= 0.035, dist_reward * 1.5,
+                                          torch.where(d <= 0.05, dist_reward * 1.2, dist_reward)))
 
     # # distance from hand to the drawer
     # d = torch.norm(franka_grasp_pos - drawer_grasp_pos, p=2, dim=-1)
@@ -456,7 +473,7 @@ def compute_franka_reward(
     axis1 = tf_vector(mirobot_grasp_rot, gripper_forward_axis)
     axis2 = tf_vector(cube_grasp_rot, cube_down_axis)
     dot1 = torch.bmm(axis1.view(num_envs, 1, 3), axis2.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # alignment of forward axis for gripper
-    rot_reward = 1.0 * (torch.sign(dot1) * dot1 ** 2)
+    rot_reward = 0.5 * (torch.sign(dot1) * dot1 ** 2)
 
     # axis1 = tf_vector(franka_grasp_rot, gripper_forward_axis)
     # axis2 = tf_vector(drawer_grasp_rot, drawer_inward_axis)
