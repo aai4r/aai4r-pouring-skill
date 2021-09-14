@@ -258,7 +258,7 @@ class MirobotCube(BaseTask):
                                                 mirobot_local_grasp_pose.r.z, mirobot_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         cube_local_grasp_pose = gymapi.Transform()
-        cube_local_grasp_pose.p = gymapi.Vec3(*get_axis_params(0.06, grasp_pose_axis))
+        cube_local_grasp_pose.p = gymapi.Vec3(*get_axis_params(0.005, grasp_pose_axis))
         cube_local_grasp_pose.r = gymapi.Quat(0, 0, 0, 1)
         self.cube_local_grasp_pos = to_torch([cube_local_grasp_pose.p.x, cube_local_grasp_pose.p.y,
                                               cube_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
@@ -304,10 +304,10 @@ class MirobotCube(BaseTask):
         self.mirobot_grasp_rot[:], self.mirobot_grasp_pos[:] = \
             compute_grasp_transforms(hand_rot, hand_pos, self.mirobot_local_grasp_rot, self.mirobot_local_grasp_pos)
 
-        self.franka_lfinger_pos = self.rigid_body_states[:, self.lfinger_handle][:, 0:3]
-        self.franka_rfinger_pos = self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
-        self.franka_lfinger_rot = self.rigid_body_states[:, self.lfinger_handle][:, 3:7]
-        self.franka_rfinger_rot = self.rigid_body_states[:, self.rfinger_handle][:, 3:7]
+        self.mirobot_lfinger_pos = self.rigid_body_states[:, self.lfinger_handle][:, 0:3]
+        self.mirobot_rfinger_pos = self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
+        self.mirobot_lfinger_rot = self.rigid_body_states[:, self.lfinger_handle][:, 3:7]
+        self.mirobot_rfinger_rot = self.rigid_body_states[:, self.rfinger_handle][:, 3:7]
 
         # cube info
         self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
@@ -349,7 +349,7 @@ class MirobotCube(BaseTask):
         pick[:, 3:7] = quat
         xy_scale = to_torch([0.12, 0.2, 0.0,            # position
                              0.0, 0.0, 0.0, 0.0,        # rotation
-                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).repeat(len(pick), 1)
+                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
         rand_cube_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
         self.cube_states[env_ids] = pick + rand_cube_pos
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
@@ -370,8 +370,8 @@ class MirobotCube(BaseTask):
         self.reset_buf[env_ids] = 0
 
     def pre_physics_step(self, actions):
-        # act_grip_mean = actions[:, 6:8].mean(dim=-1)
-        # actions[:, 6], actions[:, 7] = act_grip_mean, act_grip_mean
+        act_grip_mean = actions[:, 6:8].mean(dim=-1)
+        actions[:, 6], actions[:, 7] = act_grip_mean, act_grip_mean
         self.actions = actions.clone().to(self.device)
         targets = self.franka_dof_targets[:, :self.num_franka_dofs] + self.mirobot_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.franka_dof_targets[:, :self.num_franka_dofs] = tensor_clamp(
@@ -425,20 +425,20 @@ class MirobotCube(BaseTask):
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # px = (self.franka_lfinger_pos[i] + quat_apply(self.franka_lfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.franka_lfinger_pos[i] + quat_apply(self.franka_lfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.franka_lfinger_pos[i] + quat_apply(self.franka_lfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                # px = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
                 #
-                # p0 = self.franka_lfinger_pos[i].cpu().numpy()
+                # p0 = self.mirobot_lfinger_pos[i].cpu().numpy()
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
                 #
-                # px = (self.franka_rfinger_pos[i] + quat_apply(self.franka_rfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.franka_rfinger_pos[i] + quat_apply(self.franka_rfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.franka_rfinger_pos[i] + quat_apply(self.franka_rfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                # px = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
                 #
-                # p0 = self.franka_rfinger_pos[i].cpu().numpy()
+                # p0 = self.mirobot_rfinger_pos[i].cpu().numpy()
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
@@ -499,21 +499,31 @@ def compute_franka_reward(
     # reward handling around the grasping
     around_handle_reward = torch.norm(mirobot_lfinger_pos - mirobot_rfinger_pos, p=2, dim=-1)
 
-    # regularization on the actions (summed for each environment)
-    action_penalty = torch.sum(actions ** 2, dim=-1)
-    rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward - action_penalty * action_penalty_scale
-
-    # approach reward
-    rewards = torch.where((d <= 0.01) & ((1 - dot1) <= 0.01) & ((1 - dot2) <= 0.01), rewards * 2.0, rewards)
-
     # finger reward
+    finger_dist = torch.norm(mirobot_lfinger_pos - mirobot_rfinger_pos, p=2, dim=-1)
+    cube_size = 0.02
+    finger_dist_reward = torch.where(finger_dist >= cube_size, 0.1, 0.0)
 
     # cube lifting reward
-    # lift_reward = cube_pos[:, 2]
-    # rewards = torch.where(lift_reward > 0.5, rewards + 1.0,
-    #                       torch.where(lift_reward > 0.4, rewards + 0.8,
-    #                                   torch.where(lift_reward > 0.3, rewards + 0.5,
-    #                                               torch.where(lift_reward > 0.2, rewards + 0.25, rewards))))
+    lift_reward_scale = 5.0
+    des_height = 0.1
+    lift_dist = torch.norm(des_height - cube_pos[:, 2], p=2, dim=-1)
+    lift_reward = torch.exp(-15.0 * lift_dist)
+
+    # regularization on the actions (summed for each environment)
+    action_penalty = torch.sum(actions ** 2, dim=-1)
+    rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + lift_reward * lift_reward_scale + \
+              finger_dist_reward_scale * finger_dist_reward - action_penalty * action_penalty_scale
+
+    # approach success bonus
+    approach_done = (d <= 0.01) & ((1 - dot1) <= 0.05) & ((1 - dot2) <= 0.05)
+    rewards = torch.where(approach_done, rewards * 2.0, rewards)
+    rewards = torch.where(lift_dist < 0.01, rewards * 3.0, rewards)
+
+    # rewards = torch.where(cube_height > 0.1, rewards + 1.0,
+    #                       torch.where(cube_height > 0.07, rewards + 0.8,
+    #                                   torch.where(cube_height > 0.04, rewards + 0.5,
+    #                                               torch.where(cube_height > 0.02, rewards + 0.25, rewards))))
 
     # how far the cabinet has been opened out
     # open_reward = cabinet_dof_pos[:, 3]  # drawer_top_joint
@@ -541,6 +551,7 @@ def compute_franka_reward(
     #                         torch.ones_like(reset_buf), reset_buf)
 
     # reset_buf = torch.where(d < 0.01, torch.ones_like(reset_buf), reset_buf)
+    reset_buf = torch.where(lift_dist < 0.01, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
 
     return rewards, reset_buf
