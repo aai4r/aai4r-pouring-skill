@@ -51,10 +51,10 @@ class MirobotCube(BaseTask):
         self.prop_length = 0.08
         self.prop_spacing = 0.09
 
-        num_obs = 19
+        num_obs = 23
         num_acts = 8
 
-        self.cfg["env"]["numObservations"] = 19
+        self.cfg["env"]["numObservations"] = 23
         self.cfg["env"]["numActions"] = 8
 
         self.cfg["device_type"] = device_type
@@ -326,8 +326,10 @@ class MirobotCube(BaseTask):
 
         dof_pos_scaled = (2.0 * (self.franka_dof_pos - self.franka_dof_lower_limits)
                           / (self.franka_dof_upper_limits - self.franka_dof_lower_limits) - 1.0)
-        to_target = self.cube_grasp_pos - self.mirobot_grasp_pos
-        self.obs_buf = torch.cat((dof_pos_scaled, self.franka_dof_vel * self.dof_vel_scale, to_target), dim=-1)
+        to_target_pos = self.cube_grasp_pos - self.mirobot_grasp_pos
+        to_target_rot = quat_mul(quat_conjugate(self.cube_grasp_rot), self.mirobot_grasp_rot)
+        self.obs_buf = torch.cat((dof_pos_scaled, self.franka_dof_vel * self.dof_vel_scale,
+                                  to_target_pos, to_target_rot), dim=-1)
 
         return self.obs_buf
 
@@ -353,7 +355,7 @@ class MirobotCube(BaseTask):
 
         pick = self.default_cube_states[env_ids]
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.15, 0.2, 0.0,            # position
+        xy_scale = to_torch([0.12, 0.2, 0.0,            # position
                              0.0, 0.0, 0.0, 0.0,        # rotation
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0]).repeat(len(pick), 1)
         rand_cube_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
@@ -509,6 +511,11 @@ def compute_franka_reward(
     action_penalty = torch.sum(actions ** 2, dim=-1)
     rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward - action_penalty * action_penalty_scale
 
+    # approach reward
+    rewards = torch.where((d <= 0.01) & ((1 - dot1) <= 0.01) & ((1 - dot2) <= 0.01), rewards * 2.0, rewards)
+
+    # finger reward
+
     # cube lifting reward
     # lift_reward = cube_pos[:, 2]
     # rewards = torch.where(lift_reward > 0.5, rewards + 1.0,
@@ -541,7 +548,7 @@ def compute_franka_reward(
     # reset_buf = torch.where(franka_rfinger_pos[:, 0] < drawer_grasp_pos[:, 0] - distX_offset,
     #                         torch.ones_like(reset_buf), reset_buf)
 
-    reset_buf = torch.where(d < 0.01, torch.ones_like(reset_buf), reset_buf)
+    # reset_buf = torch.where(d < 0.01, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
 
     return rewards, reset_buf
