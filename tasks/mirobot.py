@@ -73,11 +73,11 @@ class MirobotCube(BaseTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
         # create some wrapper tensors for different slices
-        self.franka_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), 0.017, 0.017], device=self.device)
+        self.mirobot_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), 0.017, 0.017], device=self.device)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
-        self.franka_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, :self.num_franka_dofs]
-        self.franka_dof_pos = self.franka_dof_state[..., 0]
-        self.franka_dof_vel = self.franka_dof_state[..., 1]
+        self.mirobot_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, :self.num_franka_dofs]
+        self.mirobot_dof_pos = self.mirobot_dof_state[..., 0]
+        self.mirobot_dof_vel = self.mirobot_dof_state[..., 1]
 
         self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_tensor).view(self.num_envs, -1, 13)
         self.num_bodies = self.rigid_body_states.shape[1]
@@ -97,8 +97,7 @@ class MirobotCube(BaseTask):
         self.sim_params.gravity.x = 0
         self.sim_params.gravity.y = 0
         self.sim_params.gravity.z = -9.81
-        self.sim = super().create_sim(
-            self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
+        self.sim = super().create_sim(self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
         self._create_ground_plane()
         self._create_envs(self.num_envs, self.cfg["env"]['envSpacing'], int(np.sqrt(self.num_envs)))
 
@@ -144,31 +143,31 @@ class MirobotCube(BaseTask):
         self.num_franka_bodies = self.gym.get_asset_rigid_body_count(mirobot_asset)
         self.num_franka_dofs = self.gym.get_asset_dof_count(mirobot_asset)
 
-        print("num franka bodies: ", self.num_franka_bodies)
-        print("num franka dofs: ", self.num_franka_dofs)
+        print("num mirobot bodies: ", self.num_franka_bodies)
+        print("num mirobot dofs: ", self.num_franka_dofs)
 
         # set franka dof properties
-        franka_dof_props = self.gym.get_asset_dof_properties(mirobot_asset)
-        self.franka_dof_lower_limits = []
-        self.franka_dof_upper_limits = []
+        mirobot_dof_props = self.gym.get_asset_dof_properties(mirobot_asset)
+        self.mirobot_dof_lower_limits = []
+        self.mirobot_dof_upper_limits = []
         for i in range(self.num_franka_dofs):
-            franka_dof_props['driveMode'][i] = gymapi.DOF_MODE_POS
+            mirobot_dof_props['driveMode'][i] = gymapi.DOF_MODE_POS
             if self.physics_engine == gymapi.SIM_PHYSX:
-                franka_dof_props['stiffness'][i] = mirobot_dof_stiffness[i]
-                franka_dof_props['damping'][i] = mirobot_dof_damping[i]
+                mirobot_dof_props['stiffness'][i] = mirobot_dof_stiffness[i]
+                mirobot_dof_props['damping'][i] = mirobot_dof_damping[i]
             else:
-                franka_dof_props['stiffness'][i] = 7000.0
-                franka_dof_props['damping'][i] = 50.0
+                mirobot_dof_props['stiffness'][i] = 7000.0
+                mirobot_dof_props['damping'][i] = 50.0
 
-            self.franka_dof_lower_limits.append(franka_dof_props['lower'][i])
-            self.franka_dof_upper_limits.append(franka_dof_props['upper'][i])
+            self.mirobot_dof_lower_limits.append(mirobot_dof_props['lower'][i])
+            self.mirobot_dof_upper_limits.append(mirobot_dof_props['upper'][i])
 
-        self.franka_dof_lower_limits = to_torch(self.franka_dof_lower_limits, device=self.device)
-        self.franka_dof_upper_limits = to_torch(self.franka_dof_upper_limits, device=self.device)
-        self.franka_dof_speed_scales = torch.ones_like(self.franka_dof_lower_limits)
-        self.franka_dof_speed_scales[[6, 7]] = 0.1
-        franka_dof_props['effort'][6] = 200
-        franka_dof_props['effort'][7] = 200
+        self.mirobot_dof_lower_limits = to_torch(self.mirobot_dof_lower_limits, device=self.device)
+        self.mirobot_dof_upper_limits = to_torch(self.mirobot_dof_upper_limits, device=self.device)
+        self.mirobot_dof_speed_scales = torch.ones_like(self.mirobot_dof_lower_limits)
+        self.mirobot_dof_speed_scales[[6, 7]] = 0.1
+        mirobot_dof_props['effort'][6] = 200
+        mirobot_dof_props['effort'][7] = 200
 
         franka_start_pose = gymapi.Transform()
         franka_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
@@ -201,7 +200,7 @@ class MirobotCube(BaseTask):
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
 
             mirobot_actor = self.gym.create_actor(env_ptr, mirobot_asset, franka_start_pose, "mirobot", i, 1)
-            self.gym.set_actor_dof_properties(env_ptr, mirobot_actor, franka_dof_props)
+            self.gym.set_actor_dof_properties(env_ptr, mirobot_actor, mirobot_dof_props)
 
             if self.aggregate_mode == 2:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
@@ -251,12 +250,12 @@ class MirobotCube(BaseTask):
 
         hand_pose_inv = hand_pose.inverse()
         grasp_pose_axis = 2
-        franka_local_grasp_pose = hand_pose_inv * finger_pose
-        franka_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(-0.025, grasp_pose_axis))
-        self.franka_local_grasp_pos = to_torch([franka_local_grasp_pose.p.x, franka_local_grasp_pose.p.y,
-                                                franka_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
-        self.franka_local_grasp_rot = to_torch([franka_local_grasp_pose.r.x, franka_local_grasp_pose.r.y,
-                                                franka_local_grasp_pose.r.z, franka_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
+        mirobot_local_grasp_pose = hand_pose_inv * finger_pose
+        mirobot_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(-0.025, grasp_pose_axis))
+        self.mirobot_local_grasp_pos = to_torch([mirobot_local_grasp_pose.p.x, mirobot_local_grasp_pose.p.y,
+                                                mirobot_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+        self.mirobot_local_grasp_rot = to_torch([mirobot_local_grasp_pose.r.x, mirobot_local_grasp_pose.r.y,
+                                                mirobot_local_grasp_pose.r.z, mirobot_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         cube_local_grasp_pose = gymapi.Transform()
         cube_local_grasp_pose.p = gymapi.Vec3(*get_axis_params(0.06, grasp_pose_axis))
@@ -268,27 +267,27 @@ class MirobotCube(BaseTask):
 
         self.gripper_forward_axis = to_torch([0, 0, 1], device=self.device).repeat((self.num_envs, 1))
         self.cube_down_axis = to_torch([0, 0, -1], device=self.device).repeat((self.num_envs, 1))
-        self.gripper_right_axis = to_torch([0, -1, 0], device=self.device).repeat((self.num_envs, 1))    # TODO, right
+        self.gripper_right_axis = to_torch([0, -1, 0], device=self.device).repeat((self.num_envs, 1))
         self.cube_left_axis = to_torch([0, 1, 0], device=self.device).repeat((self.num_envs, 1))
 
         self.cube_grasp_pos = torch.zeros_like(self.cube_local_grasp_pos)
         self.cube_grasp_rot = torch.zeros_like(self.cube_local_grasp_rot)
 
-        self.mirobot_grasp_pos = torch.zeros_like(self.franka_local_grasp_pos)
-        self.mirobot_grasp_rot = torch.zeros_like(self.franka_local_grasp_rot)
+        self.mirobot_grasp_pos = torch.zeros_like(self.mirobot_local_grasp_pos)
+        self.mirobot_grasp_rot = torch.zeros_like(self.mirobot_local_grasp_rot)
         self.mirobot_grasp_rot[..., -1] = 1  # xyzw
 
-        self.franka_lfinger_pos = torch.zeros_like(self.franka_local_grasp_pos)
-        self.franka_rfinger_pos = torch.zeros_like(self.franka_local_grasp_pos)
-        self.franka_lfinger_rot = torch.zeros_like(self.franka_local_grasp_rot)
-        self.franka_rfinger_rot = torch.zeros_like(self.franka_local_grasp_rot)
+        self.mirobot_lfinger_pos = torch.zeros_like(self.mirobot_local_grasp_pos)
+        self.mirobot_rfinger_pos = torch.zeros_like(self.mirobot_local_grasp_pos)
+        self.mirobot_lfinger_rot = torch.zeros_like(self.mirobot_local_grasp_rot)
+        self.mirobot_rfinger_rot = torch.zeros_like(self.mirobot_local_grasp_rot)
 
     def compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf[:] = compute_franka_reward(
             self.reset_buf, self.progress_buf, self.actions,
             self.cube_grasp_pos, self.cube_grasp_rot, self.cube_pos,
             self.mirobot_grasp_pos, self.mirobot_grasp_rot,
-            self.franka_lfinger_pos, self.franka_rfinger_pos,
+            self.mirobot_lfinger_pos, self.mirobot_rfinger_pos,
             self.gripper_forward_axis, self.cube_down_axis, self.gripper_right_axis, self.cube_left_axis,
             self.num_envs, self.dist_reward_scale, self.rot_reward_scale, self.around_handle_reward_scale, self.open_reward_scale,
             self.finger_dist_reward_scale, self.action_penalty_scale, self.distX_offset, self.max_episode_length
@@ -303,19 +302,12 @@ class MirobotCube(BaseTask):
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
 
         self.mirobot_grasp_rot[:], self.mirobot_grasp_pos[:] = \
-            compute_grasp_transforms(hand_rot, hand_pos, self.franka_local_grasp_rot, self.franka_local_grasp_pos)
+            compute_grasp_transforms(hand_rot, hand_pos, self.mirobot_local_grasp_rot, self.mirobot_local_grasp_pos)
 
         self.franka_lfinger_pos = self.rigid_body_states[:, self.lfinger_handle][:, 0:3]
         self.franka_rfinger_pos = self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
         self.franka_lfinger_rot = self.rigid_body_states[:, self.lfinger_handle][:, 3:7]
         self.franka_rfinger_rot = self.rigid_body_states[:, self.rfinger_handle][:, 3:7]
-
-        z_offset = 0.025
-        # self.mirobot_grasp_pos = (self.franka_lfinger_pos + self.franka_rfinger_pos) / 2.0
-        # self.mirobot_grasp_pos = hand_pos
-        vec = to_torch([0, 0, 1], device=self.device).repeat(len(self.franka_lfinger_rot), 1)
-        # self.mirobot_grasp_pos += quat_apply(self.franka_lfinger_rot, vec * z_offset)
-        # self.mirobot_grasp_rot = self.franka_lfinger_rot
 
         # cube info
         self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
@@ -324,11 +316,11 @@ class MirobotCube(BaseTask):
         self.cube_grasp_rot[:], self.cube_grasp_pos[:] = \
             tf_combine(self.cube_rot, self.cube_pos, self.cube_local_grasp_rot, self.cube_local_grasp_pos)
 
-        dof_pos_scaled = (2.0 * (self.franka_dof_pos - self.franka_dof_lower_limits)
-                          / (self.franka_dof_upper_limits - self.franka_dof_lower_limits) - 1.0)
+        dof_pos_scaled = (2.0 * (self.mirobot_dof_pos - self.mirobot_dof_lower_limits)
+                          / (self.mirobot_dof_upper_limits - self.mirobot_dof_lower_limits) - 1.0)
         to_target_pos = self.cube_grasp_pos - self.mirobot_grasp_pos
         to_target_rot = quat_mul(quat_conjugate(self.cube_grasp_rot), self.mirobot_grasp_rot)
-        self.obs_buf = torch.cat((dof_pos_scaled, self.franka_dof_vel * self.dof_vel_scale,
+        self.obs_buf = torch.cat((dof_pos_scaled, self.mirobot_dof_vel * self.dof_vel_scale,
                                   to_target_pos, to_target_rot), dim=-1)
 
         return self.obs_buf
@@ -337,10 +329,10 @@ class MirobotCube(BaseTask):
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         # reset mirobot
         pos = tensor_clamp(
-            self.franka_default_dof_pos.unsqueeze(0) + 0.25 * (torch.rand((len(env_ids), self.num_franka_dofs), device=self.device) - 0.5),
-            self.franka_dof_lower_limits, self.franka_dof_upper_limits)
-        self.franka_dof_pos[env_ids, :] = pos
-        self.franka_dof_vel[env_ids, :] = torch.zeros_like(self.franka_dof_vel[env_ids])
+            self.mirobot_default_dof_pos.unsqueeze(0) + 0.25 * (torch.rand((len(env_ids), self.num_franka_dofs), device=self.device) - 0.5),
+            self.mirobot_dof_lower_limits, self.mirobot_dof_upper_limits)
+        self.mirobot_dof_pos[env_ids, :] = pos
+        self.mirobot_dof_vel[env_ids, :] = torch.zeros_like(self.mirobot_dof_vel[env_ids])
         self.franka_dof_targets[env_ids, :self.num_franka_dofs] = pos
 
         # reset cube
@@ -381,9 +373,9 @@ class MirobotCube(BaseTask):
         # act_grip_mean = actions[:, 6:8].mean(dim=-1)
         # actions[:, 6], actions[:, 7] = act_grip_mean, act_grip_mean
         self.actions = actions.clone().to(self.device)
-        targets = self.franka_dof_targets[:, :self.num_franka_dofs] + self.franka_dof_speed_scales * self.dt * self.actions * self.action_scale
+        targets = self.franka_dof_targets[:, :self.num_franka_dofs] + self.mirobot_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.franka_dof_targets[:, :self.num_franka_dofs] = tensor_clamp(
-            targets, self.franka_dof_lower_limits, self.franka_dof_upper_limits)
+            targets, self.mirobot_dof_lower_limits, self.mirobot_dof_upper_limits)
         env_ids_int32 = torch.arange(self.num_envs, dtype=torch.int32, device=self.device)
         self.gym.set_dof_position_target_tensor(self.sim,
                                                 gymtorch.unwrap_tensor(self.franka_dof_targets))
@@ -461,7 +453,7 @@ def compute_franka_reward(
     reset_buf, progress_buf, actions,
     cube_grasp_pos, cube_grasp_rot, cube_pos,
     mirobot_grasp_pos, mirobot_grasp_rot,
-    franka_lfinger_pos, franka_rfinger_pos,
+    mirobot_lfinger_pos, mirobot_rfinger_pos,
     gripper_forward_axis, cube_down_axis, gripper_right_axis, cube_left_axis,
     num_envs, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
     finger_dist_reward_scale, action_penalty_scale, distX_offset, max_episode_length
@@ -505,7 +497,7 @@ def compute_franka_reward(
     #                                              (0.04 - lfinger_dist) + (0.04 - rfinger_dist), finger_dist_reward), finger_dist_reward)
 
     # reward handling around the grasping
-    around_handle_reward = torch.norm(franka_lfinger_pos - franka_rfinger_pos, p=2, dim=-1)
+    around_handle_reward = torch.norm(mirobot_lfinger_pos - mirobot_rfinger_pos, p=2, dim=-1)
 
     # regularization on the actions (summed for each environment)
     action_penalty = torch.sum(actions ** 2, dim=-1)
@@ -555,10 +547,10 @@ def compute_franka_reward(
 
 
 @torch.jit.script
-def compute_grasp_transforms(hand_rot, hand_pos, franka_local_grasp_rot, franka_local_grasp_pos):
+def compute_grasp_transforms(hand_rot, hand_pos, mirobot_local_grasp_rot, mirobot_local_grasp_pos):
     # type: (Tensor, Tensor, Tensor, Tensor) -> Tuple[Tensor, Tensor]
 
     global_franka_rot, global_franka_pos = tf_combine(
-        hand_rot, hand_pos, franka_local_grasp_rot, franka_local_grasp_pos)
+        hand_rot, hand_pos, mirobot_local_grasp_rot, mirobot_local_grasp_pos)
 
     return global_franka_rot, global_franka_pos
