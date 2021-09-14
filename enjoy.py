@@ -1,10 +1,12 @@
+import os
+
 from utils.config import set_np_formatting, set_seed, get_args, parse_sim_params, load_cfg
 from utils.parse_task import parse_task
 from utils.process_ppo import process_ppo
 import torch
 
 
-def test():
+def test(resume=None):
     if torch.cuda.device_count() > 1:
         args.compute_device_id = 1
         args.device_id = 1
@@ -16,8 +18,17 @@ def test():
 
         cfg['device_id'] = 1
         cfg['env']['numEnvs'] = 64
-        cfg_train['resume'] = 8900
-        cfg_train['learn']['resume'] = 8900
+
+        if not resume:
+            file_list = os.listdir(logdir)
+            file_list = list(filter(lambda x: 'model_' in x, file_list))
+            file_list.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
+            latest_num = file_list[-1].split('_')[-1].split('.')[0]
+        else:
+            latest_num = resume
+
+        cfg_train['resume'] = latest_num
+        cfg_train['learn']['resume'] = latest_num
 
     print("args: ", args)
     print("cfg: ", cfg)

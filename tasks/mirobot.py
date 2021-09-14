@@ -471,7 +471,11 @@ def compute_franka_reward(
     axis3 = tf_vector(mirobot_grasp_rot, gripper_right_axis)
     axis4 = tf_vector(cube_grasp_rot, cube_left_axis)
     dot2 = torch.bmm(axis3.view(num_envs, 1, 3), axis4.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # alignment of forward axis for gripper
-    rot_reward = 0.5 * torch.exp(-5.0 * (1.0 - dot1)) + 0.5 * torch.exp(-5.0 * (1.0 - dot2))
+
+    axis5 = tf_vector(cube_grasp_rot, gripper_forward_axis)
+    axis6 = gripper_forward_axis
+    dot3 = torch.bmm(axis5.view(num_envs, 1, 3), axis6.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # check the cube fallen
+    rot_reward = 0.5 * torch.exp(-5.0 * (1.0 - dot1)) + 0.5 * torch.exp(-5.0 * (1.0 - dot2)) - (1 - dot3) * 0.5
 
     # axis1 = tf_vector(franka_grasp_rot, gripper_forward_axis)
     # axis2 = tf_vector(drawer_grasp_rot, drawer_inward_axis)
@@ -512,12 +516,15 @@ def compute_franka_reward(
 
     # regularization on the actions (summed for each environment)
     action_penalty = torch.sum(actions ** 2, dim=-1)
-    rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + lift_reward * lift_reward_scale + \
+    rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
               finger_dist_reward_scale * finger_dist_reward - action_penalty * action_penalty_scale
 
     # approach success bonus
-    approach_done = (d <= 0.01) & ((1 - dot1) <= 0.05) & ((1 - dot2) <= 0.05)
-    rewards = torch.where(approach_done, rewards * 2.0, rewards)
+    approach_done = (d <= 0.01) & ((1 - dot1) <= 0.02) & ((1 - dot2) <= 0.02)
+    grasp_done = finger_dist <= cube_size + 0.001
+    rewards = torch.where(approach_done & grasp_done, rewards + 1.0 + lift_reward,
+                          torch.where(approach_done, rewards + 0.8, rewards))
+
     rewards = torch.where(lift_dist < 0.01, rewards * 3.0, rewards)
 
     # rewards = torch.where(cube_height > 0.1, rewards + 1.0,
@@ -551,6 +558,7 @@ def compute_franka_reward(
     #                         torch.ones_like(reset_buf), reset_buf)
 
     # reset_buf = torch.where(d < 0.01, torch.ones_like(reset_buf), reset_buf)
+    reset_buf = torch.where(dot3 < 0.9, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(lift_dist < 0.01, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
 
