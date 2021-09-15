@@ -85,7 +85,7 @@ class PPO:
         # Log
         self.log_dir = log_dir
         self.print_log = print_log
-        self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+        self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10) if self.print_log else None
         self.tot_timesteps = 0
         self.tot_time = 0
         self.is_testing = is_testing

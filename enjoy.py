@@ -29,6 +29,7 @@ def test(resume=None):
 
         cfg_train['resume'] = latest_num
         cfg_train['learn']['resume'] = latest_num
+        cfg_train['learn']['print_log'] = False     # tensorboard log
 
     print("args: ", args)
     print("cfg: ", cfg)
