@@ -247,13 +247,27 @@ class MirobotCube(BaseTask):
         finger_pose.r = lfinger_pose.r
 
         hand_pose_inv = hand_pose.inverse()
-        grasp_pose_axis = 2
+        grasp_pose_axis = 2     # z-axis
         mirobot_local_grasp_pose = hand_pose_inv * finger_pose
         mirobot_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(-0.025, grasp_pose_axis))
         self.mirobot_local_grasp_pos = to_torch([mirobot_local_grasp_pose.p.x, mirobot_local_grasp_pose.p.y,
                                                 mirobot_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.mirobot_local_grasp_rot = to_torch([mirobot_local_grasp_pose.r.x, mirobot_local_grasp_pose.r.y,
                                                 mirobot_local_grasp_pose.r.z, mirobot_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
+
+        _lfinger_pose = gymapi.Transform()
+        _lfinger_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
+        self.mirobot_local_lfinger_pos = to_torch([_lfinger_pose.p.x, _lfinger_pose.p.y,
+                                                   _lfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+        self.mirobot_local_lfinger_rot = to_torch([_lfinger_pose.r.x, _lfinger_pose.r.y,
+                                                   _lfinger_pose.r.z, _lfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
+
+        _rfinger_pose = gymapi.Transform()
+        _rfinger_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
+        self.mirobot_local_rfinger_pos = to_torch([_rfinger_pose.p.x, _rfinger_pose.p.y,
+                                                   _rfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+        self.mirobot_local_rfinger_rot = to_torch([_rfinger_pose.r.x, _rfinger_pose.r.y,
+                                                   _rfinger_pose.r.z, _rfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         cube_local_grasp_pose = gymapi.Transform()
         cube_local_grasp_pose.p = gymapi.Vec3(*get_axis_params(0.005, grasp_pose_axis))
@@ -309,6 +323,14 @@ class MirobotCube(BaseTask):
         self.mirobot_rfinger_pos = self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
         self.mirobot_lfinger_rot = self.rigid_body_states[:, self.lfinger_handle][:, 3:7]
         self.mirobot_rfinger_rot = self.rigid_body_states[:, self.rfinger_handle][:, 3:7]
+
+        self.mirobot_lfinger_rot, self.mirobot_lfinger_pos = \
+            compute_grasp_transforms(self.mirobot_lfinger_rot, self.mirobot_lfinger_pos,
+                                     self.mirobot_local_lfinger_rot, self.mirobot_local_lfinger_pos)
+
+        self.mirobot_rfinger_rot, self.mirobot_rfinger_pos = \
+            compute_grasp_transforms(self.mirobot_rfinger_rot, self.mirobot_rfinger_pos,
+                                     self.mirobot_local_rfinger_rot, self.mirobot_local_rfinger_pos)
 
         # cube info
         self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
@@ -427,23 +449,24 @@ class MirobotCube(BaseTask):
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # px = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.mirobot_lfinger_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
-                #
-                # px = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.mirobot_rfinger_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
+                # finger pose
+                px = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.mirobot_lfinger_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
+
+                px = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.mirobot_rfinger_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
 
 #####################################################################
 ###=========================jit functions=========================###
@@ -511,8 +534,8 @@ def compute_mirobot_reward(
     # check the collisions of both fingers
     _lfinger_contact_net_force = (lfinger_contact_net_force.T / (lfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
     _rfinger_contact_net_force = (rfinger_contact_net_force.T / (rfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
-    lf_dot = torch.bmm(lfinger_contact_net_force.view(num_envs, 1, 3), gripper_forward_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
-    rf_dot = torch.bmm(rfinger_contact_net_force.view(num_envs, 1, 3), gripper_forward_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
+    lf_dot = torch.bmm(_lfinger_contact_net_force.view(num_envs, 1, 3), gripper_forward_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
+    rf_dot = torch.bmm(_rfinger_contact_net_force.view(num_envs, 1, 3), gripper_forward_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
 
     rewards = torch.where(lf_dot > 0.7, rewards - 1.0, rewards)
     rewards = torch.where(rf_dot > 0.7, rewards - 1.0, rewards)
