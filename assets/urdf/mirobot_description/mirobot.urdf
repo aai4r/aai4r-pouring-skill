@@ -177,7 +177,7 @@
   <link name="mirobot_hand">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_hand.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_hand.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -195,7 +195,7 @@
   <link name="left_finger">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_leftfinger.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_leftfinger.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -207,7 +207,7 @@
   <link name="right_finger">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_rightfinger.obj"/>
+        <mesh filename="assets/urdf/mirobot_description/meshes/mirobot_rightfinger.dae"/>
       </geometry>
     </visual>
     <collision>

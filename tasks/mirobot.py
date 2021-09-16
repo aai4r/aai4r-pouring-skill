@@ -258,7 +258,7 @@ class MirobotCube(BaseTask):
                                                 mirobot_local_grasp_pose.r.z, mirobot_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         cube_local_grasp_pose = gymapi.Transform()
-        cube_local_grasp_pose.p = gymapi.Vec3(*get_axis_params(0.01, grasp_pose_axis))
+        cube_local_grasp_pose.p = gymapi.Vec3(*get_axis_params(0.005, grasp_pose_axis))
         cube_local_grasp_pose.r = gymapi.Quat(0, 0, 0, 1)
         self.cube_local_grasp_pos = to_torch([cube_local_grasp_pose.p.x, cube_local_grasp_pose.p.y,
                                               cube_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
@@ -478,7 +478,7 @@ def compute_franka_reward(
     cube_fallen_reward = torch.where((1 - dot3) < 0.8, -1, 0)
     rot_reward = 0.5 * torch.exp(-5.0 * (1.0 - dot1)) + 0.5 * torch.exp(-5.0 * (1.0 - dot2)) - cube_fallen_reward
 
-    approach_done = (d <= 0.005) & ((1 - dot1) <= 0.15) & ((1 - dot2) <= 0.15)
+    approach_done = (d <= 0.01) & ((1 - dot1) <= 0.2) & ((1 - dot2) <= 0.2)
 
     # finger reward
     finger_dist = torch.norm(mirobot_lfinger_pos - mirobot_rfinger_pos, p=2, dim=-1)
