@@ -17,6 +17,7 @@ from tasks.shadow_hand import ShadowHand
 from tasks.ingenuity import Ingenuity
 from tasks.anymal import Anymal
 from tasks.mirobot import MirobotCube
+from tasks.ur3_pouring import UR3Pouring
 from tasks.base.vec_task import VecTaskCPU, VecTaskGPU, VecTaskPython
 
 from isaacgym import rlgpu

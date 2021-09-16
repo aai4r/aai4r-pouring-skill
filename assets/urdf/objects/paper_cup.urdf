@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<robot name="paper_cup">
+  <link name="paper_cup">
+
+    <inertial>
+       <mass value="0.00408"/>
+       <inertia ixx="0.00000391" ixy="0.0" ixz="0.0" iyy="0.00000391" iyz="0.0" izz="0.00000349"/>
+    </inertial>
+
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0.037"/>
+      <geometry>
+        <mesh filename="package://target_objects/meshes/paper_cup.obj" scale="1 1 1"/>
+      </geometry>
+      <material name="white">
+        <color rgba="1.0 1.0 0.0 0.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.037"/>
+      <geometry>
+        <mesh filename="package://target_objects/meshes/paper_cup.obj" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+
+</robot>

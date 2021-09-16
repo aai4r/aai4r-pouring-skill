@@ -5,10 +5,6 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
-import numpy as np
-import os
-import torch
-
 from utils.torch_jit_utils import *
 from tasks.base.base_task import BaseTask
 from isaacgym import gymtorch
@@ -41,21 +37,13 @@ class MirobotCube(BaseTask):
 
         self.up_axis = "x"      # z
         self.up_axis_idx = 0    # 2
-
-        self.distX_offset = 0.04
         self.dt = 1/60.
 
-        # prop dimensions
-        self.prop_width = 0.08
-        self.prop_height = 0.08
-        self.prop_length = 0.08
-        self.prop_spacing = 0.09
-
-        num_obs = 26
+        num_obs = 24
         num_acts = 8
 
-        self.cfg["env"]["numObservations"] = 26
-        self.cfg["env"]["numActions"] = 8
+        self.cfg["env"]["numObservations"] = num_obs
+        self.cfg["env"]["numActions"] = num_acts
 
         self.cfg["device_type"] = device_type
         self.cfg["device_id"] = device_id
@@ -290,7 +278,7 @@ class MirobotCube(BaseTask):
             self.mirobot_lfinger_pos, self.mirobot_rfinger_pos,
             self.gripper_forward_axis, self.cube_down_axis, self.gripper_right_axis, self.cube_left_axis,
             self.num_envs, self.dist_reward_scale, self.rot_reward_scale, self.around_handle_reward_scale, self.open_reward_scale,
-            self.finger_dist_reward_scale, self.action_penalty_scale, self.distX_offset, self.max_episode_length
+            self.finger_dist_reward_scale, self.action_penalty_scale, self.max_episode_length
         )
 
     def compute_observations(self):
@@ -320,8 +308,9 @@ class MirobotCube(BaseTask):
                           / (self.mirobot_dof_upper_limits - self.mirobot_dof_lower_limits) - 1.0)
         to_target_pos = self.cube_grasp_pos - self.mirobot_grasp_pos
         to_target_rot = quat_mul(quat_conjugate(self.cube_grasp_rot), self.mirobot_grasp_rot)
+        cube_pos_z = self.cube_pos[:, 2].unsqueeze(-1)
         self.obs_buf = torch.cat((dof_pos_scaled, self.mirobot_dof_vel * self.dof_vel_scale,
-                                  to_target_pos, to_target_rot, self.cube_pos), dim=-1)
+                                  to_target_pos, to_target_rot, cube_pos_z), dim=-1)
 
         return self.obs_buf
 
@@ -456,9 +445,9 @@ def compute_franka_reward(
     mirobot_lfinger_pos, mirobot_rfinger_pos,
     gripper_forward_axis, cube_down_axis, gripper_right_axis, cube_left_axis,
     num_envs, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
-    finger_dist_reward_scale, action_penalty_scale, distX_offset, max_episode_length
+    finger_dist_reward_scale, action_penalty_scale, max_episode_length
 ):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
 
     # distance from fingertip to the cube
     d = torch.norm(mirobot_grasp_pos - cube_grasp_pos, p=2, dim=-1)
@@ -496,8 +485,11 @@ def compute_franka_reward(
     rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
               lift_reward_scale * lift_reward - action_penalty * action_penalty_scale
 
+    grasp = torch.norm(finger_dist - (cube_size - 0.002), p=2, dim=-1)
+    grasp_reward = torch.exp(-10.0 * grasp)
+    grasp_reward_scale = 10.0
     rewards = torch.where(approach_done,
-                          rewards * 1.5 - finger_dist_reward_scale * finger_dist_reward,
+                          rewards * 1.5 + grasp_reward_scale * grasp_reward,
                           rewards + finger_dist_reward_scale * finger_dist_reward)
 
     rewards = torch.where(lift_dist < 0.01, rewards * 3.0, rewards)

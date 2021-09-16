@@ -25,7 +25,7 @@ if __name__ == '__main__':
     set_np_formatting()
 
     # [BallBalance, Cartpole, CartpoleYUp, Ant, Humanoid, Anymal, FrankaCabinet, Quadcopter, ShadowHand, ShadowHandLSTM, ShadowHandFFOpenAI, ShadowHandFFOpenAITest, ShadowHandOpenAI, ShadowHandOpenAITest, Ingenuity]
-    # [MirobotCube]
+    # [MirobotCube, UR3Pouring]
     target_task = 'MirobotCube'
     args = get_args(target_task=target_task, headless=True)
 
