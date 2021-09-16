@@ -475,42 +475,15 @@ def compute_franka_reward(
     axis5 = tf_vector(cube_grasp_rot, gripper_forward_axis)
     axis6 = gripper_forward_axis
     dot3 = torch.bmm(axis5.view(num_envs, 1, 3), axis6.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # check the cube fallen
-    rot_reward = 0.5 * torch.exp(-5.0 * (1.0 - dot1)) + 0.5 * torch.exp(-5.0 * (1.0 - dot2)) - (1 - dot3) * 0.5
-
-    # axis1 = tf_vector(franka_grasp_rot, gripper_forward_axis)
-    # axis2 = tf_vector(drawer_grasp_rot, drawer_inward_axis)
-    # axis3 = tf_vector(franka_grasp_rot, gripper_up_axis)
-    # axis4 = tf_vector(drawer_grasp_rot, drawer_up_axis)
-    #
-    # dot1 = torch.bmm(axis1.view(num_envs, 1, 3), axis2.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # alignment of forward axis for gripper
-    # dot2 = torch.bmm(axis3.view(num_envs, 1, 3), axis4.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # alignment of up axis for gripper
-    # # reward for matching the orientation of the hand to the drawer (fingers wrapped)
-    # rot_reward = 0.5 * (torch.sign(dot1) * dot1 ** 2 + torch.sign(dot2) * dot2 ** 2)
-    #
-    # # bonus if left finger is above the drawer handle and right below
-    # around_handle_reward = torch.zeros_like(rot_reward)
-    # around_handle_reward = torch.where(franka_lfinger_pos[:, 2] > drawer_grasp_pos[:, 2],
-    #                                    torch.where(franka_rfinger_pos[:, 2] < drawer_grasp_pos[:, 2],
-    #                                                around_handle_reward + 0.5, around_handle_reward), around_handle_reward)
-    # # reward for distance of each finger from the drawer
-    # finger_dist_reward = torch.zeros_like(rot_reward)
-    # lfinger_dist = torch.abs(franka_lfinger_pos[:, 2] - drawer_grasp_pos[:, 2])
-    # rfinger_dist = torch.abs(franka_rfinger_pos[:, 2] - drawer_grasp_pos[:, 2])
-    # finger_dist_reward = torch.where(franka_lfinger_pos[:, 2] > drawer_grasp_pos[:, 2],
-    #                                  torch.where(franka_rfinger_pos[:, 2] < drawer_grasp_pos[:, 2],
-    #                                              (0.04 - lfinger_dist) + (0.04 - rfinger_dist), finger_dist_reward), finger_dist_reward)
+    cube_fallen_reward = torch.where((1 - dot3) < 0.8, -1, 0)
+    rot_reward = 0.5 * torch.exp(-5.0 * (1.0 - dot1)) + 0.5 * torch.exp(-5.0 * (1.0 - dot2)) - cube_fallen_reward
 
     approach_done = (d <= 0.005) & ((1 - dot1) <= 0.15) & ((1 - dot2) <= 0.15)
 
     # finger reward
     finger_dist = torch.norm(mirobot_lfinger_pos - mirobot_rfinger_pos, p=2, dim=-1)
     cube_size = 0.02
-    grasp_reward_scale = 5.0
     finger_dist_reward = torch.where(finger_dist > cube_size, 0.1, 0.0)
-    # torch.exp(-5.0 * torch.norm(finger_dist - (cube_size - 0.001), p=2, dim=-1))
-    grasp_reward = torch.where(approach_done,
-                               -finger_dist_reward_scale * finger_dist_reward,
-                               finger_dist_reward_scale * finger_dist_reward)
 
     # cube lifting reward
     lift_reward_scale = 5.0
@@ -520,48 +493,15 @@ def compute_franka_reward(
 
     # regularization on the actions (summed for each environment)
     action_penalty = torch.sum(actions ** 2, dim=-1)
-    rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + grasp_reward_scale * grasp_reward + \
+    rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
               lift_reward_scale * lift_reward - action_penalty * action_penalty_scale
 
-    # # approach success bonus
-    # grasp_done = finger_dist <= cube_size - 0.001
-    # grasp_reward = torch.exp(-5.0 * torch.norm(finger_dist - (cube_size - 0.001), p=2, dim=-1))
-    # rewards = torch.where(approach_done & grasp_done, 1.0,
-    #                       torch.where(approach_done, rewards + 0.5 + grasp_reward * grasp_reward_scale, rewards))
+    rewards = torch.where(approach_done,
+                          rewards * 1.5 - finger_dist_reward_scale * finger_dist_reward,
+                          rewards + finger_dist_reward_scale * finger_dist_reward)
 
     rewards = torch.where(lift_dist < 0.01, rewards * 3.0, rewards)
 
-    # rewards = torch.where(cube_height > 0.1, rewards + 1.0,
-    #                       torch.where(cube_height > 0.07, rewards + 0.8,
-    #                                   torch.where(cube_height > 0.04, rewards + 0.5,
-    #                                               torch.where(cube_height > 0.02, rewards + 0.25, rewards))))
-
-    # how far the cabinet has been opened out
-    # open_reward = cabinet_dof_pos[:, 3]  # drawer_top_joint
-
-    # rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward \
-    #     + around_handle_reward_scale * around_handle_reward + open_reward_scale * open_reward \
-    #     + finger_dist_reward_scale * finger_dist_reward - action_penalty_scale * action_penalty
-
-    # rewards = torch.where(open_reward > 0.38, rewards + 1.0,
-    #                       torch.where(open_reward > 0.2, rewards + 0.8,
-    #                                   torch.where(open_reward > 0.15, rewards + 0.65,
-    #                                               torch.where(open_reward > 0.1, rewards + 0.5,
-    #                                                           torch.where(open_reward > 0.05, rewards + 0.35,
-    #                                                                       torch.where(open_reward > 0.01, rewards + 0.25,
-    #                                                                                   torch.where(open_reward > 0.0, rewards + 0.15, rewards)))))))
-
-    # rewards = torch.where(franka_lfinger_pos[:, 0] < drawer_grasp_pos[:, 0] - distX_offset,
-    #                       torch.ones_like(rewards) * -1, rewards)
-    # rewards = torch.where(franka_rfinger_pos[:, 0] < drawer_grasp_pos[:, 0] - distX_offset,
-    #                       torch.ones_like(rewards) * -1, rewards)
-    #
-    # reset_buf = torch.where(franka_lfinger_pos[:, 0] < drawer_grasp_pos[:, 0] - distX_offset,
-    #                         torch.ones_like(reset_buf), reset_buf)
-    # reset_buf = torch.where(franka_rfinger_pos[:, 0] < drawer_grasp_pos[:, 0] - distX_offset,
-    #                         torch.ones_like(reset_buf), reset_buf)
-
-    # reset_buf = torch.where(d < 0.01, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(dot3 < 0.8, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(lift_dist < 0.01, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
