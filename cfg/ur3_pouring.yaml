@@ -21,7 +21,7 @@ env:
 
   asset:
     assetRoot: "assets"
-    assetFileNameMirobot: "urdf/ur3_description/mirobot.urdf"
+    assetFileNameMirobot: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 sim:
