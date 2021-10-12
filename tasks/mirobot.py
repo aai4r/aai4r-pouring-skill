@@ -47,7 +47,7 @@ class MirobotCube(BaseTask):
         self.dt = 1/60.
 
         num_obs = 23
-        num_acts = 8
+        num_acts = 9
 
         self.cfg["env"]["numObservations"] = num_obs
         self.cfg["env"]["numActions"] = num_acts
@@ -219,7 +219,7 @@ class MirobotCube(BaseTask):
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
 
-            self.default_cube_states.append([cube_start_pose.p.x + 0.23, cube_start_pose.p.y, cube_start_pose.p.z + 0.02,
+            self.default_cube_states.append([cube_start_pose.p.x + 0.23, cube_start_pose.p.y, cube_start_pose.p.z + 0.0105,
                                              cube_start_pose.r.x, cube_start_pose.r.y, cube_start_pose.r.z, cube_start_pose.r.w,
                                              0, 0, 0, 0, 0, 0])
 
@@ -365,7 +365,12 @@ class MirobotCube(BaseTask):
         to_target_rot = quat_mul(quat_conjugate(self.cube_grasp_rot), self.mirobot_grasp_rot)
         # to_2nd_target_pos_z = (0.1 - self.cube_pos[:, 2].unsqueeze(-1)).norm()
         # cube_pos_z = self.cube_pos[:, 2].unsqueeze(-1)
-        self.obs_buf = torch.cat((dof_pos_scaled, self.mirobot_dof_vel * self.dof_vel_scale,
+
+        # self.obs_buf = torch.cat((dof_pos_scaled, self.mirobot_dof_vel * self.dof_vel_scale,
+        #                           to_target_pos, to_target_rot), dim=-1)
+        self.obs_buf = torch.cat((dof_pos_scaled[:, -2:],
+                                  self.mirobot_grasp_pos, self.mirobot_grasp_rot,
+                                  self.cube_pos, self.cube_rot,
                                   to_target_pos, to_target_rot), dim=-1)
 
         return self.obs_buf
@@ -392,7 +397,7 @@ class MirobotCube(BaseTask):
 
         pick = self.default_cube_states[env_ids]
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.12, 0.2, 0.0,            # position
+        xy_scale = to_torch([0.12, 0.2, 0.0,            # position: [0.12, 0.2, 0.0]
                              0.0, 0.0, 0.0, 0.0,        # rotation
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
         rand_cube_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
@@ -449,11 +454,12 @@ class MirobotCube(BaseTask):
             compute_grasp_transforms(hand_rot, hand_pos, self.mirobot_local_grasp_rot, self.mirobot_local_grasp_pos)
 
         # grasp result
-        gripper_stroke = self.mirobot_dof_pos[:, 6:8].to(self.device)
-        _grip = grip.repeat(2, 1).T
-        gripper_stroke = torch.where(_grip > 0.0,
-                                     torch.ones_like(gripper_stroke) * 0.017,
-                                     torch.ones_like(gripper_stroke) * 0.0)
+        # gripper_stroke = self.mirobot_dof_pos[:, 6:8].to(self.device)
+        # gripper_stroke = torch.where(grip > 0.0,
+        #                              torch.ones_like(grip) * 0.0175,
+        #                              torch.ones_like(grip) * 0.0)
+        # gripper_stroke = gripper_stroke.repeat(2, 1).T
+        # gripper_stroke[:, -2] = gripper_stroke[:, -2] * -1.0
 
         # compute position and orientation error
         pos_err = rel_pos
@@ -463,16 +469,17 @@ class MirobotCube(BaseTask):
 
         # solve damped least squares
         j_eef_T = torch.transpose(self.j_eef, 1, 2)
-        d = 0.05  # damping term
+        d = 0.1  # damping term
         lmbda = torch.eye(6).to(self.device) * (d ** 2)
         u = (j_eef_T @ torch.inverse(self.j_eef @ j_eef_T + lmbda) @ dpose).view(self.num_envs, 8, 1)
-        u[:, 6:8] = gripper_stroke.unsqueeze(-1)
+        u[:, 6:8] = grip.unsqueeze(-1)
         return u.squeeze(-1)
 
     def pre_physics_step(self, actions):
         # self.actions = actions.clone().to(self.device)
         rel_action = actions.clone().to(self.device)
-        self.actions = self.solve_rel(rel_pos=rel_action[:, 0:3], rel_rot=rel_action[:, 3:7], grip=rel_action[:, 7])
+        self.actions = self.solve_rel(rel_pos=rel_action[:, 0:3], rel_rot=rel_action[:, 3:7], grip=rel_action[:, 7:])
+        # print("actions min: {}, max: {} ".format(torch.min(self.actions), torch.max(self.actions)))
         targets = self.franka_dof_targets[:, :self.num_mirobot_dofs] + self.mirobot_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.franka_dof_targets[:, :self.num_mirobot_dofs] = tensor_clamp(
             targets, self.mirobot_dof_lower_limits, self.mirobot_dof_upper_limits)
@@ -563,8 +570,10 @@ def compute_mirobot_reward(
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
 
     # distance from fingertip to the cube
-    d = torch.norm(mirobot_grasp_pos - cube_grasp_pos, p=2, dim=-1)
-    dist_reward = torch.exp(-10.0 * d)
+    d1 = torch.norm(mirobot_grasp_pos - cube_grasp_pos, p=2, dim=-1)
+    # d2 = torch.norm(mirobot_lfinger_pos - cube_grasp_pos, p=2, dim=-1)
+    # d3 = torch.norm(mirobot_rfinger_pos - cube_grasp_pos, p=2, dim=-1)
+    dist_reward = torch.exp(-20.0 * d1)
 
     axis1 = tf_vector(mirobot_grasp_rot, gripper_forward_axis)
     axis2 = tf_vector(cube_grasp_rot, cube_down_axis)
@@ -580,19 +589,19 @@ def compute_mirobot_reward(
     cube_fallen_reward = torch.where((1 - dot3) < 0.8, -1, 0)
     rot_reward = 0.5 * torch.exp(-5.0 * (1.0 - dot1)) + 0.5 * torch.exp(-5.0 * (1.0 - dot2))  # - cube_fallen_reward
 
-    approach_done = (d <= 0.005) & ((1 - dot1) <= 0.15) & ((1 - dot2) <= 0.15)
+    approach_done = (d1 <= 0.008) & ((1 - dot1) <= 0.2) & ((1 - dot2) <= 0.2)
 
     finger_dist_reward = torch.zeros_like(rot_reward)
     finger_dist = torch.norm(mirobot_lfinger_pos - mirobot_rfinger_pos, p=2, dim=-1)
     cube_size = 0.02
     finger_dist_reward = torch.where(finger_dist > cube_size, finger_dist_reward + 0.1, finger_dist_reward)
 
-    grasp_reward_scale = 1.0
+    grasp_reward_scale = 4.0
     grasp_reward = torch.zeros_like(rot_reward)
     grasp_reward = torch.where(approach_done,
-                               grasp_reward + 1.0 - 100.0 * torch.max(finger_dist - cube_size, torch.zeros_like(finger_dist) - 0.005),
+                               grasp_reward + 1.0,
                                finger_dist_reward)
-
+    # grasp_reward + 1.0 - 100.0 * torch.max(finger_dist - cube_size, torch.zeros_like(finger_dist) - 0.005),
     grasp_done = approach_done & (finger_dist <= cube_size)
 
     # finger reward
@@ -636,21 +645,21 @@ def compute_mirobot_reward(
     #                                    finger_around_reward)
 
     # cube lifting reward
-    lift_reward_scale = 5.0
-    des_height = 0.1
+    lift_reward_scale = 15.0
+    des_height = 0.2
 
     lift_reward = torch.zeros_like(rot_reward)
     cube_lift_pos = cube_grasp_pos.clone()
     cube_lift_pos[:, 2] = des_height
     d2 = torch.norm(mirobot_grasp_pos - cube_lift_pos, p=2, dim=-1)
-    lift_reward = torch.where(grasp_done, torch.exp(-20.0 * d2), lift_reward)
-    # lift_dist = torch.norm(des_height - cube_pos[:, 2], p=2, dim=-1)
-    # lift_reward = torch.exp(-100.0 * lift_dist)
+    # lift_reward = torch.where(grasp_done, torch.exp(-20.0 * d2), lift_reward)
+    lift_dist = torch.norm(des_height - cube_pos[:, 2], p=2, dim=-1)
+    lift_reward = torch.exp(-10.0 * lift_dist)
     # lift_reward = torch.where(grasp_done, lift_reward + torch.exp(-100.0 * lift_dist), lift_reward)
     # lift_reward = torch.min(cube_pos[:, 2], torch.zeros_like(rot_reward))
 
     # regularization on the actions (summed for each environment)
-    action_penalty = torch.sum(actions ** 2, dim=-1)
+    action_penalty = torch.sum(actions ** 2, dim=-1)    #
     rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
               grasp_reward_scale * grasp_reward + \
               lift_reward_scale * lift_reward - action_penalty * action_penalty_scale
@@ -671,11 +680,11 @@ def compute_mirobot_reward(
     lf_force_dot = torch.bmm(_lfinger_contact_net_force.view(num_envs, 1, 3), gripper_forward_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
     rf_force_dot = torch.bmm(_rfinger_contact_net_force.view(num_envs, 1, 3), gripper_forward_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
 
-    rewards = torch.where(lf_force_dot > 0.9, torch.ones_like(rewards) * -1.0, rewards)
-    rewards = torch.where(rf_force_dot > 0.9, torch.ones_like(rewards) * -1.0, rewards)
-
-    reset_buf = torch.where(lf_force_dot > 0.9, torch.ones_like(reset_buf), reset_buf)
-    reset_buf = torch.where(rf_force_dot > 0.9, torch.ones_like(reset_buf), reset_buf)
+    # rewards = torch.where(lf_force_dot > 0.9, torch.ones_like(rewards) * -0.1, rewards)
+    # rewards = torch.where(rf_force_dot > 0.9, torch.ones_like(rewards) * -0.1, rewards)
+    #
+    # reset_buf = torch.where(lf_force_dot > 0.9, torch.ones_like(reset_buf), reset_buf)
+    # reset_buf = torch.where(rf_force_dot > 0.9, torch.ones_like(reset_buf), reset_buf)
 
     rewards = torch.where(dot3 < 0.8,  torch.ones_like(rewards) * -1.0, rewards)
 
