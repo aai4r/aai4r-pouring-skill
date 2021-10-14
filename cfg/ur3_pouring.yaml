@@ -2,7 +2,7 @@
 env:
   numEnvs: 2048
   envSpacing: 1.5
-  episodeLength: 400
+  episodeLength: 50 # 400
   enableDebugVis: True
 
   startPositionNoise: 0.1
@@ -21,7 +21,7 @@ env:
 
   asset:
     assetRoot: "assets"
-    assetFileNameMirobot: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
+    assetFileNameUR3: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 sim:

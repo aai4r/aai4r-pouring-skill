@@ -1,3 +1,5 @@
+import torch
+
 from utils.torch_jit_utils import *
 from tasks.base.base_task import BaseTask
 from isaacgym import gymtorch
@@ -63,17 +65,20 @@ class UR3Pouring(BaseTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
         # create some wrapper tensors for different slices
-        self.ur3_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
+        self.ur3_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0),
+                                             deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
-        self.mirobot_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, :self.num_mirobot_dofs]
-        self.mirobot_dof_pos = torch.index_select(self.mirobot_dof_state[..., 0], 1, self.indices)
-        self.mirobot_dof_vel = torch.index_select(self.mirobot_dof_state[..., 1], 1, self.indices)
+        self.ur3_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, :self.num_ur3_dofs]
+        # self.ur3_dof_pos = torch.index_select(self.ur3_dof_state[..., 0], 1, self.indices)
+        # self.ur3_dof_vel = torch.index_select(self.ur3_dof_state[..., 1], 1, self.indices)
+        self.ur3_dof_pos = self.ur3_dof_state[..., 0]
+        self.ur3_dof_vel = self.ur3_dof_state[..., 1]
 
         self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_tensor).view(self.num_envs, -1, 13)
         self.num_bodies = self.rigid_body_states.shape[1]
 
         self.root_state_tensor = gymtorch.wrap_tensor(actor_root_state_tensor).view(self.num_envs, -1, 13)
-        self.cube_states = self.root_state_tensor[:, 1]
+        self.bottle_states = self.root_state_tensor[:, 1]
 
         self.contact_net_force = gymtorch.wrap_tensor(contact_net_force_tensor)
 
@@ -104,14 +109,14 @@ class UR3Pouring(BaseTask):
 
         asset_root = "../assets"
         ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
-        cube_asset_file = "urdf/objects/cube.urdf"
+        bottle_asset_file = "urdf/objects/bottle.urdf"
 
         if "asset" in self.cfg["env"]:
             asset_root = self.cfg["env"]["asset"].get("assetRoot", asset_root)
-            mirobot_asset_file = self.cfg["env"]["asset"].get("assetFileNameMirobot", ur3_asset_file)
-            cube_asset_file = self.cfg["env"]["asset"].get("assetFileNameCube", cube_asset_file)
+            ur3_asset_file = self.cfg["env"]["asset"].get("assetFileNameUR3", ur3_asset_file)
+            bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
 
-        # load mirobot asset
+        # load ur3 asset
         asset_options = gymapi.AssetOptions()
         asset_options.flip_visual_attachments = True
         asset_options.fix_base_link = True
@@ -120,25 +125,25 @@ class UR3Pouring(BaseTask):
         asset_options.thickness = 0.001
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
         asset_options.use_mesh_materials = True
-        ur3_asset = self.gym.load_asset(self.sim, asset_root, mirobot_asset_file, asset_options)
+        ur3_asset = self.gym.load_asset(self.sim, asset_root, ur3_asset_file, asset_options)
 
         # load cube asset
         asset_options = gymapi.AssetOptions()
         asset_options.fix_base_link = False
         asset_options.disable_gravity = False
         asset_options.density = 40
-        cube_asset = self.gym.load_asset(self.sim, asset_root, cube_asset_file, asset_options)
+        bottle_asset = self.gym.load_asset(self.sim, asset_root, bottle_asset_file, asset_options)
         self.cube_size = 0.02   # TODO, retrieve from cube_asset, later
 
-        mirobot_link_dict = self.gym.get_asset_rigid_body_dict(ur3_asset)
+        ur3_link_dict = self.gym.get_asset_rigid_body_dict(ur3_asset)
 
-        print("ur3 link dictionary: ", mirobot_link_dict)
-        self.mirobot_hand_index = mirobot_link_dict["ee_link"]
-        self.num_mirobot_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
-        self.num_mirobot_dofs = self.gym.get_asset_dof_count(ur3_asset)
+        print("ur3 link dictionary: ", ur3_link_dict)
+        self.ur3_hand_index = ur3_link_dict["ee_link"]
+        self.num_ur3_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
+        self.num_ur3_dofs = self.gym.get_asset_dof_count(ur3_asset)
 
-        print("num ur3 bodies: ", self.num_mirobot_bodies)
-        print("num ur3 dofs: ", self.num_mirobot_dofs)
+        print("num ur3 bodies: ", self.num_ur3_bodies)
+        print("num ur3 dofs: ", self.num_ur3_dofs)
 
         # set franka dof properties
         self.ur3_dof_props = self.gym.get_asset_dof_properties(ur3_asset)
@@ -150,34 +155,34 @@ class UR3Pouring(BaseTask):
         self.ur3_dof_props["stiffness"][6:].fill(1000.0)
         self.ur3_dof_props["damping"][6:].fill(40.0)
 
-        self.mirobot_dof_lower_limits = self.ur3_dof_props['lower']
-        self.mirobot_dof_upper_limits = self.ur3_dof_props['upper']
+        self.ur3_dof_lower_limits = self.ur3_dof_props['lower']
+        self.ur3_dof_upper_limits = self.ur3_dof_props['upper']
 
-        self.mirobot_dof_lower_limits = to_torch(self.mirobot_dof_lower_limits, device=self.device)
-        self.mirobot_dof_upper_limits = to_torch(self.mirobot_dof_upper_limits, device=self.device)
+        self.ur3_dof_lower_limits = to_torch(self.ur3_dof_lower_limits, device=self.device)
+        self.ur3_dof_upper_limits = to_torch(self.ur3_dof_upper_limits, device=self.device)
 
-        self.mirobot_dof_lower_limits = torch.index_select(self.mirobot_dof_lower_limits, 0, self.indices)
-        self.mirobot_dof_upper_limits = torch.index_select(self.mirobot_dof_upper_limits, 0, self.indices)
-        self.mirobot_dof_speed_scales = torch.ones_like(self.mirobot_dof_lower_limits)
+        # self.ur3_dof_lower_limits = torch.index_select(self.ur3_dof_lower_limits, 0, self.indices)
+        # self.ur3_dof_upper_limits = torch.index_select(self.ur3_dof_upper_limits, 0, self.indices)
+        self.ur3_dof_speed_scales = torch.ones_like(self.ur3_dof_lower_limits)
 
         ur3_start_pose = gymapi.Transform()
         ur3_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
         ur3_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
-        cube_start_pose = gymapi.Transform()
-        cube_start_pose.p = gymapi.Vec3(*get_axis_params(0.0, self.up_axis_idx))
+        bottle_start_pose = gymapi.Transform()
+        bottle_start_pose.p = gymapi.Vec3(*get_axis_params(0.0, self.up_axis_idx))
 
         # compute aggregate size
-        num_mirobot_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
-        num_mirobot_shapes = self.gym.get_asset_rigid_shape_count(ur3_asset)
-        num_cube_bodies = self.gym.get_asset_rigid_body_count(cube_asset)
-        num_cube_shapes = self.gym.get_asset_rigid_shape_count(cube_asset)
-        self.max_agg_bodies = num_mirobot_bodies + num_cube_bodies
-        self.max_agg_shapes = num_mirobot_shapes + num_cube_shapes
+        num_ur3_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
+        num_ur3_shapes = self.gym.get_asset_rigid_shape_count(ur3_asset)
+        num_cube_bodies = self.gym.get_asset_rigid_body_count(bottle_asset)
+        num_cube_shapes = self.gym.get_asset_rigid_shape_count(bottle_asset)
+        self.max_agg_bodies = num_ur3_bodies + num_cube_bodies
+        self.max_agg_shapes = num_ur3_shapes + num_cube_shapes
 
-        self.mirobots = []
-        self.cubes = []
-        self.default_cube_states = []
+        self.ur3_robots = []
+        self.bottles = []
+        self.default_bottle_states = []
         self.prop_start = []
         self.envs = []
 
@@ -190,8 +195,8 @@ class UR3Pouring(BaseTask):
             if self.aggregate_mode >= 3:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
 
-            mirobot_actor = self.gym.create_actor(env_ptr, ur3_asset, ur3_start_pose, "ur3", i, 1)
-            self.gym.set_actor_dof_properties(env_ptr, mirobot_actor, self.ur3_dof_props)
+            ur3_actor = self.gym.create_actor(env_ptr, ur3_asset, ur3_start_pose, "ur3", i, 1)
+            self.gym.set_actor_dof_properties(env_ptr, ur3_actor, self.ur3_dof_props)
 
             if self.aggregate_mode == 2:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
@@ -202,27 +207,27 @@ class UR3Pouring(BaseTask):
             # dy = np.random.rand() - 0.5
             # cube_pose.p.y = self.start_position_noise * dy
             # cube_pose.p.z = dz
-            cube_actor = self.gym.create_actor(env_ptr, cube_asset, cube_start_pose, "cube", i, 2)
+            bottle_actor = self.gym.create_actor(env_ptr, bottle_asset, bottle_start_pose, "bottle", i, 2)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
 
-            self.default_cube_states.append([cube_start_pose.p.x + 0.23, cube_start_pose.p.y, cube_start_pose.p.z + 0.0105,
-                                             cube_start_pose.r.x, cube_start_pose.r.y, cube_start_pose.r.z, cube_start_pose.r.w,
-                                             0, 0, 0, 0, 0, 0])
+            self.default_bottle_states.append([bottle_start_pose.p.x + 0.5, bottle_start_pose.p.y, bottle_start_pose.p.z + 0.15,
+                                               bottle_start_pose.r.x, bottle_start_pose.r.y, bottle_start_pose.r.z, bottle_start_pose.r.w,
+                                               0, 0, 0, 0, 0, 0])
 
             if self.aggregate_mode > 0:
                 self.gym.end_aggregate(env_ptr)
 
             self.envs.append(env_ptr)
-            self.mirobots.append(mirobot_actor)
-            self.cubes.append(cube_actor)
+            self.ur3_robots.append(ur3_actor)
+            self.bottles.append(bottle_actor)
 
-        self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "Link6")
-        self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "left_finger")
-        self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, mirobot_actor, "right_finger")
-        self.cube_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cube_actor, "cube")
-        self.default_cube_states = to_torch(self.default_cube_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
+        self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "tool0")
+        self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_left_finger_tip_link")
+        self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_right_finger_tip_link")
+        self.bottle_handle = self.gym.find_actor_rigid_body_handle(env_ptr, bottle_actor, "bottle")
+        self.default_bottle_states = to_torch(self.default_bottle_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
 
         self.init_data()
 
@@ -232,10 +237,9 @@ class UR3Pouring(BaseTask):
         # for i in range(self.num_envs):
         #     lfinger_idx = self.gym.find_actor_rigid_body_index(self.envs[i], mirobot_handle, "left_finger", gymapi.DOMAIN_SIM)
 
-
-        hand = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "Link6")
-        lfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "left_finger")
-        rfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.mirobots[0], "right_finger")
+        hand = self.gym.find_actor_rigid_body_handle(self.envs[0], self.ur3_robots[0], "tool0")
+        lfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.ur3_robots[0], "robotiq_85_left_finger_tip_link")
+        rfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.ur3_robots[0], "robotiq_85_right_finger_tip_link")
 
         hand_pose = self.gym.get_rigid_transform(self.envs[0], hand)
         lfinger_pose = self.gym.get_rigid_transform(self.envs[0], lfinger)
@@ -247,25 +251,25 @@ class UR3Pouring(BaseTask):
 
         hand_pose_inv = hand_pose.inverse()
         grasp_pose_axis = 2     # z-axis
-        mirobot_local_grasp_pose = hand_pose_inv * finger_pose
-        mirobot_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(-0.025, grasp_pose_axis))
-        self.mirobot_local_grasp_pos = to_torch([mirobot_local_grasp_pose.p.x, mirobot_local_grasp_pose.p.y,
-                                                mirobot_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
-        self.mirobot_local_grasp_rot = to_torch([mirobot_local_grasp_pose.r.x, mirobot_local_grasp_pose.r.y,
-                                                mirobot_local_grasp_pose.r.z, mirobot_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
+        ur3_local_grasp_pose = hand_pose_inv * finger_pose
+        ur3_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
+        self.ur3_local_grasp_pos = to_torch([ur3_local_grasp_pose.p.x, ur3_local_grasp_pose.p.y,
+                                                ur3_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+        self.ur3_local_grasp_rot = to_torch([ur3_local_grasp_pose.r.x, ur3_local_grasp_pose.r.y,
+                                                ur3_local_grasp_pose.r.z, ur3_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         _lfinger_pose = gymapi.Transform()
         _lfinger_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
-        self.mirobot_local_lfinger_pos = to_torch([_lfinger_pose.p.x, _lfinger_pose.p.y,
+        self.ur3_local_lfinger_pos = to_torch([_lfinger_pose.p.x, _lfinger_pose.p.y,
                                                    _lfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
-        self.mirobot_local_lfinger_rot = to_torch([_lfinger_pose.r.x, _lfinger_pose.r.y,
+        self.ur3_local_lfinger_rot = to_torch([_lfinger_pose.r.x, _lfinger_pose.r.y,
                                                    _lfinger_pose.r.z, _lfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         _rfinger_pose = gymapi.Transform()
         _rfinger_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
-        self.mirobot_local_rfinger_pos = to_torch([_rfinger_pose.p.x, _rfinger_pose.p.y,
+        self.ur3_local_rfinger_pos = to_torch([_rfinger_pose.p.x, _rfinger_pose.p.y,
                                                    _rfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
-        self.mirobot_local_rfinger_rot = to_torch([_rfinger_pose.r.x, _rfinger_pose.r.y,
+        self.ur3_local_rfinger_rot = to_torch([_rfinger_pose.r.x, _rfinger_pose.r.y,
                                                    _rfinger_pose.r.z, _rfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         cube_local_grasp_pose = gymapi.Transform()
@@ -281,17 +285,17 @@ class UR3Pouring(BaseTask):
         self.gripper_right_axis = to_torch([0, -1, 0], device=self.device).repeat((self.num_envs, 1))
         self.cube_left_axis = to_torch([0, 1, 0], device=self.device).repeat((self.num_envs, 1))
 
-        self.cube_grasp_pos = torch.zeros_like(self.cube_local_grasp_pos)
-        self.cube_grasp_rot = torch.zeros_like(self.cube_local_grasp_rot)
+        self.bottle_grasp_pos = torch.zeros_like(self.cube_local_grasp_pos)
+        self.bottle_grasp_rot = torch.zeros_like(self.cube_local_grasp_rot)
 
-        self.mirobot_grasp_pos = torch.zeros_like(self.mirobot_local_grasp_pos)
-        self.mirobot_grasp_rot = torch.zeros_like(self.mirobot_local_grasp_rot)
-        self.mirobot_grasp_rot[..., -1] = 1  # xyzw
+        self.ur3_grasp_pos = torch.zeros_like(self.ur3_local_grasp_pos)
+        self.ur3_grasp_rot = torch.zeros_like(self.ur3_local_grasp_rot)
+        self.ur3_grasp_rot[..., -1] = 1  # xyzw
 
-        self.mirobot_lfinger_pos = torch.zeros_like(self.mirobot_local_grasp_pos)
-        self.mirobot_rfinger_pos = torch.zeros_like(self.mirobot_local_grasp_pos)
-        self.mirobot_lfinger_rot = torch.zeros_like(self.mirobot_local_grasp_rot)
-        self.mirobot_rfinger_rot = torch.zeros_like(self.mirobot_local_grasp_rot)
+        self.ur3_lfinger_pos = torch.zeros_like(self.ur3_local_grasp_pos)
+        self.ur3_rfinger_pos = torch.zeros_like(self.ur3_local_grasp_pos)
+        self.ur3_lfinger_rot = torch.zeros_like(self.ur3_local_grasp_rot)
+        self.ur3_rfinger_rot = torch.zeros_like(self.ur3_local_grasp_rot)
 
         # jacobians
         # for fixed-base franka, tensor has shape (num envs, 10, 6, 9)
@@ -299,14 +303,14 @@ class UR3Pouring(BaseTask):
         jacobian = gymtorch.wrap_tensor(_jacobian)
 
         # jacobian entries corresponding to franka hand
-        self.j_eef = jacobian[:, self.mirobot_hand_index - 1, :]
+        self.j_eef = jacobian[:, self.ur3_hand_index - 1, :]
 
     def compute_reward(self, actions):
-        self.rew_buf[:], self.reset_buf[:] = compute_mirobot_reward(
+        self.rew_buf[:], self.reset_buf[:] = compute_ur3_reward(
             self.reset_buf, self.progress_buf, self.actions,
-            self.cube_grasp_pos, self.cube_grasp_rot, self.cube_pos, self.cube_rot,
-            self.mirobot_grasp_pos, self.mirobot_grasp_rot,
-            self.mirobot_lfinger_pos, self.mirobot_rfinger_pos,
+            self.bottle_grasp_pos, self.bottle_grasp_rot, self.bottle_pos, self.bottle_rot,
+            self.ur3_grasp_pos, self.ur3_grasp_rot,
+            self.ur3_lfinger_pos, self.ur3_rfinger_pos,
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.lfinger_handle],
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.rfinger_handle],
             self.gripper_forward_axis, self.cube_down_axis, self.gripper_right_axis, self.cube_left_axis,
@@ -324,41 +328,44 @@ class UR3Pouring(BaseTask):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
 
-        self.mirobot_grasp_rot[:], self.mirobot_grasp_pos[:] = \
-            compute_grasp_transforms(hand_rot, hand_pos, self.mirobot_local_grasp_rot, self.mirobot_local_grasp_pos)
+        self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
+            compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
 
-        self.mirobot_lfinger_pos = self.rigid_body_states[:, self.lfinger_handle][:, 0:3]
-        self.mirobot_rfinger_pos = self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
-        self.mirobot_lfinger_rot = self.rigid_body_states[:, self.lfinger_handle][:, 3:7]
-        self.mirobot_rfinger_rot = self.rigid_body_states[:, self.rfinger_handle][:, 3:7]
+        self.ur3_lfinger_pos = self.rigid_body_states[:, self.lfinger_handle][:, 0:3]
+        self.ur3_rfinger_pos = self.rigid_body_states[:, self.rfinger_handle][:, 0:3]
+        self.ur3_lfinger_rot = self.rigid_body_states[:, self.lfinger_handle][:, 3:7]
+        self.ur3_rfinger_rot = self.rigid_body_states[:, self.rfinger_handle][:, 3:7]
 
-        self.mirobot_lfinger_rot, self.mirobot_lfinger_pos = \
-            compute_grasp_transforms(self.mirobot_lfinger_rot, self.mirobot_lfinger_pos,
-                                     self.mirobot_local_lfinger_rot, self.mirobot_local_lfinger_pos)
+        self.ur3_lfinger_rot, self.ur3_lfinger_pos = \
+            compute_grasp_transforms(self.ur3_lfinger_rot, self.ur3_lfinger_pos,
+                                     self.ur3_local_lfinger_rot, self.ur3_local_lfinger_pos)
 
-        self.mirobot_rfinger_rot, self.mirobot_rfinger_pos = \
-            compute_grasp_transforms(self.mirobot_rfinger_rot, self.mirobot_rfinger_pos,
-                                     self.mirobot_local_rfinger_rot, self.mirobot_local_rfinger_pos)
+        self.ur3_rfinger_rot, self.ur3_rfinger_pos = \
+            compute_grasp_transforms(self.ur3_rfinger_rot, self.ur3_rfinger_pos,
+                                     self.ur3_local_rfinger_rot, self.ur3_local_rfinger_pos)
 
-        # cube info
-        self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
-        self.cube_rot = self.rigid_body_states[:, self.cube_handle][:, 3:7]
+        # bottle info
+        self.bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
+        self.bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
 
-        self.cube_grasp_rot[:], self.cube_grasp_pos[:] = \
-            tf_combine(self.cube_rot, self.cube_pos, self.cube_local_grasp_rot, self.cube_local_grasp_pos)
+        self.bottle_grasp_rot[:], self.bottle_grasp_pos[:] = \
+            tf_combine(self.bottle_rot, self.bottle_pos, self.cube_local_grasp_rot, self.cube_local_grasp_pos)
 
-        dof_pos_scaled = (2.0 * (self.mirobot_dof_pos - self.mirobot_dof_lower_limits)
-                          / (self.mirobot_dof_upper_limits - self.mirobot_dof_lower_limits) - 1.0)
-        to_target_pos = self.cube_grasp_pos - self.mirobot_grasp_pos
-        to_target_rot = quat_mul(quat_conjugate(self.cube_grasp_rot), self.mirobot_grasp_rot)
+        dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
+                          / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
+        dof_pos_scaled = torch.index_select(dof_pos_scaled, 1, self.indices)
+
+        to_target_pos = self.bottle_grasp_pos - self.ur3_grasp_pos
+        to_target_rot = quat_mul(quat_conjugate(self.bottle_grasp_rot), self.ur3_grasp_rot)
+        to_target_rot = quat_mul(quat_conjugate(self.bottle_grasp_rot), self.ur3_grasp_rot)
         # to_2nd_target_pos_z = (0.1 - self.cube_pos[:, 2].unsqueeze(-1)).norm()
         # cube_pos_z = self.cube_pos[:, 2].unsqueeze(-1)
 
-        self.obs_buf = torch.cat((dof_pos_scaled, self.mirobot_dof_vel * self.dof_vel_scale,
+        self.obs_buf = torch.cat((dof_pos_scaled, torch.index_select(self.ur3_dof_vel * self.dof_vel_scale, 1, self.indices),
                                   to_target_pos, to_target_rot), dim=-1)
 
         # self.obs_buf = torch.cat((dof_pos_scaled[:, -2:],
-        #                           self.mirobot_grasp_pos, self.mirobot_grasp_rot,
+        #                           self.mirobot_grasp_pos, self.ur3_grasp_rot,
         #                           self.cube_pos, self.cube_rot,
         #                           to_target_pos, to_target_rot), dim=-1)
 
@@ -366,18 +373,28 @@ class UR3Pouring(BaseTask):
 
     def reset(self, env_ids):
         env_ids_int32 = env_ids.to(dtype=torch.int32)
-        # reset mirobot
+        self.dof_state[:, 0] = torch.zeros_like(self.dof_state[:, 0], dtype=torch.float, device=self.device)  # pos
+        self.dof_state[:, 1] = torch.zeros_like(self.dof_state[:, 1], dtype=torch.float, device=self.device)  # vel
+
+        # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 0.25 * torch.index_select(torch.rand((len(env_ids), self.num_mirobot_dofs), device=self.device) - 0.5, 1, self.indices),
-            self.mirobot_dof_lower_limits, self.mirobot_dof_upper_limits)
-        self.mirobot_dof_pos[env_ids, :] = pos
-        self.mirobot_dof_vel[env_ids, :] = torch.zeros_like(self.mirobot_dof_vel[env_ids])
-        self.ur3_dof_targets[env_ids][:, self.indices] = pos
+            self.ur3_default_dof_pos.unsqueeze(0) + 1.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
+        self.ur3_dof_pos[env_ids, :] = pos
+        self.ur3_dof_vel[env_ids, :] = torch.zeros_like(self.ur3_dof_vel[env_ids])
+        # self.ur3_dof_targets[env_ids][:, self.indices] = pos
+
+        # self.ur3_dof_state[:, 0] = torch.ones_like(self.ur3_dof_state[:, 0], dtype=torch.float, device=self.device)
+
+        robot_indices = self.global_indices[env_ids, :1].flatten()
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self.dof_state),
+                                              gymtorch.unwrap_tensor(robot_indices), len(robot_indices))
 
         # TODO, setting rest joints of robotiq...
 
-        # reset cube
-        cube_indices = self.global_indices[env_ids, 1].flatten()
+        # reset bottle
+        bottle_indices = self.global_indices[env_ids, 1].flatten()
 
         rand_z_angle = torch.rand(len(env_ids)).uniform_(deg2rad(-90.0), deg2rad(90.0))
         quat = []   # z-axis cube orientation randomization
@@ -386,16 +403,16 @@ class UR3Pouring(BaseTask):
             quat.append(torch.FloatTensor([_q.x, _q.y, _q.z, _q.w]))
         quat = torch.stack(quat).to(self.device)
 
-        pick = self.default_cube_states[env_ids]
+        pick = self.default_bottle_states[env_ids]
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.12, 0.2, 0.0,            # position: [0.12, 0.2, 0.0]
-                             0.0, 0.0, 0.0, 0.0,        # rotation
+        xy_scale = to_torch([0.2, 0.2, 0.0,            # position
+                             0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
         rand_cube_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
-        self.cube_states[env_ids] = pick + rand_cube_pos
+        self.bottle_states[env_ids] = pick + rand_cube_pos
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.root_state_tensor),
-                                                     gymtorch.unwrap_tensor(cube_indices), len(cube_indices))
+                                                     gymtorch.unwrap_tensor(bottle_indices), len(bottle_indices))
 
         # apply
         multi_env_ids_int32 = self.global_indices[env_ids, :1].flatten()
@@ -414,20 +431,20 @@ class UR3Pouring(BaseTask):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
 
-        self.mirobot_grasp_rot[:], self.mirobot_grasp_pos[:] = \
-            compute_grasp_transforms(hand_rot, hand_pos, self.mirobot_local_grasp_rot, self.mirobot_local_grasp_pos)
+        self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
+            compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
 
         # grasp result
         des_stroke = self.cube_size * 0.5
-        gripper_stroke = self.mirobot_dof_pos[:, 6:8].sum(dim=1).squeeze(-1).to(self.device)
+        gripper_stroke = self.ur3_dof_pos[:, 6:8].sum(dim=1).squeeze(-1).to(self.device)
         dist = torch.where(goal_grip.squeeze(-1).to(self.device),
                            (gripper_stroke - des_stroke).abs(),
                            torch.ones_like(gripper_stroke).to(self.device) * -1)
         grip_rst = torch.where(dist < 0.007, 1, 0)
 
         # compute position and orientation error
-        pos_err = goal_pos - self.mirobot_grasp_pos
-        orn_err = orientation_error(goal_rot, self.mirobot_grasp_rot)
+        pos_err = goal_pos - self.ur3_grasp_pos
+        orn_err = orientation_error(goal_rot, self.ur3_grasp_rot)
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
 
         # solve damped least squares
@@ -441,11 +458,11 @@ class UR3Pouring(BaseTask):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
 
-        self.mirobot_grasp_rot[:], self.mirobot_grasp_pos[:] = \
-            compute_grasp_transforms(hand_rot, hand_pos, self.mirobot_local_grasp_rot, self.mirobot_local_grasp_pos)
+        self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
+            compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
 
         # grasp result
-        # gripper_stroke = self.mirobot_dof_pos[:, 6:8].to(self.device)
+        # gripper_stroke = self.ur3_dof_pos[:, 6:8].to(self.device)
         # gripper_stroke = torch.where(grip > 0.0,
         #                              torch.ones_like(grip) * 0.0175,
         #                              torch.ones_like(grip) * 0.0)
@@ -454,8 +471,8 @@ class UR3Pouring(BaseTask):
 
         # compute position and orientation error
         pos_err = rel_pos
-        goal_rot = quat_mul(self.mirobot_grasp_rot, quat_unit(rel_rot))
-        orn_err = orientation_error(goal_rot, self.mirobot_grasp_rot)
+        goal_rot = quat_mul(self.ur3_grasp_rot, quat_unit(rel_rot))
+        orn_err = orientation_error(goal_rot, self.ur3_grasp_rot)
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
 
         # solve damped least squares
@@ -471,9 +488,9 @@ class UR3Pouring(BaseTask):
         # rel_action = actions.clone().to(self.device)
         # self.actions = self.solve_rel(rel_pos=rel_action[:, 0:3], rel_rot=rel_action[:, 3:7], grip=rel_action[:, 7:])
         # print("actions min: {}, max: {} ".format(torch.min(self.actions), torch.max(self.actions)))
-        targets = self.ur3_dof_targets[:][:, self.indices] + self.mirobot_dof_speed_scales * self.dt * self.actions * self.action_scale
+        targets = self.ur3_dof_targets[:][:, self.indices] + self.ur3_dof_speed_scales[self.indices] * self.dt * self.actions * self.action_scale
         self.ur3_dof_targets[:][:, self.indices] = tensor_clamp(
-            targets, self.mirobot_dof_lower_limits, self.mirobot_dof_upper_limits)
+            targets, self.ur3_dof_lower_limits[self.indices], self.ur3_dof_upper_limits[self.indices])
         env_ids_int32 = torch.arange(self.num_envs, dtype=torch.int32, device=self.device)
         self.gym.set_dof_position_target_tensor(self.sim,
                                                 gymtorch.unwrap_tensor(self.ur3_dof_targets))
@@ -504,40 +521,40 @@ class UR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # cube grasp pose
-                px = (self.cube_grasp_pos[i] + quat_apply(self.cube_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                py = (self.cube_grasp_pos[i] + quat_apply(self.cube_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pz = (self.cube_grasp_pos[i] + quat_apply(self.cube_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                px = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
 
-                p0 = self.cube_grasp_pos[i].cpu().numpy()
+                p0 = self.bottle_grasp_pos[i].cpu().numpy()
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # mirobot grasp pose
-                px = (self.mirobot_grasp_pos[i] + quat_apply(self.mirobot_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                py = (self.mirobot_grasp_pos[i] + quat_apply(self.mirobot_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pz = (self.mirobot_grasp_pos[i] + quat_apply(self.mirobot_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                # ur3 grasp pose
+                px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
 
-                p0 = self.mirobot_grasp_pos[i].cpu().numpy()
+                p0 = self.ur3_grasp_pos[i].cpu().numpy()
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # # finger pose
-                # px = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.mirobot_lfinger_pos[i] + quat_apply(self.mirobot_lfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                # px = (self.ur3_lfinger_pos[i] + quat_apply(self.ur3_lfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.ur3_lfinger_pos[i] + quat_apply(self.ur3_lfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.ur3_lfinger_pos[i] + quat_apply(self.ur3_lfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
                 #
-                # p0 = self.mirobot_lfinger_pos[i].cpu().numpy()
+                # p0 = self.ur3_lfinger_pos[i].cpu().numpy()
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
                 #
-                # px = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.mirobot_rfinger_pos[i] + quat_apply(self.mirobot_rfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                # px = (self.ur3_rfinger_pos[i] + quat_apply(self.ur3_rfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.ur3_rfinger_pos[i] + quat_apply(self.ur3_rfinger_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.ur3_rfinger_pos[i] + quat_apply(self.ur3_rfinger_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
                 #
-                # p0 = self.mirobot_rfinger_pos[i].cpu().numpy()
+                # p0 = self.ur3_rfinger_pos[i].cpu().numpy()
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
@@ -548,11 +565,11 @@ class UR3Pouring(BaseTask):
 
 
 @torch.jit.script
-def compute_mirobot_reward(
+def compute_ur3_reward(
     reset_buf, progress_buf, actions,
-    cube_grasp_pos, cube_grasp_rot, cube_pos, cube_rot,
-    mirobot_grasp_pos, mirobot_grasp_rot,
-    mirobot_lfinger_pos, mirobot_rfinger_pos,
+    bottle_grasp_pos, bottle_grasp_rot, bottle_pos, bottle_rot,
+    ur3_grasp_pos, ur3_grasp_rot,
+    ur3_lfinger_pos, ur3_rfinger_pos,
     lfinger_contact_net_force, rfinger_contact_net_force,
     gripper_forward_axis, cube_down_axis, gripper_right_axis, cube_left_axis,
     num_envs, cube_size, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
@@ -561,20 +578,20 @@ def compute_mirobot_reward(
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
 
     # distance from fingertip to the cube
-    d1 = torch.norm(mirobot_grasp_pos - cube_grasp_pos, p=2, dim=-1)
-    # d2 = torch.norm(mirobot_lfinger_pos - cube_grasp_pos, p=2, dim=-1)
-    # d3 = torch.norm(mirobot_rfinger_pos - cube_grasp_pos, p=2, dim=-1)
+    d1 = torch.norm(ur3_grasp_pos - bottle_grasp_pos, p=2, dim=-1)
+    # d2 = torch.norm(ur3_lfinger_pos - bottle_grasp_pos, p=2, dim=-1)
+    # d3 = torch.norm(ur3_rfinger_pos - bottle_grasp_pos, p=2, dim=-1)
     dist_reward = torch.exp(-20.0 * d1)
 
-    axis1 = tf_vector(mirobot_grasp_rot, gripper_forward_axis)
-    axis2 = tf_vector(cube_grasp_rot, cube_down_axis)
+    axis1 = tf_vector(ur3_grasp_rot, gripper_forward_axis)
+    axis2 = tf_vector(bottle_grasp_rot, cube_down_axis)
     dot1 = torch.bmm(axis1.view(num_envs, 1, 3), axis2.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # alignment of forward axis for gripper
 
-    axis3 = tf_vector(mirobot_grasp_rot, gripper_right_axis)
-    axis4 = tf_vector(cube_grasp_rot, cube_left_axis)
+    axis3 = tf_vector(ur3_grasp_rot, gripper_right_axis)
+    axis4 = tf_vector(bottle_grasp_rot, cube_left_axis)
     dot2 = torch.bmm(axis3.view(num_envs, 1, 3), axis4.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # alignment of forward axis for gripper
 
-    axis5 = tf_vector(cube_grasp_rot, gripper_forward_axis)
+    axis5 = tf_vector(bottle_grasp_rot, gripper_forward_axis)
     axis6 = gripper_forward_axis
     dot3 = torch.bmm(axis5.view(num_envs, 1, 3), axis6.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)  # check the cube fallen
     cube_fallen_reward = torch.where((1 - dot3) < 0.8, -1, 0)
@@ -583,7 +600,7 @@ def compute_mirobot_reward(
     approach_done = (d1 <= 0.008) & ((1 - dot1) <= 0.2) & ((1 - dot2) <= 0.2)
 
     finger_dist_reward = torch.zeros_like(rot_reward)
-    finger_dist = torch.norm(mirobot_lfinger_pos - mirobot_rfinger_pos, p=2, dim=-1)
+    finger_dist = torch.norm(ur3_lfinger_pos - ur3_rfinger_pos, p=2, dim=-1)
     cube_size = 0.02
     finger_dist_reward = torch.where(finger_dist > cube_size, finger_dist_reward + 0.1, finger_dist_reward)
 
@@ -596,9 +613,9 @@ def compute_mirobot_reward(
     grasp_done = approach_done & (finger_dist <= cube_size)
 
     # finger reward
-    cube_z_axis = tf_vector(cube_rot, gripper_forward_axis)
-    _lfinger_vec = mirobot_lfinger_pos - cube_pos
-    _rfinger_vec = mirobot_rfinger_pos - cube_pos
+    cube_z_axis = tf_vector(bottle_rot, gripper_forward_axis)
+    _lfinger_vec = ur3_lfinger_pos - bottle_pos
+    _rfinger_vec = ur3_rfinger_pos - bottle_pos
     lfinger_dot = torch.bmm(_lfinger_vec.view(num_envs, 1, 3), cube_z_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
     rfinger_dot = torch.bmm(_rfinger_vec.view(num_envs, 1, 3), cube_z_axis.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
     lfinger_len = torch.norm(_lfinger_vec - lfinger_dot.unsqueeze(-1) * cube_z_axis, p=2, dim=-1)
@@ -640,11 +657,11 @@ def compute_mirobot_reward(
     des_height = 0.2
 
     lift_reward = torch.zeros_like(rot_reward)
-    cube_lift_pos = cube_grasp_pos.clone()
+    cube_lift_pos = bottle_grasp_pos.clone()
     cube_lift_pos[:, 2] = des_height
-    d2 = torch.norm(mirobot_grasp_pos - cube_lift_pos, p=2, dim=-1)
+    d2 = torch.norm(ur3_grasp_pos - cube_lift_pos, p=2, dim=-1)
     # lift_reward = torch.where(grasp_done, torch.exp(-20.0 * d2), lift_reward)
-    lift_dist = torch.norm(des_height - cube_pos[:, 2], p=2, dim=-1)
+    lift_dist = torch.norm(des_height - bottle_pos[:, 2], p=2, dim=-1)
     lift_reward = torch.exp(-10.0 * lift_dist)
     # lift_reward = torch.where(grasp_done, lift_reward + torch.exp(-100.0 * lift_dist), lift_reward)
     # lift_reward = torch.min(cube_pos[:, 2], torch.zeros_like(rot_reward))
@@ -663,7 +680,7 @@ def compute_mirobot_reward(
     #                       rewards + finger_dist_reward_scale * finger_dist_reward)
 
     # rewards = torch.where(lift_dist < 0.01, rewards * 3.0, rewards)
-    rewards = torch.where(cube_pos[:, 2] >= des_height, rewards * 2.0, rewards)
+    rewards = torch.where(bottle_pos[:, 2] >= des_height, rewards * 2.0, rewards)
 
     # check the collisions of both fingers
     _lfinger_contact_net_force = (lfinger_contact_net_force.T / (lfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
@@ -681,17 +698,17 @@ def compute_mirobot_reward(
 
     reset_buf = torch.where(dot3 < 0.8, torch.ones_like(reset_buf), reset_buf)
     # reset_buf = torch.where(lift_dist < 0.01, torch.ones_like(reset_buf), reset_buf)
-    reset_buf = torch.where(cube_pos[:, 2] >= des_height, torch.ones_like(reset_buf), reset_buf)
+    reset_buf = torch.where(bottle_pos[:, 2] >= des_height, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
 
     return rewards, reset_buf
 
 
 @torch.jit.script
-def compute_grasp_transforms(hand_rot, hand_pos, mirobot_local_grasp_rot, mirobot_local_grasp_pos):
+def compute_grasp_transforms(hand_rot, hand_pos, ur3_local_grasp_rot, ur3_local_grasp_pos):
     # type: (Tensor, Tensor, Tensor, Tensor) -> Tuple[Tensor, Tensor]
 
     global_franka_rot, global_franka_pos = tf_combine(
-        hand_rot, hand_pos, mirobot_local_grasp_rot, mirobot_local_grasp_pos)
+        hand_rot, hand_pos, ur3_local_grasp_rot, ur3_local_grasp_pos)
 
     return global_franka_rot, global_franka_pos
