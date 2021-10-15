@@ -54,6 +54,10 @@ class UR3Pouring(BaseTask):
 
         super().__init__(cfg=self.cfg)
 
+        # set gripper params
+        self.grasp_z_offset = 0.135  # (m)
+        self.gripper_stroke = 60  # (mm)
+
         # get gym GPU state tensors
         actor_root_state_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
@@ -95,7 +99,6 @@ class UR3Pouring(BaseTask):
         self.sim_params.gravity.y = 0
         self.sim_params.gravity.z = -9.81
         self.sim = super().create_sim(self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
-        self._create_ground_plane()
         self._create_envs(self.num_envs, self.cfg["env"]['envSpacing'], int(np.sqrt(self.num_envs)))
 
     def _create_ground_plane(self):
@@ -103,18 +106,26 @@ class UR3Pouring(BaseTask):
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
         self.gym.add_ground(self.sim, plane_params)
 
-    def _create_envs(self, num_envs, spacing, num_per_row):
-        lower = gymapi.Vec3(-spacing, -spacing, 0.0)
-        upper = gymapi.Vec3(spacing, spacing, spacing)
+    def _create_asset_bottle(self):
+        self.bottle_height = 0.195
+        self.bottle_radius = 0.065 / 2
+        asset_options = gymapi.AssetOptions()
+        asset_options.vhacd_enabled = True
+        asset_options.vhacd_params.resolution = 30000
+        asset_options.vhacd_params.max_convex_hulls = 8
+        asset_options.vhacd_params.max_num_vertices_per_ch = 16
 
-        asset_root = "../assets"
-        ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
         bottle_asset_file = "urdf/objects/bottle.urdf"
-
         if "asset" in self.cfg["env"]:
-            asset_root = self.cfg["env"]["asset"].get("assetRoot", asset_root)
-            ur3_asset_file = self.cfg["env"]["asset"].get("assetFileNameUR3", ur3_asset_file)
             bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
+
+        bottle_asset = self.gym.load_asset(self.sim, self.asset_root, bottle_asset_file, asset_options)
+        return bottle_asset
+
+    def _create_asset_ur3(self):
+        ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
+        if "asset" in self.cfg["env"]:
+            ur3_asset_file = self.cfg["env"]["asset"].get("assetFileNameUR3", ur3_asset_file)
 
         # load ur3 asset
         asset_options = gymapi.AssetOptions()
@@ -125,19 +136,29 @@ class UR3Pouring(BaseTask):
         asset_options.thickness = 0.001
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
         asset_options.use_mesh_materials = True
-        ur3_asset = self.gym.load_asset(self.sim, asset_root, ur3_asset_file, asset_options)
+        ur3_asset = self.gym.load_asset(self.sim, self.asset_root, ur3_asset_file, asset_options)
+        return ur3_asset
 
-        # load cube asset
-        asset_options = gymapi.AssetOptions()
-        asset_options.fix_base_link = False
-        asset_options.disable_gravity = False
-        asset_options.density = 40
-        bottle_asset = self.gym.load_asset(self.sim, asset_root, bottle_asset_file, asset_options)
+    def _create_asset_cup(self):
+        raise NotImplementedError
+
+    def _create_envs(self, num_envs, spacing, num_per_row):
+        self.asset_root = "../assets"
+        if "asset" in self.cfg["env"]:
+            self.asset_root = self.cfg["env"]["asset"].get("assetRoot", self.asset_root)
+
+        self._create_ground_plane()
+        bottle_asset = self._create_asset_bottle()
+        ur3_asset = self._create_asset_ur3()
+
+        lower = gymapi.Vec3(-spacing, -spacing, 0.0)
+        upper = gymapi.Vec3(spacing, spacing, spacing)
+
         self.cube_size = 0.02   # TODO, retrieve from cube_asset, later
 
         ur3_link_dict = self.gym.get_asset_rigid_body_dict(ur3_asset)
-
         print("ur3 link dictionary: ", ur3_link_dict)
+
         self.ur3_hand_index = ur3_link_dict["ee_link"]
         self.num_ur3_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
         self.num_ur3_dofs = self.gym.get_asset_dof_count(ur3_asset)
@@ -153,7 +174,7 @@ class UR3Pouring(BaseTask):
         self.ur3_dof_props["damping"][:6].fill(40.0)
         # robotiq 85 gripper
         self.ur3_dof_props["stiffness"][6:].fill(1000.0)
-        self.ur3_dof_props["damping"][6:].fill(40.0)
+        self.ur3_dof_props["damping"][6:].fill(400.0)
 
         self.ur3_dof_lower_limits = self.ur3_dof_props['lower']
         self.ur3_dof_upper_limits = self.ur3_dof_props['upper']
@@ -175,10 +196,10 @@ class UR3Pouring(BaseTask):
         # compute aggregate size
         num_ur3_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
         num_ur3_shapes = self.gym.get_asset_rigid_shape_count(ur3_asset)
-        num_cube_bodies = self.gym.get_asset_rigid_body_count(bottle_asset)
-        num_cube_shapes = self.gym.get_asset_rigid_shape_count(bottle_asset)
-        self.max_agg_bodies = num_ur3_bodies + num_cube_bodies
-        self.max_agg_shapes = num_ur3_shapes + num_cube_shapes
+        num_bottle_bodies = self.gym.get_asset_rigid_body_count(bottle_asset)
+        num_bottle_shapes = self.gym.get_asset_rigid_shape_count(bottle_asset)
+        self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies
+        self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes
 
         self.ur3_robots = []
         self.bottles = []
@@ -201,12 +222,6 @@ class UR3Pouring(BaseTask):
             if self.aggregate_mode == 2:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
 
-            # cube_pose = cube_start_pose
-            # cube_pose.p.x = self.start_position_noise * (np.random.rand() - 0.5)
-            # dz = 0.025
-            # dy = np.random.rand() - 0.5
-            # cube_pose.p.y = self.start_position_noise * dy
-            # cube_pose.p.z = dz
             bottle_actor = self.gym.create_actor(env_ptr, bottle_asset, bottle_start_pose, "bottle", i, 2)
 
             if self.aggregate_mode == 1:
@@ -254,23 +269,23 @@ class UR3Pouring(BaseTask):
         ur3_local_grasp_pose = hand_pose_inv * finger_pose
         ur3_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
         self.ur3_local_grasp_pos = to_torch([ur3_local_grasp_pose.p.x, ur3_local_grasp_pose.p.y,
-                                                ur3_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+                                             ur3_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_grasp_rot = to_torch([ur3_local_grasp_pose.r.x, ur3_local_grasp_pose.r.y,
-                                                ur3_local_grasp_pose.r.z, ur3_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
+                                             ur3_local_grasp_pose.r.z, ur3_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         _lfinger_pose = gymapi.Transform()
         _lfinger_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
         self.ur3_local_lfinger_pos = to_torch([_lfinger_pose.p.x, _lfinger_pose.p.y,
-                                                   _lfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+                                               _lfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_lfinger_rot = to_torch([_lfinger_pose.r.x, _lfinger_pose.r.y,
-                                                   _lfinger_pose.r.z, _lfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
+                                               _lfinger_pose.r.z, _lfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         _rfinger_pose = gymapi.Transform()
         _rfinger_pose.p += gymapi.Vec3(*get_axis_params(0.025, grasp_pose_axis))
         self.ur3_local_rfinger_pos = to_torch([_rfinger_pose.p.x, _rfinger_pose.p.y,
-                                                   _rfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+                                               _rfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_rfinger_rot = to_torch([_rfinger_pose.r.x, _rfinger_pose.r.y,
-                                                   _rfinger_pose.r.z, _rfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
+                                               _rfinger_pose.r.z, _rfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         cube_local_grasp_pose = gymapi.Transform()
         cube_local_grasp_pose.p = gymapi.Vec3(*get_axis_params(0.005, grasp_pose_axis))
@@ -324,6 +339,7 @@ class UR3Pouring(BaseTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.gym.refresh_jacobian_tensors(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.sync_gripper()
 
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
@@ -372,6 +388,9 @@ class UR3Pouring(BaseTask):
         return self.obs_buf
 
     def reset(self, env_ids):
+        self.actions = torch.zeros(self.num_envs, 7, dtype=torch.float, device=self.device)
+        self.actions[:, -1] = 1.0
+
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.dof_state[:, 0] = torch.zeros_like(self.dof_state[:, 0], dtype=torch.float, device=self.device)  # pos
         self.dof_state[:, 1] = torch.zeros_like(self.dof_state[:, 1], dtype=torch.float, device=self.device)  # vel
@@ -426,6 +445,16 @@ class UR3Pouring(BaseTask):
 
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
+
+    def sync_gripper(self):
+        self.ur3_dof_pos[:, 6] = 1.04 * self.ur3_dof_pos[:, 8]
+        self.ur3_dof_pos[:, 7] = -1. * self.ur3_dof_pos[:, 8]
+        self.ur3_dof_pos[:, 9] = 1.04 * self.ur3_dof_pos[:, 8]
+        self.ur3_dof_pos[:, 10] = -1. * self.ur3_dof_pos[:, 8]
+        self.ur3_dof_pos[:, 11] = 1 * self.ur3_dof_pos[:, 8]
+
+        self.dof_state[:, 0] = self.ur3_dof_pos.view(-1)
+        self.gym.set_dof_state_tensor(self.sim, gymtorch.unwrap_tensor(self.dof_state))
 
     def solve_abs(self, goal_pos, goal_rot, goal_grip):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
@@ -485,6 +514,7 @@ class UR3Pouring(BaseTask):
 
     def pre_physics_step(self, actions):
         self.actions = actions.clone().to(self.device)
+        # self.actions = torch.zeros_like(self.actions, dtype=torch.float, device=self.device)
         # rel_action = actions.clone().to(self.device)
         # self.actions = self.solve_rel(rel_pos=rel_action[:, 0:3], rel_rot=rel_action[:, 3:7], grip=rel_action[:, 7:])
         # print("actions min: {}, max: {} ".format(torch.min(self.actions), torch.max(self.actions)))
@@ -696,7 +726,7 @@ def compute_ur3_reward(
 
     rewards = torch.where(dot3 < 0.8,  torch.ones_like(rewards) * -1.0, rewards)
 
-    reset_buf = torch.where(dot3 < 0.8, torch.ones_like(reset_buf), reset_buf)
+    # reset_buf = torch.where(dot3 < 0.8, torch.ones_like(reset_buf), reset_buf)
     # reset_buf = torch.where(lift_dist < 0.01, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(bottle_pos[:, 2] >= des_height, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)

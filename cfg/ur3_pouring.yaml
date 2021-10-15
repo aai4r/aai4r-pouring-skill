@@ -2,7 +2,7 @@
 env:
   numEnvs: 2048
   envSpacing: 1.5
-  episodeLength: 50 # 400
+  episodeLength: 200 # 400
   enableDebugVis: True
 
   startPositionNoise: 0.1
