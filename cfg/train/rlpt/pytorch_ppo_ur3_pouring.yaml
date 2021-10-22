@@ -21,10 +21,10 @@ learn:
   cliprange: 0.1
   ent_coef: 0
   nsteps: 32
-  noptepochs: 20
+  noptepochs: 10
   nminibatches: 4 # this is per agent
   max_grad_norm: 1
-  optim_stepsize: 3.e-4 # 3e-4 is default for single agent training with constant schedule
+  optim_stepsize: 2.e-4 # 3e-4 is default for single agent training with constant schedule
   schedule: fixed # could be adaptive or linear or fixed
   gamma: 0.99
   lam: 0.95
