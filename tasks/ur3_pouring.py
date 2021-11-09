@@ -302,24 +302,25 @@ class UR3Pouring(BaseTask):
 
         hand_pose_inv = hand_pose.inverse()
         grasp_pose_axis = 2     # z-axis
+        fwd_offset = 0.02
         ur3_local_grasp_pose = hand_pose_inv * finger_pose
-        ur3_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(0.02, grasp_pose_axis))
+        ur3_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(fwd_offset, grasp_pose_axis))
         self.ur3_local_grasp_pos = to_torch([ur3_local_grasp_pose.p.x, ur3_local_grasp_pose.p.y,
                                              ur3_local_grasp_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_grasp_rot = to_torch([ur3_local_grasp_pose.r.x, ur3_local_grasp_pose.r.y,
                                              ur3_local_grasp_pose.r.z, ur3_local_grasp_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
-        finger_pose_axis = 0  # x-axis
+        finger_pose_axis = 1  # y-axis
         _lfinger_pose = gymapi.Transform()
-        _lfinger_pose.p += gymapi.Vec3(*get_axis_params(0.05, finger_pose_axis))
-        self.ur3_local_lfinger_pos = to_torch([_lfinger_pose.p.x, _lfinger_pose.p.y,
+        _lfinger_pose.p += gymapi.Vec3(*get_axis_params(0.008, finger_pose_axis))
+        self.ur3_local_lfinger_pos = to_torch([_lfinger_pose.p.x + fwd_offset, _lfinger_pose.p.y,
                                                _lfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_lfinger_rot = to_torch([_lfinger_pose.r.x, _lfinger_pose.r.y,
                                                _lfinger_pose.r.z, _lfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         _rfinger_pose = gymapi.Transform()
-        _rfinger_pose.p += gymapi.Vec3(*get_axis_params(0.05, finger_pose_axis))
-        self.ur3_local_rfinger_pos = to_torch([_rfinger_pose.p.x, _rfinger_pose.p.y,
+        _rfinger_pose.p += gymapi.Vec3(*get_axis_params(0.008, finger_pose_axis))
+        self.ur3_local_rfinger_pos = to_torch([_rfinger_pose.p.x + fwd_offset, _rfinger_pose.p.y,
                                                _rfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_rfinger_rot = to_torch([_rfinger_pose.r.x, _rfinger_pose.r.y,
                                                _rfinger_pose.r.z, _rfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
@@ -423,6 +424,23 @@ class UR3Pouring(BaseTask):
         dof_pos_finger = self.ur3_dof_pos[:, 8].unsqueeze(-1)
         self.obs_buf = torch.cat((dof_pos_finger, self.ur3_grasp_pos, self.ur3_grasp_rot,
                                   to_target_pos, to_target_rot), dim=-1)
+
+        # d1 = torch.norm(self.ur3_grasp_pos - self.bottle_grasp_pos, p=2, dim=-1)
+        # approach_done = d1 <= 0.01
+        #
+        # finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1)
+        # margin = 0.015
+        # finger_dist_reward = torch.exp(-15.0 * torch.norm(finger_dist - margin - self.bottle_diameter, p=2, dim=-1))
+        #
+        # grasp_reward_scale = 4.0
+        # grasp_reward = torch.where(approach_done,
+        #                            finger_dist_reward,
+        #                            -finger_dist_reward)
+        #
+        # env_id = 61
+        # print("appr. done: {},  finger dist: {},  grasp rew: {}".format(
+        #     approach_done[env_id], finger_dist[env_id], grasp_reward[env_id]))
+
         return self.obs_buf
 
     def reset(self, env_ids):
@@ -633,15 +651,15 @@ class UR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # bottle grasp pose
-                px = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                py = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pz = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                p0 = self.bottle_grasp_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # # bottle grasp pose
+                # px = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                #
+                # p0 = self.bottle_grasp_pos[i].cpu().numpy()
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # ur3 grasp pose
                 px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
@@ -717,20 +735,16 @@ def compute_ur3_reward(
     # rot_reward = 0.5 * torch.exp(-5.0 * (1.0 - dot1)) + 0.5 * torch.exp(-5.0 * (1.0 - dot2))
     rot_reward = 0.5 * torch.exp(-10.0 * (1.0 - dot1)) + 0.5 * torch.exp(-10.0 * (1.0 - dot2))
 
-    approach_done = d1 <= 0.01
+    approach_done = d1 <= 0.015
 
-    finger_dist_reward = torch.zeros_like(rot_reward)
     finger_dist = torch.norm(ur3_lfinger_pos - ur3_rfinger_pos, p=2, dim=-1)
     margin = 0.015
     finger_dist_reward = torch.exp(-15.0 * torch.norm(finger_dist - margin - bottle_diameter, p=2, dim=-1))
-    # finger_dist_reward = torch.where(finger_dist > bottle_diameter, finger_dist_reward + 0.1, finger_dist_reward)
 
     grasp_reward_scale = 4.0
-    grasp_reward = torch.zeros_like(rot_reward)
     grasp_reward = torch.where(approach_done,
                                finger_dist_reward,
                                -finger_dist_reward)
-    # grasp_reward + 1.0 - 100.0 * torch.max(finger_dist - cube_size, torch.zeros_like(finger_dist) - 0.005),
 
     # finger reward
     cube_z_axis = tf_vector(bottle_rot, gripper_up_axis)
@@ -771,9 +785,9 @@ def compute_ur3_reward(
     lift_done = bottle_pos[:, 2] >= des_height
     lift_reward = torch.where(lift_done, lift_reward * 2.0, lift_reward)
 
-    rewards = dist_reward_scale * dist_reward + grasp_reward_scale * grasp_reward + \
-              lift_reward_scale * lift_reward + rot_reward_scale * rot_reward \
-              - action_penalty * action_penalty_scale
+    rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
+              lift_reward_scale * lift_reward - action_penalty * action_penalty_scale
+              # + grasp_reward_scale * grasp_reward +
 
     # grasp = torch.norm(finger_dist - (cube_size - 0.002), p=2, dim=-1)
     # grasp_reward = torch.exp(-10.0 * grasp)
@@ -798,7 +812,7 @@ def compute_ur3_reward(
     # reset_buf = torch.where(rf_force_dot > 0.9, torch.ones_like(reset_buf), reset_buf)
 
     # bottle fallen penalty
-    # rewards = torch.where(dot3 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
+    rewards = torch.where(dot3 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
 
     reset_buf = torch.where(dot3 < 0.5, torch.ones_like(reset_buf), reset_buf)
     # reset_buf = torch.where(lift_dist < 0.01, torch.ones_like(reset_buf), reset_buf)
