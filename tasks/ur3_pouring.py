@@ -42,8 +42,8 @@ class UR3Pouring(BaseTask):
         self.up_axis_idx = 0    # 2
         self.dt = 1/60.
 
-        num_obs = 36
-        num_acts = 7
+        num_obs = 15
+        num_acts = 8
 
         self.cfg["env"]["numObservations"] = num_obs
         self.cfg["env"]["numActions"] = num_acts
@@ -59,6 +59,7 @@ class UR3Pouring(BaseTask):
         # set gripper params
         self.grasp_z_offset = 0.135  # (m)
         self.gripper_stroke = 60  # (mm)
+        self.angle_stroke_ratio = deg2rad(46) / 85
 
         # get gym GPU state tensors
         actor_root_state_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
@@ -71,6 +72,7 @@ class UR3Pouring(BaseTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
         # create some wrapper tensors for different slices
+        print("device:: ", self.device)
         self.ur3_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(-90.0), deg2rad(85.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
                                              deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
@@ -111,12 +113,15 @@ class UR3Pouring(BaseTask):
 
     def _create_asset_bottle(self):
         self.bottle_height = 0.195
-        self.bottle_radius = 0.065 / 2
+        self.bottle_diameter = 0.065
         asset_options = gymapi.AssetOptions()
+        asset_options.armature = 0.01
+        asset_options.angular_damping = 0.01
+        asset_options.linear_damping = 0.01
         asset_options.vhacd_enabled = True
-        asset_options.vhacd_params.resolution = 30000
-        asset_options.vhacd_params.max_convex_hulls = 16
-        asset_options.vhacd_params.max_num_vertices_per_ch = 32
+        asset_options.vhacd_params.resolution = 100000
+        # asset_options.vhacd_params.max_convex_hulls = 16
+        # asset_options.vhacd_params.max_num_vertices_per_ch = 32
 
         bottle_asset_file = "urdf/objects/bottle.urdf"
         if "asset" in self.cfg["env"]:
@@ -147,7 +152,7 @@ class UR3Pouring(BaseTask):
         asset_options.fix_base_link = True
         asset_options.collapse_fixed_joints = False
         asset_options.disable_gravity = True
-        asset_options.thickness = 0.001
+        asset_options.thickness = 0.005
         asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
         asset_options.use_mesh_materials = True
         ur3_asset = self.gym.load_asset(self.sim, self.asset_root, ur3_asset_file, asset_options)
@@ -169,8 +174,6 @@ class UR3Pouring(BaseTask):
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
 
-        self.cube_size = 0.02   # TODO, retrieve from cube_asset, later
-
         ur3_link_dict = self.gym.get_asset_rigid_body_dict(ur3_asset)
         print("ur3 link dictionary: ", ur3_link_dict)
 
@@ -189,7 +192,7 @@ class UR3Pouring(BaseTask):
         self.ur3_dof_props["damping"][:6].fill(40.0)
         # robotiq 85 gripper
         self.ur3_dof_props["stiffness"][6:].fill(1000.0)
-        self.ur3_dof_props["damping"][6:].fill(40.0)
+        self.ur3_dof_props["damping"][6:].fill(400.0)
 
         self.ur3_dof_lower_limits = self.ur3_dof_props['lower']
         self.ur3_dof_upper_limits = self.ur3_dof_props['upper']
@@ -207,7 +210,7 @@ class UR3Pouring(BaseTask):
 
         bottle_start_pose = gymapi.Transform()
         bottle_start_pose.p = gymapi.Vec3(*get_axis_params(0.0, self.up_axis_idx))
-        bottle_start_pose.p.x = 0.6
+        bottle_start_pose.p.x = 0.5
         bottle_start_pose.p.y = 0.0
         bottle_start_pose.p.z = self.bottle_height * 0.55
 
@@ -364,7 +367,7 @@ class UR3Pouring(BaseTask):
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.lfinger_handle],
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.rfinger_handle],
             self.gripper_forward_axis, self.bottle_up_axis, self.gripper_up_axis, self.cube_left_axis,
-            self.num_envs, self.cube_size, self.dist_reward_scale, self.rot_reward_scale, self.around_handle_reward_scale, self.open_reward_scale,
+            self.num_envs, self.bottle_diameter, self.dist_reward_scale, self.rot_reward_scale, self.around_handle_reward_scale, self.open_reward_scale,
             self.finger_dist_reward_scale, self.action_penalty_scale, self.max_episode_length
         )
 
@@ -405,25 +408,26 @@ class UR3Pouring(BaseTask):
         dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
                           / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
         dof_pos_scaled = torch.index_select(dof_pos_scaled, 1, self.indices)
-        dof_vel = self.ur3_dof_vel[:, :6]
+        dof_vel = torch.index_select(self.ur3_dof_vel, 1, self.indices)
 
         to_target_pos = self.bottle_grasp_pos - self.ur3_grasp_pos
         to_target_rot = quat_mul(quat_conjugate(self.bottle_grasp_rot), self.ur3_grasp_rot)
         # to_2nd_target_pos_z = (0.1 - self.cube_pos[:, 2].unsqueeze(-1)).norm()
         # cube_pos_z = self.cube_pos[:, 2].unsqueeze(-1)
 
-        # self.obs_buf = torch.cat((dof_pos_scaled, torch.index_select(self.ur3_dof_vel * self.dof_vel_scale, 1, self.indices),
+        # 7 + 7 + 7 = 21
+        # self.obs_buf = torch.cat((dof_pos_scaled, dof_vel * self.dof_vel_scale,
         #                           to_target_pos, to_target_rot), dim=-1)
 
-        self.obs_buf = torch.cat((dof_pos_scaled, dof_vel * self.dof_vel_scale,
-                                  self.ur3_grasp_pos, self.ur3_grasp_rot,
-                                  self.ur3_lfinger_pos, self.ur3_rfinger_pos,
-                                  self.bottle_pos, to_target_pos, to_target_rot), dim=-1)
+        # 1 + 7 + 7 + 7 = 22
+        dof_pos_finger = self.ur3_dof_pos[:, 8].unsqueeze(-1)
+        self.obs_buf = torch.cat((dof_pos_finger, self.ur3_grasp_pos, self.ur3_grasp_rot,
+                                  to_target_pos, to_target_rot), dim=-1)
         return self.obs_buf
 
     def reset(self, env_ids):
         self.actions = torch.zeros(self.num_envs, 7, dtype=torch.float, device=self.device)
-        self.actions[:, -1] = 1.0
+        # self.actions[:, -1] = 1.0
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.dof_state[:, 0] = torch.zeros_like(self.dof_state[:, 0], dtype=torch.float, device=self.device)  # pos
@@ -433,10 +437,10 @@ class UR3Pouring(BaseTask):
         pos = tensor_clamp(
             self.ur3_default_dof_pos.unsqueeze(0) + 0.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
+        self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, 8] = 0.0
         self.ur3_dof_vel[env_ids, :] = torch.zeros_like(self.ur3_dof_vel[env_ids])
-        # self.ur3_dof_targets[env_ids, :] = pos[env_ids, :]
 
         # for gripper sync.
         self.ur3_dof_pos[env_ids, 6] = 1 * self.ur3_dof_pos[env_ids, 8]
@@ -523,6 +527,12 @@ class UR3Pouring(BaseTask):
         self.ur3_dof_state[:, :, 0] = self.ur3_dof_pos
         self.gym.set_dof_state_tensor(self.sim, gymtorch.unwrap_tensor(self.dof_state))
 
+    def stroke_to_angle(self, mm):
+        return deg2rad(46) - self.angle_stroke_ratio * mm
+
+    def angle_to_stroke(self, rad):
+        return (deg2rad(46) - rad) / self.angle_stroke_ratio
+
     def solve(self, goal_pos, goal_rot, goal_grip, abs=False):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
@@ -539,12 +549,12 @@ class UR3Pouring(BaseTask):
             pos_err = goal_pos
             unit_quat = torch.zeros_like(goal_rot, device=self.device, dtype=torch.float)
             unit_quat[:, -1] = 1.0
-            orn_err = orientation_error(quat_unit(goal_rot), quat_unit(unit_quat))
+            orn_err = orientation_error(quat_unit(goal_rot), unit_quat)    # unit_quat
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
 
         # solve damped least squares
         j_eef_T = torch.transpose(self.j_eef, 1, 2)
-        d = 0.08  # damping term
+        d = 0.1  # damping term
         lmbda = torch.eye(6).to(self.device) * (d ** 2)
         u = (j_eef_T @ torch.inverse(self.j_eef @ j_eef_T + lmbda) @ dpose).view(self.num_envs, 6, 1)
 
@@ -565,18 +575,34 @@ class UR3Pouring(BaseTask):
 
     def pre_physics_step(self, actions):
         # self.actions = actions.clone().to(self.device)
+        # print("action: ", actions.shape, actions[0, :])
 
-        # abs. task space control
-        abs_actions = actions.to(self.device)
-        self.actions = torch.zeros(self.num_envs, 12, device=self.device, dtype=torch.float)
-        self.actions[:, :6] = abs_actions[:, :6]
-        self.actions[:, 8] = abs_actions[:, -1]
+        # joint space control
+        # self.actions = torch.zeros(self.num_envs, 12, device=self.device, dtype=torch.float)
+        # self.actions[:, :6] = actions[:, :6]
+        # grip_act = torch.tanh(actions[:, -1])
+        # self.actions[:, 8] = grip_act
 
-        # self.actions = self.solve(goal_pos=actions[:, :3], goal_rot=actions[:, 3:7], goal_grip=actions[:, -1],
-        #                           abs=False)
+        # TODO, rel. solve test code
+        # actions[:, :3] = torch.zeros_like(actions[:, :3])
+        # actions[:, 3:7] = torch.zeros_like(actions[:, 3:7])
+        # actions[:, 6] = 1.0
+        # q = quat_from_euler_xyz(0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float),
+        #                         0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float),
+        #                         0.1 * torch.ones(self.num_envs, device=self.device, dtype=torch.float))
+        # actions[:, 3:7] = q
+
+        # task space control
+        self.actions = self.solve(goal_pos=actions[:, :3], goal_rot=actions[:, 3:7], goal_grip=actions[:, -1],
+                                  abs=False)
 
         targets = self.ur3_dof_targets + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
+
+        # bottle_grasp_angle = torch.tensor(self.stroke_to_angle(self.bottle_diameter), device=self.device, dtype=torch.float)
+        # bottle_grasp_angle = torch.tensor(0.28, device=self.device, dtype=torch.float)
+        # gripper_open_angle = self.ur3_dof_lower_limits[8]
+        # self.ur3_dof_targets[:, 8] = torch.where(grip_act > 0.0, gripper_open_angle, bottle_grasp_angle)
         self.sync_gripper_target()
 
         env_ids_int32 = torch.arange(self.num_envs, dtype=torch.int32, device=self.device)
@@ -627,10 +653,10 @@ class UR3Pouring(BaseTask):
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # direction line
-                p1 = self.bottle_grasp_pos[i].cpu().numpy()
-                p0 = self.ur3_grasp_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]] ,[0.85, 0.85, 0.1])
+                # # direction line
+                # p1 = self.bottle_grasp_pos[i].cpu().numpy()
+                # p0 = self.ur3_grasp_pos[i].cpu().numpy()
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]] ,[0.85, 0.85, 0.1])
 
                 # # finger pose
                 # px = (self.ur3_lfinger_pos[i] + quat_apply(self.ur3_lfinger_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
@@ -650,6 +676,7 @@ class UR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [1, 0, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
+                pass
 
 #####################################################################
 ###=========================jit functions=========================###
@@ -664,7 +691,7 @@ def compute_ur3_reward(
     ur3_lfinger_pos, ur3_rfinger_pos,
     lfinger_contact_net_force, rfinger_contact_net_force,
     gripper_forward_axis, bottle_up_axis, gripper_up_axis, cube_left_axis,
-    num_envs, cube_size, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
+    num_envs, bottle_diameter, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
     finger_dist_reward_scale, action_penalty_scale, max_episode_length
 ):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
@@ -694,16 +721,16 @@ def compute_ur3_reward(
 
     finger_dist_reward = torch.zeros_like(rot_reward)
     finger_dist = torch.norm(ur3_lfinger_pos - ur3_rfinger_pos, p=2, dim=-1)
-    cube_size = 0.02
-    finger_dist_reward = torch.where(finger_dist > cube_size, finger_dist_reward + 0.1, finger_dist_reward)
+    margin = 0.015
+    finger_dist_reward = torch.exp(-15.0 * torch.norm(finger_dist - margin - bottle_diameter, p=2, dim=-1))
+    # finger_dist_reward = torch.where(finger_dist > bottle_diameter, finger_dist_reward + 0.1, finger_dist_reward)
 
     grasp_reward_scale = 4.0
     grasp_reward = torch.zeros_like(rot_reward)
     grasp_reward = torch.where(approach_done,
-                               grasp_reward + 1.0,
-                               finger_dist_reward)
+                               finger_dist_reward,
+                               -finger_dist_reward)
     # grasp_reward + 1.0 - 100.0 * torch.max(finger_dist - cube_size, torch.zeros_like(finger_dist) - 0.005),
-    grasp_done = approach_done & (finger_dist <= cube_size)
 
     # finger reward
     cube_z_axis = tf_vector(bottle_rot, gripper_up_axis)
@@ -720,34 +747,9 @@ def compute_ur3_reward(
     rfinger_vec = (_rfinger_vec.T / (_rfinger_vec_len + 1e-8)).T
     finger_around_dot = torch.bmm(lfinger_vec.view(num_envs, 1, 3), rfinger_vec.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
 
-    finger_around_reward_scale = 5.0
-    margin = 0.6
-    lfinger_around_reward = torch.zeros_like(rot_reward)
-    lfinger_around_reward = torch.where((lfinger_dot < cube_size * 2) & (lfinger_dot > cube_size * 0.5),
-                                       torch.where(lfinger_len < cube_size * 0.5, lfinger_around_reward - 1.0,
-                                                   lfinger_around_reward),
-                                       lfinger_around_reward)
-    rfinger_around_reward = torch.zeros_like(rot_reward)
-    rfinger_around_reward = torch.where((rfinger_dot < cube_size * 2) & (rfinger_dot > cube_size * 0.5),
-                                        torch.where(rfinger_len < cube_size * 0.5, rfinger_around_reward - 1.0,
-                                                    rfinger_around_reward),
-                                        rfinger_around_reward)
-    finger_around_reward = 0.5 * lfinger_around_reward + 0.5 * rfinger_around_reward
-    # finger_around_reward = torch.where(lfinger_len < cube_size * 0.5, finger_around_reward - 1.0, finger_around_reward)
-    # finger_around_reward = torch.where(finger_around_dot < -0.0, -1.0 * finger_around_dot, finger_around_reward)
-    # finger_around_reward = torch.where(finger_around_dot < -0.98, finger_around_reward * 2.0, finger_around_reward)
-    # finger_around_reward = torch.where(finger_around_dot < -0.99,
-    #                                    torch.where(_lfinger_vec_len < cube_size * margin,
-    #                                                torch.where(_rfinger_vec_len < cube_size * margin,
-    #                                                            finger_around_reward +
-    #                                                            2.0 * cube_size * margin - (_lfinger_vec_len + _rfinger_vec_len),
-    #                                                            finger_around_reward + (cube_size * margin - _lfinger_vec_len)),
-    #                                                finger_around_reward + 1.0),
-    #                                    finger_around_reward)
-
     # cube lifting reward
     lift_reward_scale = 8.0
-    des_height = 0.5
+    des_height = 0.8
 
     lift_reward = torch.zeros_like(rot_reward)
     bottle_lift_pos = bottle_grasp_pos.clone()
@@ -769,9 +771,9 @@ def compute_ur3_reward(
     lift_done = bottle_pos[:, 2] >= des_height
     lift_reward = torch.where(lift_done, lift_reward * 2.0, lift_reward)
 
-    rewards = dist_reward_scale * dist_reward + lift_reward_scale * lift_reward \
-              + rot_reward_scale * rot_reward - action_penalty * action_penalty_scale
-              # grasp_reward_scale * grasp_reward + \
+    rewards = dist_reward_scale * dist_reward + grasp_reward_scale * grasp_reward + \
+              lift_reward_scale * lift_reward + rot_reward_scale * rot_reward \
+              - action_penalty * action_penalty_scale
 
     # grasp = torch.norm(finger_dist - (cube_size - 0.002), p=2, dim=-1)
     # grasp_reward = torch.exp(-10.0 * grasp)

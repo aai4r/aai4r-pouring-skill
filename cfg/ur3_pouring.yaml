@@ -31,7 +31,7 @@ sim:
     solver_type: 1  # 0: pgs, 1: tgs
     num_position_iterations: 12 # 12
     num_velocity_iterations: 1
-    contact_offset: 0.012 # 0.005
+    contact_offset: 0.005 # 0.005
     rest_offset: 0.0
     bounce_threshold_velocity: 0.2
     max_depenetration_velocity: 1000.0

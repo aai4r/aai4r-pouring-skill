@@ -1,6 +1,6 @@
 seed: -1
 
-clip_observations: 10.0
+clip_observations: 5.0
 clip_actions: 1.0
 
 policy: # only works for MlpPolicy right now
@@ -8,7 +8,7 @@ policy: # only works for MlpPolicy right now
   vf_hid_sizes: [256, 128, 64]
   activation: selu # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
 learn:
-  agent_name: mirobot_ppo
+  agent_name: ur3_ppo
   test: False
   resume: 0
   save_interval: 100 # check for potential saves every this many iterations
@@ -25,8 +25,8 @@ learn:
   nminibatches: 4 # this is per agent
   max_grad_norm: 1
   optim_stepsize: 1.e-3 # 3e-4 is default for single agent training with constant schedule
-  schedule: adaptive # could be adaptive or linear or fixed
-  gamma: 0.98
+  schedule: fixed # could be adaptive or linear or fixed
+  gamma: 0.99
   lam: 0.95
   init_noise_std: 1.0
 
