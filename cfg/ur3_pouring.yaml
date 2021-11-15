@@ -17,7 +17,7 @@ env:
   aroundHandleRewardScale: 1.0
   openRewardScale: 4.0
   fingerDistRewardScale: 2.0
-  actionPenaltyScale: 0.001
+  actionPenaltyScale: 0.005
 
   asset:
     assetRoot: "assets"

@@ -393,15 +393,14 @@
     <child link="robotiq_85_left_knuckle_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="3.14159265359 0.0 0.0" xyz="0.05490451627 0.03060114443 0.0"/>
-    <limit effort="1000" lower="0.0" upper="0.80285" velocity="0.5"/>
+    <limit effort="100" lower="0.0" upper="0.80285" velocity="0.2"/>
   </joint>
-  <joint name="robotiq_85_right_knuckle_joint" type="continuous"> <!-- (11), continuous -->
+  <joint name="robotiq_85_right_knuckle_joint" type="revolute"> <!-- (11), continuous -->
     <parent link="robotiq_85_base_link"/>
     <child link="robotiq_85_right_knuckle_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.05490451627 -0.03060114443 0.0"/>
-    <limit effort="1000" lower="-3.14" upper="3.14" velocity="0.5"/>
-    <mimic joint="robotiq_85_left_knuckle_joint"/>
+    <limit effort="100" lower="0.0" upper="0.80285" velocity="0.2"/>
   </joint>
   <link name="robotiq_85_left_knuckle_link">
     <visual>
@@ -481,21 +480,19 @@
       <inertia ixx="0.000003" ixy="-0.000002" ixz="0.000000" iyx="-0.000002" iyy="0.000021" iyz="0.000000" izx="0.000000" izy="0.000000" izz="0.000020"/>
     </inertial>
   </link>
-  <joint name="robotiq_85_left_inner_knuckle_joint" type="continuous">  <!-- (6), continuous -->
+  <joint name="robotiq_85_left_inner_knuckle_joint" type="revolute">  <!-- (6), continuous -->
     <parent link="robotiq_85_base_link"/>
     <child link="robotiq_85_left_inner_knuckle_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="3.14159265359 0.0 0.0" xyz="0.06142 0.0127 0"/>
-    <limit effort="1000" lower="-3.14" upper="3.14" velocity="1.0"/>
-    <mimic joint="robotiq_85_left_knuckle_joint" offset="0"/>
+    <limit effort="100" lower="0.0" upper="0.80285" velocity="0.2"/>
   </joint>
-  <joint name="robotiq_85_right_inner_knuckle_joint" type="continuous"> <!-- (9), continuous -->
+  <joint name="robotiq_85_right_inner_knuckle_joint" type="revolute"> <!-- (9), continuous -->
     <parent link="robotiq_85_base_link"/>
     <child link="robotiq_85_right_inner_knuckle_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="0 0 0" xyz="0.06142 -0.0127 0"/>
-    <limit effort="1000" lower="-3.14" upper="3.14" velocity="1.0"/>
-    <mimic joint="robotiq_85_left_knuckle_joint" offset="0"/>
+    <limit effort="100" lower="0.0" upper="0.80285" velocity="0.2"/>
   </joint>
   <link name="robotiq_85_left_inner_knuckle_link">
     <visual>
@@ -531,21 +528,19 @@
       <inertia ixx="0.000039" ixy="0.000000" ixz="0.000000" iyx="0.000000" iyy="0.000005" iyz="0.000000" izx="0.000000" izy="0.000000" izz="0.000035"/>
     </inertial>
   </link>
-  <joint name="robotiq_85_left_finger_tip_joint" type="continuous"> <!-- (7), continuous -->
+  <joint name="robotiq_85_left_finger_tip_joint" type="revolute"> <!-- (7), continuous -->
     <parent link="robotiq_85_left_inner_knuckle_link"/>
     <child link="robotiq_85_left_finger_tip_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.04303959807 -0.03759940821 0.0"/>
-    <limit effort="1000" lower="-3.14" upper="3.14" velocity="1.0"/>
-    <mimic joint="robotiq_85_left_knuckle_joint" multiplier="-1"/>
+    <limit effort="100" lower="-0.80285" upper="0.0" velocity="0.2"/>
   </joint>
-  <joint name="robotiq_85_right_finger_tip_joint" type="continuous"> <!-- (10), continuous -->
+  <joint name="robotiq_85_right_finger_tip_joint" type="revolute"> <!-- (10), continuous -->
     <parent link="robotiq_85_right_inner_knuckle_link"/>
     <child link="robotiq_85_right_finger_tip_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="0.0 0.0 0.0" xyz="0.04303959807 -0.03759940821  0.0"/>
-    <limit effort="1000" lower="-3.14" upper="3.14" velocity="1.0"/>
-    <mimic joint="robotiq_85_left_knuckle_joint" multiplier="-1"/>
+    <limit effort="100" lower="-0.80285" upper="0.0" velocity="0.2"/>
   </joint>
   <link name="robotiq_85_left_finger_tip_link">
     <visual>
@@ -608,59 +603,6 @@
       <!-- <hardwareInterface>EfforJointInterface</hardwareInterface> -->
     </actuator>
   </transmission>
-  <!-- Mimic joints -->
-  <gazebo>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_1">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_right_knuckle_joint</mimicJoint>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_2">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_left_inner_knuckle_joint</mimicJoint>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_3">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_right_inner_knuckle_joint</mimicJoint>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_4">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_left_finger_tip_joint</mimicJoint>
-      <multiplier>-1.0</multiplier>
-      <offset>0.0</offset>
-    </plugin>
-    <plugin filename="libgazebo_mimic_joint_plugin.so" name="mimic_robotiq_85_5">
-      <joint>robotiq_85_left_knuckle_joint</joint>
-      <mimicJoint>robotiq_85_right_finger_tip_joint</mimicJoint>
-      <multiplier>-1.0</multiplier>
-      <offset>0.0</offset>
-    </plugin>
-  </gazebo>
-  <!-- Gazebo FT sensor plugin -->
-  <gazebo reference="wrist_3_joint">
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo>
-    <plugin filename="libgazebo_ros_ft_sensor.so" name="ft_sensor_plugin">
-      <updateRate>250.0</updateRate>
-      <topicName>ft_sensor/raw</topicName>
-      <gaussianNoise>0.0</gaussianNoise>
-      <jointName>wrist_3_joint</jointName>
-    </plugin>
-  </gazebo>
-  <!-- Gazebo grasping plugin -->
-  <gazebo>
-    <gripper name="gazebo_gripper">
-      <grasp_check>
-        <attach_steps>2</attach_steps>
-        <!-- default: 20 -->
-        <detach_steps>2</detach_steps>
-        <!-- default: 40 -->
-        <min_contact_count>3</min_contact_count>
-      </grasp_check>
-      <gripper_link>robotiq_85_left_finger_tip_link</gripper_link>
-      <gripper_link>robotiq_85_right_finger_tip_link</gripper_link>
-      <palm_link>robotiq_85_base_link</palm_link>
-    </gripper>
-  </gazebo>
+  <!-- <mimic joint="robotiq_85_left_knuckle_joint" offset="0"/> -->
 </robot>
 
