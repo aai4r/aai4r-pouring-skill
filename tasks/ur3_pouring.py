@@ -456,7 +456,7 @@ class UR3Pouring(BaseTask):
         #                           to_target_pos, to_target_rot), dim=-1)
 
         # 1 + 7 + 7 + 7 = 22
-        dof_pos_finger = self.ur3_dof_pos[:, 8].unsqueeze(-1)
+        dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
         finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1).unsqueeze(-1)
         self.obs_buf = torch.cat((dof_pos_finger,
                                   self.ur3_grasp_pos, self.ur3_grasp_rot,
