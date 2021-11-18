@@ -87,6 +87,7 @@ class UR3Pouring(BaseTask):
 
         self.root_state_tensor = gymtorch.wrap_tensor(actor_root_state_tensor).view(self.num_envs, -1, 13)
         self.bottle_states = self.root_state_tensor[:, 1]
+        self.cup_states = self.root_state_tensor[:, 2]
 
         self.contact_net_force = gymtorch.wrap_tensor(contact_net_force_tensor)
 
@@ -128,7 +129,7 @@ class UR3Pouring(BaseTask):
         # asset_options.fix_base_link = True
         # asset_options.armature = 0.005
         asset_options.vhacd_enabled = True
-        asset_options.vhacd_params.resolution = 100000
+        asset_options.vhacd_params.resolution = 30000
         # asset_options.vhacd_params.max_convex_hulls = 16
         # asset_options.vhacd_params.max_num_vertices_per_ch = 32
 
@@ -138,6 +139,22 @@ class UR3Pouring(BaseTask):
 
         bottle_asset = self.gym.load_asset(self.sim, self.asset_root, bottle_asset_file, asset_options)
         return bottle_asset
+
+    def _create_asset_cup(self):
+        self.cup_height = 0.074
+        asset_options = gymapi.AssetOptions()
+        # asset_options.armature = 0.01
+        # asset_options.angular_damping = 0.01
+        # asset_options.linear_damping = 0.01
+        asset_options.vhacd_enabled = True
+        asset_options.vhacd_params.resolution = 250000
+        # asset_options.vhacd_params.max_convex_hulls = 128
+        # asset_options.vhacd_params.max_num_vertices_per_ch = 64
+        # asset_options.use_mesh_materials = True
+
+        cup_asset_file = "urdf/objects/paper_cup.urdf"
+        cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)
+        return cup_asset
 
     def create_asset_fluid_particle(self):
         r = 0.012
@@ -167,30 +184,15 @@ class UR3Pouring(BaseTask):
         ur3_asset = self.gym.load_asset(self.sim, self.asset_root, ur3_asset_file, asset_options)
         return ur3_asset
 
-    def _create_asset_cup(self):
-        self.cup_height = 0.074
-        asset_options = gymapi.AssetOptions()
-        asset_options.armature = 0.01
-        # asset_options.angular_damping = 0.01
-        # asset_options.linear_damping = 0.01
-        asset_options.vhacd_enabled = True
-        asset_options.vhacd_params.resolution = 30000
-        # asset_options.vhacd_params.max_convex_hulls = 8
-        # asset_options.vhacd_params.max_num_vertices_per_ch = 16
-
-        cup_asset_file = "urdf/objects/paper_cup.urdf"
-        cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)
-        return cup_asset
-
     def _create_envs(self, num_envs, spacing, num_per_row):
         self.asset_root = "../assets"
         if "asset" in self.cfg["env"]:
             self.asset_root = self.cfg["env"]["asset"].get("assetRoot", self.asset_root)
 
         self._create_ground_plane()
+        ur3_asset = self._create_asset_ur3()
         bottle_asset = self._create_asset_bottle()
         cup_asset = self._create_asset_cup()
-        ur3_asset = self._create_asset_ur3()
         fluid_asset = self.create_asset_fluid_particle()
 
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
@@ -249,13 +251,14 @@ class UR3Pouring(BaseTask):
         num_bottle_shapes = self.gym.get_asset_rigid_shape_count(bottle_asset)
         num_cup_bodies = self.gym.get_asset_rigid_body_count(cup_asset)
         num_cup_shapes = self.gym.get_asset_rigid_shape_count(cup_asset)
-        self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies #+ num_cup_bodies #+ self.num_liq_particles
-        self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes #+ num_cup_shapes #+ self.num_liq_particles
+        self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies + num_cup_bodies #+ self.num_liq_particles
+        self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes + num_cup_shapes #+ self.num_liq_particles
 
         self.ur3_robots = []
         self.bottles = []
         self.cups = []
         self.default_bottle_states = []
+        self.default_cup_states = []
         self.prop_start = []
         self.envs = []
 
@@ -276,17 +279,19 @@ class UR3Pouring(BaseTask):
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
 
             # (2) Create Bottle
-            bottle_actor = self.gym.create_actor(env_ptr, bottle_asset, bottle_start_pose, "bottle", i, 2)
+            bottle_actor = self.gym.create_actor(env_ptr, bottle_asset, bottle_start_pose, "bottle", i, 0)
+            self.default_bottle_states.append([bottle_start_pose.p.x, bottle_start_pose.p.y, bottle_start_pose.p.z,
+                                               bottle_start_pose.r.x, bottle_start_pose.r.y, bottle_start_pose.r.z, bottle_start_pose.r.w,
+                                               0, 0, 0, 0, 0, 0])
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
 
             # (3) Create Cup
-            # cup_actor = self.gym.create_actor(env_ptr, cup_asset, cup_start_pose, "cup", i, 3)
-
-            self.default_bottle_states.append([bottle_start_pose.p.x, bottle_start_pose.p.y, bottle_start_pose.p.z,
-                                               bottle_start_pose.r.x, bottle_start_pose.r.y, bottle_start_pose.r.z, bottle_start_pose.r.w,
-                                               0, 0, 0, 0, 0, 0])
+            cup_actor = self.gym.create_actor(env_ptr, cup_asset, cup_start_pose, "paper_cup", i, 0)
+            self.default_cup_states.append([cup_start_pose.p.x, cup_start_pose.p.y, cup_start_pose.p.z,
+                                            cup_start_pose.r.x, cup_start_pose.r.y, cup_start_pose.r.z, cup_start_pose.r.w,
+                                            0, 0, 0, 0, 0, 0])
 
             if self.aggregate_mode > 0:
                 self.gym.end_aggregate(env_ptr)
@@ -307,14 +312,16 @@ class UR3Pouring(BaseTask):
             self.envs.append(env_ptr)
             self.ur3_robots.append(ur3_actor)
             self.bottles.append(bottle_actor)
-            # self.cups.append(cup_actor)
+            self.cups.append(cup_actor)
 
         self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "tool0")
         self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_left_finger_tip_link")
         self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_right_finger_tip_link")
+        # TODO
         self.bottle_handle = self.gym.find_actor_rigid_body_handle(env_ptr, bottle_actor, "bottle")
+        self.cup_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cup_actor, "paper_cup")
         self.default_bottle_states = to_torch(self.default_bottle_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
-
+        self.default_cup_states = to_torch(self.default_cup_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
         self.init_data()
 
     def init_data(self):
@@ -412,7 +419,7 @@ class UR3Pouring(BaseTask):
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.gym.refresh_jacobian_tensors(self.sim)
-        # self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.gym.refresh_net_contact_force_tensor(self.sim)
         self.sync_gripper()
 
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
@@ -437,6 +444,12 @@ class UR3Pouring(BaseTask):
         # bottle info
         self.bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
         self.bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
+
+        # cup info.
+        # self.cup_pos = self.rigid_body_states[:, self.cup_handle][:, 0:3]
+        # self.cup_rot = self.rigid_body_states[:, self.cup_handle][:, 3:7]
+        self.cup_pos = self.cup_states[:, 0:3]
+        self.cup_rot = self.cup_states[:, 3:7]
 
         self.bottle_grasp_rot[:], self.bottle_grasp_pos[:] = \
             tf_combine(self.bottle_rot, self.bottle_pos, self.bottle_local_grasp_rot, self.bottle_local_grasp_pos)
@@ -549,6 +562,15 @@ class UR3Pouring(BaseTask):
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
         rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
         self.bottle_states[env_ids] = pick + rand_bottle_pos
+
+        # reset cup
+        place = self.default_cup_states[env_ids]
+        place += (torch.rand_like(place, device=self.device, dtype=torch.float) - 0.5) * xy_scale
+        place[:, 1] = torch.where(self.bottle_states[env_ids, 1] >= 0,
+                                  self.bottle_states[env_ids, 1] - 0.2,
+                                  self.bottle_states[env_ids, 1] + 0.2)
+        place[:, 3:7] = quat
+        self.cup_states[env_ids] = place
 
         # # fluid particle init.
         # for i in range(self.num_envs):
@@ -724,12 +746,22 @@ class UR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # # bottle grasp pose
-                # px = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                # bottle grasp pose
+                px = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.bottle_grasp_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
+                # # cup pose
+                # px = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
                 #
-                # p0 = self.bottle_grasp_pos[i].cpu().numpy()
+                # p0 = self.cup_pos[i].cpu().numpy()
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
