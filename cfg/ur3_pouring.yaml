@@ -12,12 +12,12 @@ env:
 
   actionScale: 1.0
   dofVelocityScale: 0.1
-  distRewardScale: 1.5
-  rotRewardScale: 0.5
-  aroundHandleRewardScale: 1.0
+  distRewardScale: 0.1
+  rotRewardScale: 0.05
+  aroundHandleRewardScale: 2.0
   openRewardScale: 4.0
   fingerDistRewardScale: 2.0
-  actionPenaltyScale: 0.005
+  actionPenaltyScale: 0.001
 
   asset:
     assetRoot: "assets"
@@ -34,7 +34,7 @@ sim:
     contact_offset: 0.005 # 0.005
     rest_offset: 0.0
     bounce_threshold_velocity: 0.2
-    max_depenetration_velocity: 1000.0
+    max_depenetration_velocity: 10000.0
     default_buffer_size_multiplier: 5.0
     always_use_articulations: False
 
