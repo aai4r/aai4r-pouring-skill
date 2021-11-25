@@ -10,7 +10,7 @@ policy: # only works for MlpPolicy right now
 learn:
   agent_name: ur3_ppo
   test: False
-  resume: 6000
+  resume: 0
   save_interval: 100 # check for potential saves every this many iterations
   print_log: True
 
@@ -19,7 +19,7 @@ learn:
 
   # training params
   cliprange: 0.2
-  ent_coef: 0.0
+  ent_coef: 0.001
   nsteps: 32
   noptepochs: 4
   nminibatches: 4 # this is per agent
