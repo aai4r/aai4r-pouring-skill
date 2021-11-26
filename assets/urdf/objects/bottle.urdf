@@ -10,7 +10,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0.00649375"/>
       <geometry>
-        <mesh filename="package://objects/meshes/bottle.obj" scale="1 1 1"/>
+        <mesh filename="package://objects/meshes/bottle2.obj" scale="1 1 1"/>
       </geometry>
       <material name="white">
         <color rgba="1.0 1.0 0.0 0.0"/>
@@ -19,7 +19,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0.00649375"/>
       <geometry>
-        <mesh filename="package://objects/meshes/bottle.obj" scale="1 1 1"/>
+        <mesh filename="package://objects/meshes/bottle2.obj" scale="1 1 1"/>
       </geometry>
     </collision>
   </link>

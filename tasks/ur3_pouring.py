@@ -42,7 +42,7 @@ class UR3Pouring(BaseTask):
         self.up_axis_idx = 0    # 2
         self.dt = 1/60.
 
-        num_obs = 18
+        num_obs = 21
         num_acts = 8
 
         self.cfg["env"]["numObservations"] = num_obs
@@ -87,7 +87,8 @@ class UR3Pouring(BaseTask):
 
         self.root_state_tensor = gymtorch.wrap_tensor(actor_root_state_tensor).view(self.num_envs, -1, 13)
         self.bottle_states = self.root_state_tensor[:, 1]
-        self.cup_states = self.root_state_tensor[:, 2]
+        self.liquid_states = self.root_state_tensor[:, 2]
+        self.cup_states = self.root_state_tensor[:, 3]
 
         self.contact_net_force = gymtorch.wrap_tensor(contact_net_force_tensor)
 
@@ -129,7 +130,7 @@ class UR3Pouring(BaseTask):
         # asset_options.fix_base_link = True
         # asset_options.armature = 0.005
         asset_options.vhacd_enabled = True
-        asset_options.vhacd_params.resolution = 30000
+        asset_options.vhacd_params.resolution = 300000
         # asset_options.vhacd_params.max_convex_hulls = 16
         # asset_options.vhacd_params.max_num_vertices_per_ch = 32
 
@@ -163,7 +164,7 @@ class UR3Pouring(BaseTask):
 
         asset_options = gymapi.AssetOptions()
         asset_options.density = 997
-        liquid_asset = self.gym.create_sphere(self.sim, 0.004, asset_options)
+        liquid_asset = self.gym.create_sphere(self.sim, 0.015, asset_options)
         return liquid_asset
 
     def _create_asset_ur3(self):
@@ -193,7 +194,7 @@ class UR3Pouring(BaseTask):
         ur3_asset = self._create_asset_ur3()
         bottle_asset = self._create_asset_bottle()
         cup_asset = self._create_asset_cup()
-        fluid_asset = self.create_asset_fluid_particle()
+        liq_asset = self.create_asset_fluid_particle()
 
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
@@ -236,7 +237,10 @@ class UR3Pouring(BaseTask):
         bottle_start_pose.p = gymapi.Vec3(*get_axis_params(0.0, self.up_axis_idx))
         bottle_start_pose.p.x = 0.5
         bottle_start_pose.p.y = 0.0
-        bottle_start_pose.p.z = self.bottle_height * 0.55
+        bottle_start_pose.p.z = self.bottle_height * 0.05
+
+        liquid_start_pose = bottle_start_pose
+        liquid_start_pose.p.z += 0.1
 
         cup_start_pose = gymapi.Transform()
         cup_start_pose.p = gymapi.Vec3(*get_axis_params(0.0, self.up_axis_idx))
@@ -251,8 +255,10 @@ class UR3Pouring(BaseTask):
         num_bottle_shapes = self.gym.get_asset_rigid_shape_count(bottle_asset)
         num_cup_bodies = self.gym.get_asset_rigid_body_count(cup_asset)
         num_cup_shapes = self.gym.get_asset_rigid_shape_count(cup_asset)
-        self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies + num_cup_bodies #+ self.num_liq_particles
-        self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes + num_cup_shapes #+ self.num_liq_particles
+        num_liq_bodies = self.gym.get_asset_rigid_body_count(liq_asset)
+        num_liq_shapes = self.gym.get_asset_rigid_shape_count(liq_asset)
+        self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies + num_cup_bodies + num_liq_bodies  #+ self.num_liq_particles
+        self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes + num_cup_shapes + num_liq_shapes  #+ self.num_liq_particles
 
         self.ur3_robots = []
         self.bottles = []
@@ -289,7 +295,12 @@ class UR3Pouring(BaseTask):
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
 
-            # (3) Create Cup
+            # (3) Create liquid
+            liq_actor = self.gym.create_actor(env_ptr, liq_asset, liquid_start_pose, "liquid", i, 0)
+            self.gym.set_rigid_body_color(env_ptr, liq_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                          gymapi.Vec3(0, 0, np.random.uniform(0.7, 1)))
+
+            # (4) Create Cup
             cup_actor = self.gym.create_actor(env_ptr, cup_asset, cup_start_pose, "paper_cup", i, 0)
             self.default_cup_states.append([cup_start_pose.p.x, cup_start_pose.p.y, cup_start_pose.p.z,
                                             cup_start_pose.r.x, cup_start_pose.r.y, cup_start_pose.r.z, cup_start_pose.r.w,
@@ -406,7 +417,7 @@ class UR3Pouring(BaseTask):
         self.rew_buf[:], self.reset_buf[:] = compute_ur3_reward(
             self.reset_buf, self.progress_buf, self.actions,
             self.bottle_grasp_pos, self.bottle_grasp_rot, self.bottle_pos, self.bottle_rot,
-            self.ur3_grasp_pos, self.ur3_grasp_rot, self.cup_pos, self.cup_rot,
+            self.ur3_grasp_pos, self.ur3_grasp_rot, self.cup_pos, self.cup_rot, self.liq_pos,
             self.ur3_lfinger_pos, self.ur3_rfinger_pos,
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.lfinger_handle],
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.rfinger_handle],
@@ -452,6 +463,10 @@ class UR3Pouring(BaseTask):
         self.cup_pos = self.cup_states[:, 0:3]
         self.cup_rot = self.cup_states[:, 3:7]
 
+        # liquid info.
+        self.liq_pos = self.liquid_states[:, 0:3]
+        self.liq_rot = self.liquid_states[:, 3:7]
+
         self.bottle_grasp_rot[:], self.bottle_grasp_pos[:] = \
             tf_combine(self.bottle_rot, self.bottle_pos, self.bottle_local_grasp_rot, self.bottle_local_grasp_pos)
 
@@ -477,7 +492,7 @@ class UR3Pouring(BaseTask):
         self.obs_buf = torch.cat((dof_pos_finger,
                                   self.ur3_grasp_pos, self.ur3_grasp_rot,
                                   self.bottle_pos, self.bottle_rot,
-                                  self.cup_pos), dim=-1)
+                                  self.cup_pos, self.liq_pos), dim=-1)
 
         env_id = 61
         # d1 = torch.norm(self.ur3_grasp_pos - self.bottle_grasp_pos, p=2, dim=-1)
@@ -546,6 +561,11 @@ class UR3Pouring(BaseTask):
                                   self.bottle_states[env_ids, 1] + 0.2)
         place[:, 3:7] = quat
         self.cup_states[env_ids] = place
+
+        # reset liquid
+        init_liq_pose = pick + rand_bottle_pos
+        init_liq_pose[:, 2] = init_liq_pose[:, 2] + 0.13
+        self.liquid_states[env_ids] = init_liq_pose
 
         # # fluid particle init.
         # for i in range(self.num_envs):
@@ -785,14 +805,14 @@ class UR3Pouring(BaseTask):
 def compute_ur3_reward(
     reset_buf, progress_buf, actions,
     bottle_grasp_pos, bottle_grasp_rot, bottle_pos, bottle_rot,
-    ur3_grasp_pos, ur3_grasp_rot, cup_pos, cup_rot,
+    ur3_grasp_pos, ur3_grasp_rot, cup_pos, cup_rot, liq_pos,
     ur3_lfinger_pos, ur3_rfinger_pos,
     lfinger_contact_net_force, rfinger_contact_net_force,
     gripper_forward_axis, bottle_up_axis, gripper_up_axis, cube_left_axis,
     num_envs, bottle_diameter, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
     finger_dist_reward_scale, action_penalty_scale, max_episode_length
 ):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
 
     # distance from fingertip to the cube
     d1 = torch.norm(ur3_grasp_pos - bottle_grasp_pos, p=2, dim=-1)
@@ -840,17 +860,15 @@ def compute_ur3_reward(
 
     # cube lifting reward
     lift_reward_scale = 1.5
-    des_height = 0.3
+    des_height = 0.2
 
-    bottle_lift_pos = bottle_grasp_pos.clone()
-    bottle_lift_pos[:, 2] = des_height
     bottle_height = bottle_grasp_pos[:, 2]
 
     # regularization on the actions (summed for each environment)
     action_penalty = torch.sum(actions ** 2, dim=-1)
 
     # bottle_z = 0.195 * 0.55  # 0.107
-    is_lifted = torch.where((bottle_height > 0.3), 1.0, 0.0)
+    is_lifted = torch.where((bottle_height > des_height), 1.0, 0.0)
 
     # is_lifted = torch.zeros_like(rot_reward)
     # is_lifted = torch.where(approach_done,
@@ -864,14 +882,23 @@ def compute_ur3_reward(
     align_reward_scale = 2.0
     align_reward = torch.exp(-5.0 * torch.norm(bottle_pos[:, :2] - cup_pos[:, :2], p=2, dim=-1)) * is_lifted
 
+    pour_reward_scale = 2.0
+    liq_cup_dist = torch.norm(liq_pos - cup_pos, p=2, dim=-1)
+    pour_reward = torch.exp(-5.0 * liq_cup_dist) * is_lifted
+
     rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
-              lift_reward_scale * is_lifted + align_reward_scale * align_reward \
+              lift_reward_scale * is_lifted + pour_reward_scale * pour_reward \
               # - action_penalty_scale * action_penalty
               # + align_reward_scale * align_reward
               # - action_penalty_scale * action_penalty
               # grasp_reward_scale * grasp_reward
               # + lift_reward_scale * is_lifted \
               #+ align_reward_scale * align_reward \
+
+    poured_reward_scale = 20.0
+    poured_reward = torch.zeros_like(rewards)
+    poured_reward = torch.where(liq_cup_dist < 0.01, poured_reward + 1.0, poured_reward)
+    rewards = torch.max(rewards, poured_reward_scale * poured_reward)
 
     # check the collisions of both fingers
     # _lfinger_contact_net_force = (lfinger_contact_net_force.T / (lfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
@@ -891,7 +918,7 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.3) & (dot3 < 0.85), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.85, torch.ones_like(rewards) * -1.0, rewards)
 
-    reset_buf = torch.where((bottle_height < 0.3) & (dot3 < 0.85), torch.ones_like(reset_buf), reset_buf)
+    reset_buf = torch.where((bottle_height < des_height) & (dot3 < 0.85), torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where(dot4 < 0.85, torch.ones_like(reset_buf), reset_buf)
     # reset_buf = torch.where(lift_dist < 0.01, torch.ones_like(reset_buf), reset_buf)
     # reset_buf = torch.where(bottle_pos[:, 2] >= des_height, torch.ones_like(reset_buf), reset_buf)
