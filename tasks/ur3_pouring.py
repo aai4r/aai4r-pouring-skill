@@ -850,7 +850,7 @@ def compute_ur3_reward(
     action_penalty = torch.sum(actions ** 2, dim=-1)
 
     # bottle_z = 0.195 * 0.55  # 0.107
-    is_lifted = torch.where(approach_done & (bottle_height > 0.3), 1.0, 0.0)
+    is_lifted = torch.where((bottle_height > 0.3), 1.0, 0.0)
 
     # is_lifted = torch.zeros_like(rot_reward)
     # is_lifted = torch.where(approach_done,
