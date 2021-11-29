@@ -42,8 +42,10 @@ class UR3Pouring(BaseTask):
         self.up_axis_idx = 0    # 2
         self.dt = 1/60.
 
-        num_obs = 21
-        num_acts = 8
+        self.use_ik = True
+
+        num_obs = 21 if self.use_ik else 27    # 21 for task space
+        num_acts = 8 if self.use_ik else 12   # 8 for task space
 
         self.cfg["env"]["numObservations"] = num_obs
         self.cfg["env"]["numActions"] = num_acts
@@ -489,17 +491,13 @@ class UR3Pouring(BaseTask):
         # dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
         dof_pos_finger = self.ur3_dof_pos[:, 8].unsqueeze(-1)
         # finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1).unsqueeze(-1)
-        self.obs_buf = torch.cat((dof_pos_finger,
+        dof_state = dof_pos_finger if self.use_ik else dof_pos_scaled
+        self.obs_buf = torch.cat((dof_state,
                                   self.ur3_grasp_pos, self.ur3_grasp_rot,
                                   self.bottle_pos, self.bottle_rot,
                                   self.cup_pos, self.liq_pos), dim=-1)
 
         env_id = 61
-        # d1 = torch.norm(self.ur3_grasp_pos - self.bottle_grasp_pos, p=2, dim=-1)
-        # appr_done = d1 < 0.005
-        # print("d1: {:3f}, appr_done: {}".format(d1[env_id], appr_done[env_id]))
-        # print("fin_dist: {}, dof_pos: {}".format(finger_dist[env_id], dof_pos_finger[env_id]))
-        # print("actions: ", self.actions[env_id])
 
         return self.obs_buf
 
@@ -677,32 +675,31 @@ class UR3Pouring(BaseTask):
         return _u.squeeze(-1)
 
     def pre_physics_step(self, actions):
-        # self.actions = actions.clone().to(self.device)
-        # print("action: ", actions.shape, actions[0, :])
-
         # joint space control
         # self.actions = torch.zeros(self.num_envs, 12, device=self.device, dtype=torch.float)
         # self.actions[:, :6] = actions[:, :6]
         # grip_act = torch.tanh(actions[:, -1])
         # self.actions[:, 8] = grip_act
 
-        # TODO, rel. solve test code
-        # actions[:, :3] = torch.zeros_like(actions[:, :3])
-        # actions[:, 3:7] = torch.zeros_like(actions[:, 3:7])
-        # actions[:, 6] = 1.0
-        # q = quat_from_euler_xyz(0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float),
-        #                         0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float),
-        #                         0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float))
-        # actions[:, 3:7] = q
-        # actions[:, 7] = 0.001
+        if self.use_ik:
+            # TODO, rel. solve test code
+            # actions[:, :3] = torch.zeros_like(actions[:, :3])
+            # actions[:, 3:7] = torch.zeros_like(actions[:, 3:7])
+            # actions[:, 6] = 1.0
+            # q = quat_from_euler_xyz(0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float),
+            #                         0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float),
+            #                         0.0 * torch.ones(self.num_envs, device=self.device, dtype=torch.float))
+            # actions[:, 3:7] = q
+            # actions[:, 7] = 0.001
 
-        # task space control
-        self.actions = self.solve(goal_pos=actions[:, :3], goal_rot=actions[:, 3:7],
-                                  goal_grip=actions[:, 7], abs=False)
+            # task space control
+            self.actions = self.solve(goal_pos=actions[:, :3], goal_rot=actions[:, 3:7],
+                                      goal_grip=actions[:, 7], abs=False)
+        else:
+            self.actions = actions.clone().to(self.device)
 
         targets = self.ur3_dof_targets + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
-
 
         # gripper on/off
         # grip_act = torch.tanh(actions[:, -1])
@@ -870,33 +867,25 @@ def compute_ur3_reward(
     # bottle_z = 0.195 * 0.55  # 0.107
     is_lifted = torch.where((bottle_height > des_height), 1.0, 0.0)
 
-    # is_lifted = torch.zeros_like(rot_reward)
-    # is_lifted = torch.where(approach_done,
-    #                         torch.where(bottle_height > 0.2,
-    #                                     torch.where(bottle_height > 0.3,
-    #                                                 is_lifted + 1.0,
-    #                                                 is_lifted + 0.5),
-    #                                     is_lifted),
-    #                         is_lifted)
+    approach_reward_scale = 2.0
+    liq_cup_dist_xy = torch.norm(liq_pos[:, :2] - cup_pos[:, :2], p=2, dim=-1)
+    approach_reward = torch.where(liq_cup_dist_xy < 0.3, 1.0, 0.0) * is_lifted
 
-    align_reward_scale = 2.0
-    align_reward = torch.exp(-5.0 * torch.norm(bottle_pos[:, :2] - cup_pos[:, :2], p=2, dim=-1)) * is_lifted
-
-    pour_reward_scale = 2.0
-    liq_cup_dist = torch.norm(liq_pos - cup_pos, p=2, dim=-1)
-    pour_reward = torch.exp(-5.0 * liq_cup_dist) * is_lifted
+    pouring_reward_scale = 0.5
+    axis_bottle_up = tf_vector(bottle_rot, bottle_up_axis)
+    axis_bottle_cup = normalize(cup_pos - bottle_pos)
+    dot_pouring = torch.bmm(axis_bottle_up.view(num_envs, 1, 3), axis_bottle_cup.view(num_envs, 3, 1)).squeeze(-1).squeeze(-1)
+    pouring_reward = dot_pouring * is_lifted
 
     rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
-              lift_reward_scale * is_lifted + pour_reward_scale * pour_reward \
-              # - action_penalty_scale * action_penalty
-              # + align_reward_scale * align_reward
-              # - action_penalty_scale * action_penalty
-              # grasp_reward_scale * grasp_reward
-              # + lift_reward_scale * is_lifted \
-              #+ align_reward_scale * align_reward \
+              lift_reward_scale * is_lifted + approach_reward_scale * approach_reward + \
+              pouring_reward_scale * pouring_reward
+
+    # - action_penalty_scale * action_penalty
 
     poured_reward_scale = 20.0
     poured_reward = torch.zeros_like(rewards)
+    liq_cup_dist = torch.norm(liq_pos - cup_pos, p=2, dim=-1)
     poured_reward = torch.where(liq_cup_dist < 0.01, poured_reward + 1.0, poured_reward)
     rewards = torch.max(rewards, poured_reward_scale * poured_reward)
 
