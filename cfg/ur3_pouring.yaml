@@ -10,14 +10,14 @@ env:
 
   aggregateMode: 3
 
-  actionScale: 1.0
+  actionScale: 5.0
   dofVelocityScale: 0.1
-  distRewardScale: 0.1
-  rotRewardScale: 0.05
+  distRewardScale: 0.5
+  rotRewardScale: 0.1
   aroundHandleRewardScale: 2.0
   openRewardScale: 4.0
   fingerDistRewardScale: 2.0
-  actionPenaltyScale: 0.001
+  actionPenaltyScale: 0.003
 
   asset:
     assetRoot: "assets"
@@ -29,7 +29,7 @@ sim:
   physx:
     num_threads: 4
     solver_type: 1  # 0: pgs, 1: tgs
-    num_position_iterations: 12 # 12
+    num_position_iterations: 16 # 12
     num_velocity_iterations: 1
     contact_offset: 0.008 # 0.005
     rest_offset: 0.0
