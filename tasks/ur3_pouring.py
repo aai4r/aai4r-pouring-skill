@@ -166,7 +166,7 @@ class UR3Pouring(BaseTask):
 
         asset_options = gymapi.AssetOptions()
         asset_options.density = 997
-        liquid_asset = self.gym.create_sphere(self.sim, 0.015, asset_options)
+        liquid_asset = self.gym.create_sphere(self.sim, 0.02, asset_options)   # radius
         return liquid_asset
 
     def _create_asset_ur3(self):
@@ -358,7 +358,7 @@ class UR3Pouring(BaseTask):
 
         hand_pose_inv = hand_pose.inverse()
         grasp_pose_axis = 2     # z-axis
-        fwd_offset = 0.025
+        fwd_offset = 0.02
         ur3_local_grasp_pose = hand_pose_inv * finger_pose
         ur3_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(fwd_offset, grasp_pose_axis))
         self.ur3_local_grasp_pos = to_torch([ur3_local_grasp_pose.p.x, ur3_local_grasp_pose.p.y,
@@ -407,7 +407,7 @@ class UR3Pouring(BaseTask):
                                                 device=self.device).repeat((self.num_envs, 1))
 
         cup_local_tip_pose = gymapi.Transform()
-        cup_local_tip_pose.p = gymapi.Vec3(*get_axis_params(self.cup_height * 0.5 + 0.02, 2))
+        cup_local_tip_pose.p = gymapi.Vec3(*get_axis_params(self.cup_height * 0.5 + 0.03, 2))
         cup_local_tip_pose.r = gymapi.Quat(0, 0, 0, 1)
         self.cup_local_tip_pos = to_torch([cup_local_tip_pose.p.x, cup_local_tip_pose.p.y,
                                            cup_local_tip_pose.p.z], device=self.device).repeat((self.num_envs, 1))
@@ -544,6 +544,8 @@ class UR3Pouring(BaseTask):
                                   tip_pos_diff), dim=-1)
 
         env_id = 61
+        # tip_diff = torch.tanh(50 * (self.bottle_tip_pos[:, 2] - self.bottle_floor_pos[:, 2]))
+        # print("tip_diff: {}".format(tip_diff[env_id]))
 
         return self.obs_buf
 
@@ -914,7 +916,7 @@ def compute_ur3_reward(
     lfd = torch.norm(ur3_lfinger_pos - bottle_grasp_pos, p=2, dim=-1)
     rfd = torch.norm(ur3_rfinger_pos - bottle_grasp_pos, p=2, dim=-1)
 
-    dist_reward = torch.exp(-5.0 * (0.8 * d1 + 0.1 * lfd + 0.1 * rfd))
+    dist_reward = torch.exp(-5.0 * (0.4 * d1 + 0.3 * lfd + 0.3 * rfd))
     dist_reward = torch.where(approach_done, dist_reward + 1.0, dist_reward)
 
     # finger reward
@@ -945,7 +947,7 @@ def compute_ur3_reward(
     is_lifted = torch.where((bottle_floor_pos[:, 2] > 0.07), 1.0, 0.0)
     is_grasped = torch.where(approach_done & ((lfd + rfd) <= 0.065), 1.0, 0.0)
 
-    pouring_reward_scale = 3.0
+    pouring_reward_scale = 10.0
     axis_bottle_up = tf_vector(bottle_rot, bottle_up_axis)
     axis_bottle_cup = normalize(cup_pos - bottle_pos)
     # axis_bottle_cup = tf_vector(cup_rot, -bottle_up_axis)
@@ -954,30 +956,29 @@ def compute_ur3_reward(
     # pouring_reward = (torch.exp(-5.0 * (1.0 - dot_pouring)) - torch.sigmoid(bottle_cup_dist_xy - 0.2)) * is_lifted
 
     bottle_cup_tip_dist = torch.norm(bottle_tip_pos - cup_tip_pos, p=2, dim=-1)
-    approach_tip = torch.where(bottle_cup_tip_dist < 0.02, 1.0, 0.0)
+    approach_tip = torch.where(bottle_cup_tip_dist < 0.03, 1.0, 0.0)
 
-    liq_cup_dist = torch.norm(liq_pos[:, :2] - cup_pos[:, :2], p=2, dim=-1)
+    liq_cup_dist_xy = torch.norm(liq_pos[:, :2] - cup_pos[:, :2], p=2, dim=-1)
+    liq_cup_dist = torch.norm(liq_pos - cup_pos, p=2, dim=-1)
     # bottle_height_rew = torch.where((bottle_pos[:, 2] - bottle_tip_pos[:, 2]) > 0, 1.0, 0.0)
     # bottle_height_rew = torch.min(0.1125 + (bottle_pos[:, 2] - bottle_tip_pos[:, 2]), torch.tensor(0.15))
-    bottle_height_rew = 1.0 - torch.tanh(5.0 * (bottle_tip_pos[:, 2] - bottle_floor_pos[:, 2]))
+    bottle_height_rew = 1.0 - torch.tanh(50.0 * (bottle_tip_pos[:, 2] - bottle_floor_pos[:, 2]))
     # pouring_reward = (((2.0 * torch.exp(-1.0 * liq_cup_dist) + 1.0 * bottle_height_rew)) / 3) * is_lifted
-    pouring_reward = 1.0 * torch.exp(-5.0 * bottle_cup_tip_dist) * is_lifted + \
-                     2.0 * torch.exp(-5.0 * bottle_height_rew) * approach_tip + \
-                     3.0 * torch.exp(-5.0 * liq_cup_dist) * approach_tip
+    pouring_reward = 0.3 * torch.exp(-5.0 * bottle_cup_tip_dist) * is_lifted + \
+                     0.7 * torch.exp(-5.0 * liq_cup_dist_xy) * approach_tip
+                     # 3.0 * bottle_height_rew * approach_tip + \
 
     drop_reward_scale = 10.0
     is_dropped = torch.where((is_lifted > 0.0) & (liq_pos[:, 2] < 0.06), 1.0, 0.0)
-    liq_cup_dist_xy = torch.norm(liq_pos[:, :2] - cup_pos[:, :2], p=2, dim=-1)
     drop_reward = torch.exp(-5.0 * liq_cup_dist_xy) * is_dropped
 
     rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
               lift_reward_scale * is_lifted + pouring_reward_scale * pouring_reward  \
               - action_penalty_scale * action_penalty \
-        # drop_reward_scale * drop_reward \
 
     poured_reward_scale = 100.0
     poured_reward = torch.zeros_like(rewards)
-    is_poured = (liq_cup_dist_xy < 0.01) & (liq_pos[:, 2] < 0.06)
+    is_poured = (liq_cup_dist_xy < 0.015) & (liq_pos[:, 2] < 0.06)
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
     rewards = torch.max(rewards, poured_reward_scale * poured_reward * is_lifted)
 
@@ -1000,11 +1001,11 @@ def compute_ur3_reward(
     # rewards = torch.where(dot4 < 0.85, torch.ones_like(rewards) * -1.0, rewards)
 
     # early stopping
-    reset_buf = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(reset_buf), reset_buf)
-    reset_buf = torch.where(dot4 < 0.5, torch.ones_like(reset_buf), reset_buf)
-    reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)
-    reset_buf = torch.where((liq_cup_dist_xy > 0.6) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)
-    reset_buf = torch.where((bottle_floor_pos[:, 2] > 0.1) & (liq_pos[:, 2] < 0.05), torch.ones_like(reset_buf), reset_buf)
+    reset_buf = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(reset_buf), reset_buf)   # bottle fallen
+    reset_buf = torch.where(dot4 < 0.5, torch.ones_like(reset_buf), reset_buf)  # paper cup fallen
+    reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
+    reset_buf = torch.where((liq_cup_dist_xy > 0.6) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range
+    # reset_buf = torch.where((bottle_floor_pos[:, 2] > 0.1) & (liq_pos[:, 2] < 0.05), torch.ones_like(reset_buf), reset_buf)
 
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
 

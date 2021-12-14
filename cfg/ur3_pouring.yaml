@@ -1,6 +1,6 @@
 # if given, will override the device setting in gym. 
 env:
-  numEnvs: 2048
+  numEnvs: 4096
   envSpacing: 1.5
   episodeLength: 350
   enableDebugVis: True
@@ -10,7 +10,7 @@ env:
 
   aggregateMode: 3
 
-  actionScale: 5.0
+  actionScale: 7.0
   dofVelocityScale: 0.1
   distRewardScale: 0.5
   rotRewardScale: 0.1
@@ -29,7 +29,7 @@ sim:
   physx:
     num_threads: 4
     solver_type: 1  # 0: pgs, 1: tgs
-    num_position_iterations: 16 # 12
+    num_position_iterations: 12 # 12
     num_velocity_iterations: 1
     contact_offset: 0.008 # 0.005
     rest_offset: 0.0
