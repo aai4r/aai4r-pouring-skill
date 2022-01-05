@@ -1,6 +1,6 @@
 # if given, will override the device setting in gym. 
 env:
-  numEnvs: 4096
+  numEnvs: 8192
   envSpacing: 1.5
   episodeLength: 350
   enableDebugVis: True
@@ -12,12 +12,12 @@ env:
 
   actionScale: 7.0
   dofVelocityScale: 0.1
-  distRewardScale: 0.5
+  distRewardScale: 1.0
   rotRewardScale: 0.1
   aroundHandleRewardScale: 2.0
   openRewardScale: 4.0
   fingerDistRewardScale: 2.0
-  actionPenaltyScale: 0.003
+  actionPenaltyScale: 0.01
 
   asset:
     assetRoot: "assets"
@@ -29,12 +29,12 @@ sim:
   physx:
     num_threads: 4
     solver_type: 1  # 0: pgs, 1: tgs
-    num_position_iterations: 12 # 12
+    num_position_iterations: 30 # 12
     num_velocity_iterations: 1
     contact_offset: 0.008 # 0.005
     rest_offset: 0.0
     bounce_threshold_velocity: 0.2
-    max_depenetration_velocity: 100000.0
+    max_depenetration_velocity: 10000.0
     default_buffer_size_multiplier: 5.0
     always_use_articulations: False
 

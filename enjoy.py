@@ -68,4 +68,3 @@ if __name__ == '__main__':
     set_seed(cfg_train.get("seed", -1), cfg_train.get("torch_deterministic", False))
     enjoy()
     # run_test()
-
