@@ -42,7 +42,7 @@ class UR3Pouring(BaseTask):
         self.up_axis_idx = 0    # 2
         self.dt = 1/60.
 
-        self.use_ik = False
+        self.use_ik = True
 
         num_obs = 24 if self.use_ik else 37    # 21 for task space
         num_acts = 8 if self.use_ik else 12   # 8 for task space
@@ -519,8 +519,9 @@ class UR3Pouring(BaseTask):
         self.cup_tip_rot[:], self.cup_tip_pos[:] = \
             tf_combine(self.cup_rot, self.cup_pos, self.cup_local_tip_rot, self.cup_local_tip_pos)
 
-        dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
-                          / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
+        # dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
+        #                   / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
+        dof_pos_scaled = self.ur3_dof_pos
         dof_pos_scaled = torch.index_select(dof_pos_scaled, 1, self.indices)
         dof_vel = torch.index_select(self.ur3_dof_vel, 1, self.indices)
         dof_pos_vel = torch.cat((dof_pos_scaled, dof_vel), dim=-1)
@@ -656,6 +657,7 @@ class UR3Pouring(BaseTask):
     def sync_gripper_target(self):
         scale = 1.0
         target = self.ur3_dof_targets[:, 8]
+        target = tensor_clamp(target, self.ur3_dof_lower_limits[8], self.ur3_dof_upper_limits[8])
         self.ur3_dof_targets[:, 6] = scale * target
         self.ur3_dof_targets[:, 7] = -1. * target
         self.ur3_dof_targets[:, 9] = scale * target
@@ -1018,6 +1020,7 @@ def compute_ur3_reward(
     # # bottle / cup fallen penalty
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
+    rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
 
     # early stopping
     reset_buf = torch.where((bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6), torch.ones_like(reset_buf), reset_buf)   # bottle fallen
