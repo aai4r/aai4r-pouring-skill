@@ -4,6 +4,7 @@ import torch
 
 from utils.torch_jit_utils import *
 from tasks.base.base_task import BaseTask
+from offline_rl.base.base_task_offline import BaseTaskOffline
 from isaacgym import gymtorch
 from isaacgym import gymapi
 
@@ -14,7 +15,7 @@ def orientation_error(desired, current):
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
 
-class UR3Pouring(BaseTask):
+class DemoUR3Pouring(BaseTaskOffline):
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self.cfg = cfg
@@ -31,9 +32,7 @@ class UR3Pouring(BaseTask):
         self.dof_vel_scale = self.cfg["env"]["dofVelocityScale"]
         self.dist_reward_scale = self.cfg["env"]["distRewardScale"]
         self.rot_reward_scale = self.cfg["env"]["rotRewardScale"]
-        self.around_handle_reward_scale = self.cfg["env"]["aroundHandleRewardScale"]
         self.open_reward_scale = self.cfg["env"]["openRewardScale"]
-        self.finger_dist_reward_scale = self.cfg["env"]["fingerDistRewardScale"]
         self.action_penalty_scale = self.cfg["env"]["actionPenaltyScale"]
 
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
@@ -732,6 +731,23 @@ class UR3Pouring(BaseTask):
 
         _u = torch.cat((u, u2), dim=1)
         return _u.squeeze(-1)
+
+    # demo generation codes
+
+    def _reset(self):
+        env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
+        if len(env_ids) > 0:
+            self.reset(env_ids)
+
+    def run(self):
+        print("demo start!")
+
+        obs = self._reset()
+        while not self.gym.query_viewer_has_closed(self.viewer):
+            pass
+
+        self.gym.destroy_viewer(self.viewer)
+        self.gym.destroy_sim(self.sim)
 
     def pre_physics_step(self, actions):
         # print("actions: ", actions[61])
