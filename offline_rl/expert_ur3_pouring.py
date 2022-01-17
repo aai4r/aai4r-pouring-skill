@@ -461,8 +461,8 @@ class DemoUR3Pouring(BaseTaskOffline):
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.lfinger_handle],
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.rfinger_handle],
             self.gripper_forward_axis, self.bottle_up_axis, self.gripper_up_axis, self.cube_left_axis,
-            self.num_envs, self.bottle_diameter, self.dist_reward_scale, self.rot_reward_scale, self.around_handle_reward_scale, self.open_reward_scale,
-            self.finger_dist_reward_scale, self.action_penalty_scale, self.max_episode_length
+            self.num_envs, self.bottle_diameter, self.dist_reward_scale, self.rot_reward_scale, self.open_reward_scale,
+            self.action_penalty_scale, self.max_episode_length
         )
 
     def compute_observations(self):
@@ -732,23 +732,6 @@ class DemoUR3Pouring(BaseTaskOffline):
         _u = torch.cat((u, u2), dim=1)
         return _u.squeeze(-1)
 
-    # demo generation codes
-
-    def _reset(self):
-        env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
-        if len(env_ids) > 0:
-            self.reset(env_ids)
-
-    def run(self):
-        print("demo start!")
-
-        obs = self._reset()
-        while not self.gym.query_viewer_has_closed(self.viewer):
-            pass
-
-        self.gym.destroy_viewer(self.viewer)
-        self.gym.destroy_sim(self.sim)
-
     def pre_physics_step(self, actions):
         # print("actions: ", actions[61])
         # joint space control
@@ -912,10 +895,10 @@ def compute_ur3_reward(
     ur3_lfinger_pos, ur3_rfinger_pos,
     lfinger_contact_net_force, rfinger_contact_net_force,
     gripper_forward_axis, bottle_up_axis, gripper_up_axis, cube_left_axis,
-    num_envs, bottle_diameter, dist_reward_scale, rot_reward_scale, around_handle_reward_scale, open_reward_scale,
-    finger_dist_reward_scale, action_penalty_scale, max_episode_length
+    num_envs, bottle_diameter, dist_reward_scale, rot_reward_scale, open_reward_scale,
+    action_penalty_scale, max_episode_length
 ):
-    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
 
     # distance from fingertip to the cube
     d1 = torch.norm(ur3_grasp_pos - bottle_grasp_pos, p=2, dim=-1)

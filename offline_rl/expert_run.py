@@ -8,16 +8,17 @@ Candidates:
 
 from isaacgym import gymutil
 from offline_rl.config import load_cfg
+from offline_rl.expert_manager import ExpertManager
 from utils.config import parse_sim_params
 from tasks.base.vec_task import VecTaskPython
 
 
 import torch
 
-from offline_rl.demo_ur3_pouring import DemoUR3Pouring
+from offline_rl.expert_ur3_pouring import DemoUR3Pouring
 
 # Task name format: $ROBOT_TASK: $CONFIG
-task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "demo_ur3_pouring.yaml"}}
+task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"}}
 
 
 def parse_task_py(args, cfg, sim_params):
@@ -63,8 +64,10 @@ def task_demonstration():
         args.test = True
 
     task, env = parse_task_py(args=args, cfg=cfg, sim_params=sim_params)
-    # TODO, intermediate class is needed for initialization like ppo class...
-    # task.run()
+    expert = ExpertManager(vec_env=env)
+
+    num_expert_iter = cfg['expert']['num_iterations']
+    expert.run(num_expert_iterations=num_expert_iter)
 
 
 if __name__ == '__main__':
