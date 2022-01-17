@@ -64,10 +64,13 @@ def task_demonstration():
         args.test = True
 
     task, env = parse_task_py(args=args, cfg=cfg, sim_params=sim_params)
-    expert = ExpertManager(vec_env=env)
 
-    num_expert_iter = cfg['expert']['num_iterations']
-    expert.run(num_expert_iterations=num_expert_iter)
+    # frame params
+    num_total_frames = cfg['expert']['num_total_frames']
+    num_transitions_per_env = round(num_total_frames / env.num_envs + 0.51)
+
+    expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, device=env.rl_device)
+    expert.run(num_transitions_per_env=num_transitions_per_env)
 
 
 if __name__ == '__main__':
