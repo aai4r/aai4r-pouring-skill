@@ -10,7 +10,7 @@ env:
 
   aggregateMode: 3
 
-  actionScale: 7.5
+  actionScale: 1.0
   dofVelocityScale: 0.1
   distRewardScale: 0.5
   rotRewardScale: 0.02
@@ -23,7 +23,7 @@ env:
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 expert:
-  num_total_frames: 10000
+  num_total_frames: 100000
 
 sim:
   substeps: 1

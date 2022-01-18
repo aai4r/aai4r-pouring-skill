@@ -1,7 +1,7 @@
 import torch
 
 
-class DemoRolloutStorage:
+class ExpertRolloutStorage:
 
     def __init__(self, num_envs, num_transitions_per_env, obs_shape, states_shape, actions_shape, device='cpu', sampler='sequential'):
 

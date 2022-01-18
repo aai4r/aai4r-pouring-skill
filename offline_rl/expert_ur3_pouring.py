@@ -4,7 +4,6 @@ import torch
 
 from utils.torch_jit_utils import *
 from tasks.base.base_task import BaseTask
-from offline_rl.base.base_task_offline import BaseTaskOffline
 from isaacgym import gymtorch
 from isaacgym import gymapi
 
@@ -15,7 +14,7 @@ def orientation_error(desired, current):
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
 
-class DemoUR3Pouring(BaseTaskOffline):
+class DemoUR3Pouring(BaseTask):
 
     def __init__(self, cfg, sim_params, physics_engine, device_type, device_id, headless):
         self.cfg = cfg
@@ -110,6 +109,9 @@ class DemoUR3Pouring(BaseTaskOffline):
         self.ur3_dof_upper_limits[8] = blim
         self.ur3_dof_upper_limits[9] = blim
         self.ur3_dof_upper_limits[11] = blim
+
+        # expert initialization
+        self.init_expert_flag = False
 
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -547,11 +549,6 @@ class DemoUR3Pouring(BaseTaskOffline):
                                   self.cup_pos, self.liq_pos,
                                   tip_pos_diff), dim=-1)
 
-        env_id = 61
-
-        # bottle_cup_tip_dist = torch.norm(self.bottle_tip_pos - self.cup_tip_pos, p=2, dim=-1)
-        # val = torch.exp(-5.0 * bottle_cup_tip_dist)
-        # print("val: ", val[env_id] * 50)
         return self.obs_buf
 
     def reset(self, env_ids):
@@ -689,19 +686,17 @@ class DemoUR3Pouring(BaseTaskOffline):
     def angle_to_stroke(self, rad):
         return (deg2rad(46) - rad) / self.angle_stroke_ratio
 
-    def solve(self, goal_pos, goal_rot, goal_grip, abs=False):
+    def solve(self, goal_pos, goal_rot, goal_grip, absolute=False):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
 
         self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
             compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
 
-        if abs:
-            # absolute
+        if absolute:
             pos_err = goal_pos - self.ur3_grasp_pos
             orn_err = orientation_error(quat_unit(goal_rot), self.ur3_grasp_rot)    # with quaternion normalize
-        else:
-            # relative
+        else:   # relative
             pos_err = goal_pos
             unit_quat = torch.zeros_like(goal_rot, device=self.device, dtype=torch.float)
             unit_quat[:, -1] = 1.0
@@ -710,15 +705,15 @@ class DemoUR3Pouring(BaseTaskOffline):
 
         # solve damped least squares
         j_eef_T = torch.transpose(self.j_eef, 1, 2)
-        d = 0.1  # damping term
+        d = 0.05  # damping term
         lmbda = torch.eye(6).to(self.device) * (d ** 2)
         u = (j_eef_T @ torch.inverse(self.j_eef @ j_eef_T + lmbda) @ dpose).view(self.num_envs, 6, 1)
 
         # robotiq gripper sync
         u2 = torch.zeros_like(u, device=self.device, dtype=torch.float)
-        # u2[:, 8-6] = self.stroke_to_angle(torch.tanh(goal_grip.unsqueeze(-1)))
+        u2[:, 8-6] = self.stroke_to_angle(goal_grip.unsqueeze(-1))
         # u2[:, 8-6] = torch.tanh(goal_grip.unsqueeze(-1))
-        u2[:, 8 - 6] = (self.ur3_dof_pos[:, -1] + goal_grip).unsqueeze(-1)
+        # u2[:, 8-6] = (self.ur3_dof_pos[:, -1] + goal_grip).unsqueeze(-1)
         # temp = self.stroke_to_angle(self.angle_to_stroke(self.ur3_dof_pos[:, -1]) + goal_grip)
         # u2[:, 8-6] = temp.unsqueeze(-1)
         scale = 1.0
@@ -753,7 +748,7 @@ class DemoUR3Pouring(BaseTaskOffline):
 
             # task space control
             self.actions = self.solve(goal_pos=actions[:, :3], goal_rot=actions[:, 3:7],
-                                      goal_grip=actions[:, 7], abs=False)
+                                      goal_grip=actions[:, 7], absolute=False)
         else:
             self.actions = actions.clone().to(self.device)
 
@@ -881,6 +876,33 @@ class DemoUR3Pouring(BaseTaskOffline):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0, 1, 0])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
                 pass
+
+    def init_task_viapoints(self):
+        self.task_step = 0
+        self.init_ur3_grasp_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
+        self.init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
+
+        # initial pose variation
+        var_scale = 0.1
+        pos_var = torch.rand_like(self.init_ur3_grasp_pos) - 0.5
+        # rot_var = torch.rand_like(self.init_ur3_grasp_rot) - 0.5
+        q = quat_from_euler_xyz(roll=deg2rad(45), pitch=0.0, yaw=0.0)
+
+        self.init_ur3_grasp_pos += pos_var * var_scale
+
+        self.init_ur3_grip = torch.ones(self.num_envs, device=self.device)
+
+    def calc_expert_action(self):
+        if not self.init_expert_flag:
+            self.init_task_viapoints()
+            self.init_expert_flag = True
+
+        env_ids = 61
+        print("init pos: {}, init ori: {}".format(self.init_ur3_grasp_pos[env_ids], self.init_ur3_grasp_rot[env_ids]))
+        actions = self.solve(goal_pos=self.init_ur3_grasp_pos, goal_rot=self.init_ur3_grasp_rot,
+                             goal_grip=self.init_ur3_grip, absolute=True)
+        return actions
+
 
 #####################################################################
 ###=========================jit functions=========================###

@@ -19,7 +19,7 @@ import torch
 
 
 # Base class for RL tasks
-class BaseTask():
+class BaseTask:
 
     def __init__(self, cfg, enable_camera_sensors=False):
         self.gym = gymapi.acquire_gym()
