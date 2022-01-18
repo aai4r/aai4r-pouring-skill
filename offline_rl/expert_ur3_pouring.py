@@ -886,7 +886,7 @@ class DemoUR3Pouring(BaseTask):
         var_scale = 0.1
         pos_var = torch.rand_like(self.init_ur3_grasp_pos) - 0.5
         # rot_var = torch.rand_like(self.init_ur3_grasp_rot) - 0.5
-        q = quat_from_euler_xyz(roll=deg2rad(45), pitch=0.0, yaw=0.0)
+        # q = quat_from_euler_xyz(roll=deg2rad(45), pitch=0.0, yaw=0.0)
 
         self.init_ur3_grasp_pos += pos_var * var_scale
 
