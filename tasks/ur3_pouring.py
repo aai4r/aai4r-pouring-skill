@@ -758,7 +758,7 @@ class UR3Pouring(BaseTask):
         else:
             self.actions = actions.clone().to(self.device)
 
-        targets = self.ur3_dof_targets + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
+        targets = self.ur3_dof_pos + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
 
         # gripper on/off
