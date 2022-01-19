@@ -485,7 +485,7 @@
     <child link="robotiq_85_left_inner_knuckle_link"/>
     <axis xyz="0 0 1"/>
     <origin rpy="3.14159265359 0.0 0.0" xyz="0.06142 0.0127 0"/>
-    <limit effort="100" lower="0.0" upper="0.80285" velocity="0.2"/>
+    <limit effort="100" lower="0.0" upper="0.80285" velocity="0.2"/>  <!-- limit unit: radian -->
   </joint>
   <joint name="robotiq_85_right_inner_knuckle_joint" type="revolute"> <!-- (9), continuous -->
     <parent link="robotiq_85_base_link"/>

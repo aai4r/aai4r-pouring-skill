@@ -10,7 +10,7 @@ env:
 
   aggregateMode: 3
 
-  actionScale: 1.5
+  actionScale: 15.5
   dofVelocityScale: 0.1
   distRewardScale: 0.5
   rotRewardScale: 0.02

@@ -39,7 +39,7 @@ class DemoUR3Pouring(BaseTask):
 
         self.up_axis = "x"      # z
         self.up_axis_idx = 0    # 2
-        self.dt = 1/60.
+        self.dt = 1/30.
 
         self.use_ik = False
 
@@ -60,7 +60,7 @@ class DemoUR3Pouring(BaseTask):
         # set gripper params
         self.grasp_z_offset = 0.135      # (meter)
         self.gripper_stroke = 85 / 1000  # (meter), robotiq 85 gripper stroke: 85 mm -> 0.085 m
-        self.angle_stroke_ratio = deg2rad(46) / self.gripper_stroke
+        self.angle_stroke_ratio = self.ur3_dof_upper_limits[8] / self.gripper_stroke
 
         # get gym GPU state tensors
         actor_root_state_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
@@ -102,14 +102,14 @@ class DemoUR3Pouring(BaseTask):
         self.reset(torch.arange(self.num_envs, device=self.device))
 
         # gripper limit for bottle
-        blim = self.stroke_to_angle(self.bottle_diameter - 0.005)
-        self.ur3_dof_lower_limits[7] = -blim
-        self.ur3_dof_lower_limits[10] = -blim
-
-        self.ur3_dof_upper_limits[6] = blim
-        self.ur3_dof_upper_limits[8] = blim
-        self.ur3_dof_upper_limits[9] = blim
-        self.ur3_dof_upper_limits[11] = blim
+        # blim = self.stroke_to_angle(self.bottle_diameter - 0.005)
+        # self.ur3_dof_lower_limits[7] = -blim
+        # self.ur3_dof_lower_limits[10] = -blim
+        #
+        # self.ur3_dof_upper_limits[6] = blim
+        # self.ur3_dof_upper_limits[8] = blim
+        # self.ur3_dof_upper_limits[9] = blim
+        # self.ur3_dof_upper_limits[11] = blim
 
         # expert initialization
         self.init_expert_flag = False
@@ -374,14 +374,14 @@ class DemoUR3Pouring(BaseTask):
 
         finger_pose_axis = 1  # y-axis
         _lfinger_pose = gymapi.Transform()
-        _lfinger_pose.p += gymapi.Vec3(*get_axis_params(0.008, finger_pose_axis))
+        _lfinger_pose.p += gymapi.Vec3(*get_axis_params(0.0078, finger_pose_axis))
         self.ur3_local_lfinger_pos = to_torch([_lfinger_pose.p.x + fwd_offset, _lfinger_pose.p.y,
                                                _lfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_lfinger_rot = to_torch([_lfinger_pose.r.x, _lfinger_pose.r.y,
                                                _lfinger_pose.r.z, _lfinger_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         _rfinger_pose = gymapi.Transform()
-        _rfinger_pose.p += gymapi.Vec3(*get_axis_params(0.008, finger_pose_axis))
+        _rfinger_pose.p += gymapi.Vec3(*get_axis_params(0.0078, finger_pose_axis))
         self.ur3_local_rfinger_pos = to_torch([_rfinger_pose.p.x + fwd_offset, _rfinger_pose.p.y,
                                                _rfinger_pose.p.z], device=self.device).repeat((self.num_envs, 1))
         self.ur3_local_rfinger_rot = to_torch([_rfinger_pose.r.x, _rfinger_pose.r.y,
@@ -682,10 +682,12 @@ class DemoUR3Pouring(BaseTask):
         self.gym.set_dof_state_tensor(self.sim, gymtorch.unwrap_tensor(self.dof_state))
 
     def stroke_to_angle(self, m):
-        return deg2rad(46) - self.angle_stroke_ratio * m
+        temp = self.ur3_dof_upper_limits[8] - self.angle_stroke_ratio * m
+        return tensor_clamp(temp, self.ur3_dof_lower_limits[8], self.ur3_dof_upper_limits[8])
 
     def angle_to_stroke(self, rad):
-        return (deg2rad(46) - rad) / self.angle_stroke_ratio
+        temp = (self.ur3_dof_upper_limits[8] - rad) / self.angle_stroke_ratio
+        return tensor_clamp(temp, to_torch(0.0, device=self.device), to_torch(self.gripper_stroke, device=self.device))
 
     def solve(self, goal_pos, goal_rot, goal_grip, absolute=False):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
@@ -711,14 +713,15 @@ class DemoUR3Pouring(BaseTask):
         u = (j_eef_T @ torch.inverse(self.j_eef @ j_eef_T + lmbda) @ dpose).view(self.num_envs, 6, 1)
 
         # robotiq gripper sync
+        finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1).unsqueeze(-1)
         u2 = torch.zeros_like(u, device=self.device, dtype=torch.float)
-        u2[:, 8-6] = self.stroke_to_angle(goal_grip.unsqueeze(-1))
-        # u2[:, 8-6] = torch.tanh(goal_grip.unsqueeze(-1))
-        # u2[:, 8-6] = (self.ur3_dof_pos[:, -1] + goal_grip).unsqueeze(-1)
-        # temp = self.stroke_to_angle(self.angle_to_stroke(self.ur3_dof_pos[:, -1]) + goal_grip)
-        # u2[:, 8-6] = temp.unsqueeze(-1)
-        scale = 1.0
+        angle_err = self.stroke_to_angle(goal_grip) - self.stroke_to_angle(finger_dist)
 
+        # PID control to avoid gripper oscillation
+        Kp = 2.1
+        u2[:, 8-6] = angle_err
+
+        scale = 1.0
         u2[:, 6-6] = scale * u2[:, 8-6]
         u2[:, 7-6] = -scale * u2[:, 8-6]
         u2[:, 9-6] = scale * u2[:, 8-6]
@@ -753,7 +756,7 @@ class DemoUR3Pouring(BaseTask):
         else:
             self.actions = actions.clone().to(self.device)
 
-        targets = self.ur3_dof_targets + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
+        targets = self.ur3_dof_pos + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
 
         # gripper on/off
@@ -883,10 +886,11 @@ class DemoUR3Pouring(BaseTask):
         self.init_ur3_grasp_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
         self.init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
 
-        # initial pose variation
+        # initial pos variation
         pos_var_meter = 0.05
         pos_var = (torch.rand_like(self.init_ur3_grasp_pos) - 0.5) * 2.0
 
+        # initial rot variation
         def d2r(deg):
             return deg * (math.pi / 180.0)
 
@@ -898,17 +902,32 @@ class DemoUR3Pouring(BaseTask):
 
         self.init_ur3_grasp_pos += pos_var * pos_var_meter
         self.init_ur3_grasp_rot = quat_mul(self.init_ur3_grasp_rot, q_var)
-        self.init_ur3_grip = torch.ones(self.num_envs, device=self.device)
+
+        # For 2F-85 gripper, 0x00 --> full open with 85mm, 0xFF --> close
+        # Unit: meter ~ [0.0, 0.085]
+        self.init_ur3_grip = to_torch([0.085], device=self.device).repeat((self.num_envs, 1))
+        print("init grip: ", self.init_ur3_grip)
 
     def calc_expert_action(self):
         if not self.init_expert_flag:
             self.init_task_viapoints()
             self.init_expert_flag = True
 
+        des_pos = self.init_ur3_grasp_pos
+        des_rot = self.init_ur3_grasp_rot
+        des_grip_meter = self.init_ur3_grip
+        # print("finger dist: {}".format(torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1)))
+        # print("init_ur3_grip_rad: {}, des_grip: {}".format(self.init_ur3_grip_rad, des_grip_meter))
+
+        # check arrive
+        e_pos = (des_pos - self.ur3_grasp_pos).norm(dim=-1)
+        e_rot = orientation_error(des_rot, self.ur3_grasp_rot).norm(dim=-1)
+        # e_grip = des_grip
+
         env_ids = 61
-        print("init pos: {}, init ori: {}".format(self.init_ur3_grasp_pos[env_ids], self.init_ur3_grasp_rot[env_ids]))
-        actions = self.solve(goal_pos=self.init_ur3_grasp_pos, goal_rot=self.init_ur3_grasp_rot,
-                             goal_grip=self.init_ur3_grip, absolute=True)
+        # print("init pos: {}, init ori: {}".format(self.init_ur3_grasp_pos[env_ids], self.init_ur3_grasp_rot[env_ids]))
+        actions = self.solve(goal_pos=des_pos, goal_rot=des_rot,
+                             goal_grip=des_grip_meter, absolute=True)
         return actions
 
 
