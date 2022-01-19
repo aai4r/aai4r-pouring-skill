@@ -1,6 +1,7 @@
 import copy
 
 import torch
+import math
 
 from utils.torch_jit_utils import *
 from tasks.base.base_task import BaseTask
@@ -883,13 +884,20 @@ class DemoUR3Pouring(BaseTask):
         self.init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
 
         # initial pose variation
-        var_scale = 0.1
-        pos_var = torch.rand_like(self.init_ur3_grasp_pos) - 0.5
-        # rot_var = torch.rand_like(self.init_ur3_grasp_rot) - 0.5
-        # q = quat_from_euler_xyz(roll=deg2rad(45), pitch=0.0, yaw=0.0)
+        pos_var_meter = 0.05
+        pos_var = (torch.rand_like(self.init_ur3_grasp_pos) - 0.5) * 2.0
 
-        self.init_ur3_grasp_pos += pos_var * var_scale
+        def d2r(deg):
+            return deg * (math.pi / 180.0)
 
+        rot_var_deg = 15
+        roll = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        pitch = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        yaw = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        q_var = quat_from_euler_xyz(roll=d2r(roll), pitch=d2r(pitch), yaw=d2r(yaw))
+
+        self.init_ur3_grasp_pos += pos_var * pos_var_meter
+        self.init_ur3_grasp_rot = quat_mul(self.init_ur3_grasp_rot, q_var)
         self.init_ur3_grip = torch.ones(self.num_envs, device=self.device)
 
     def calc_expert_action(self):
