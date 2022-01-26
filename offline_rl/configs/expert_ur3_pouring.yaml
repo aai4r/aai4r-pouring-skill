@@ -2,7 +2,7 @@
 env:
   numEnvs: 64
   envSpacing: 1.5
-  episodeLength: 350
+  episodeLength: 500
   enableDebugVis: True
 
   startPositionNoise: 0.1
@@ -10,7 +10,7 @@ env:
 
   aggregateMode: 3
 
-  actionScale: 15.5
+  actionScale: 1.0
   dofVelocityScale: 0.1
   distRewardScale: 0.5
   rotRewardScale: 0.02
@@ -18,7 +18,7 @@ env:
   actionPenaltyScale: 0.01
 
   asset:
-    assetRoot: "assets"
+    assetRoot: "../assets"
     assetFileNameUR3: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 

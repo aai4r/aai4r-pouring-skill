@@ -31,7 +31,7 @@
   <link name="base_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/visual/base.dae"/>
+        <mesh filename="../meshes/visual/base.dae"/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -39,7 +39,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/collision/base.stl"/>
+        <mesh filename="../meshes/collision/base.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -59,7 +59,7 @@
   <link name="shoulder_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/visual/shoulder.dae"/>
+        <mesh filename="../meshes/visual/shoulder.dae"/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -67,7 +67,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/collision/shoulder.stl"/>
+        <mesh filename="../meshes/collision/shoulder.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -87,7 +87,7 @@
   <link name="upper_arm_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/visual/upperarm.dae"/>
+        <mesh filename="../meshes/visual/upperarm.dae"/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -95,7 +95,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/collision/upperarm.stl"/>
+        <mesh filename="../meshes/collision/upperarm.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -115,7 +115,7 @@
   <link name="forearm_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/visual/forearm.dae"/>
+        <mesh filename="../meshes/visual/forearm.dae"/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -123,7 +123,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/collision/forearm.stl"/>
+        <mesh filename="../meshes/collision/forearm.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -143,7 +143,7 @@
   <link name="wrist_1_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/visual/wrist1.dae"/>
+        <mesh filename="../meshes/visual/wrist1.dae"/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -151,7 +151,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/collision/wrist1.stl"/>
+        <mesh filename="../meshes/collision/wrist1.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -171,7 +171,7 @@
   <link name="wrist_2_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/visual/wrist2.dae"/>
+        <mesh filename="../meshes/visual/wrist2.dae"/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -179,7 +179,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/collision/wrist2.stl"/>
+        <mesh filename="../meshes/collision/wrist2.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -199,7 +199,7 @@
   <link name="wrist_3_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/visual/wrist3.dae"/>
+        <mesh filename="../meshes/visual/wrist3.dae"/>
       </geometry>
       <material name="LightGrey">
         <color rgba="0.7 0.7 0.7 1.0"/>
@@ -207,7 +207,7 @@
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/ur3_description/meshes/collision/wrist3.stl"/>
+        <mesh filename="../meshes/collision/wrist3.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -334,13 +334,13 @@
   <link name="robotiq_coupler">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/robotiq_85_coupler.stl"/>
+        <mesh filename="../../robotiq_description/meshes/robotiq_85_coupler.stl"/>
       </geometry>
       <material name="flat_black"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/robotiq_85_coupler.stl"/>
+        <mesh filename="../../robotiq_description/meshes/robotiq_85_coupler.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -374,12 +374,12 @@
   <link name="robotiq_85_base_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_base_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_base_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_base_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_base_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -405,12 +405,12 @@
   <link name="robotiq_85_left_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_knuckle_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_knuckle_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_knuckle_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_knuckle_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -422,12 +422,12 @@
   <link name="robotiq_85_right_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_knuckle_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_knuckle_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_knuckle_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_knuckle_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -449,12 +449,12 @@
   <link name="robotiq_85_left_finger_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_finger_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_finger_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_finger_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_finger_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -466,12 +466,12 @@
   <link name="robotiq_85_right_finger_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_finger_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_finger_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_finger_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_finger_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -497,12 +497,12 @@
   <link name="robotiq_85_left_inner_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_inner_knuckle_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_inner_knuckle_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_inner_knuckle_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_inner_knuckle_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -514,12 +514,12 @@
   <link name="robotiq_85_right_inner_knuckle_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_inner_knuckle_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_inner_knuckle_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_inner_knuckle_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_inner_knuckle_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -545,12 +545,12 @@
   <link name="robotiq_85_left_finger_tip_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_finger_tip_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_finger_tip_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_finger_tip_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_finger_tip_link.stl"/>
       </geometry>
     </collision>
     <inertial>
@@ -562,12 +562,12 @@
   <link name="robotiq_85_right_finger_tip_link">
     <visual>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/visual/robotiq_85_finger_tip_link.dae"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_finger_tip_link.dae"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="assets/urdf/robotiq_description/meshes/collision/robotiq_85_finger_tip_link.stl"/>
+        <mesh filename="../../robotiq_description/meshes/collision/robotiq_85_finger_tip_link.stl"/>
       </geometry>
     </collision>
     <inertial>

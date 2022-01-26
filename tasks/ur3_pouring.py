@@ -951,12 +951,6 @@ def compute_ur3_reward(
     lfinger_vec = (_lfinger_vec.T / (_lfinger_vec_len + 1e-8)).T
     rfinger_vec = (_rfinger_vec.T / (_rfinger_vec_len + 1e-8)).T
 
-    # cube lifting reward
-    lift_reward_scale = 0.3
-    des_height = 0.2
-
-    bottle_height = bottle_grasp_pos[:, 2]
-
     # regularization on the actions (summed for each environment)
     action_penalty = torch.sum(actions[:, :6] ** 2, dim=-1)
 
@@ -964,6 +958,12 @@ def compute_ur3_reward(
     # finger_dist = torch.norm(ur3_lfinger_pos - ur3_rfinger_pos, p=2, dim=-1)
     is_lifted = torch.where((bottle_floor_pos[:, 2] > 0.07), 1.0, 0.0) * grasp_done
     is_grasped = torch.where((approach_done > 0.0) & ((lfd + rfd) <= 0.065), 1.0, 0.0)
+
+    # bottle lifting reward
+    lift_reward_scale = 5.0
+    des_height = 0.07
+    bottle_height = bottle_grasp_pos[:, 2]
+    lift_reward = torch.exp(-10.0 * torch.max((des_height - bottle_floor_pos[:, 2]), torch.tensor(0.0))) * is_grasped
 
     axis_bottle_up = tf_vector(bottle_rot, bottle_up_axis)
     axis_bottle_cup = normalize(cup_pos - bottle_pos)
@@ -985,19 +985,26 @@ def compute_ur3_reward(
     pour_slope_on = torch.where((bottle_tip_pos[:, 2] - bottle_floor_pos[:, 2]) <= 0.0, 1.0, 0.0)
 
     bottle_slope = torch.min(bottle_floor_pos[:, 2] - bottle_tip_pos[:, 2], torch.zeros_like(bottle_floor_pos[:, 2]))
-    pouring_reward = 0.1 * torch.exp(-10.0 * bottle_cup_tip_dist_xy) * is_lifted + \
-                     0.2 * torch.exp(-10.0 * bottle_cup_tip_dist_z) * is_lifted + \
-                     0.7 * torch.exp(-10.0 * liq_cup_dist) * is_lifted * approach_tip * pour_slope_on \
+    # pouring_reward = 0.1 * torch.exp(-10.0 * bottle_cup_tip_dist_xy) * is_lifted + \
+    #                  0.2 * torch.exp(-10.0 * bottle_cup_tip_dist_z) * is_lifted + \
+    #                  0.7 * torch.exp(-10.0 * liq_cup_dist) * is_lifted * approach_tip * pour_slope_on \
                      # 0.2 * bottle_height_rew * is_lifted * approach_tip
 
+    pouring_motion_reward_scale = 15.0
+    pouring_reward_scale = 20.0
+    pouring_motion_reward = torch.exp(-15.0 * bottle_cup_tip_dist) * is_lifted
+    pouring_reward = torch.exp(-20.0 * liq_cup_dist) * approach_tip
+
+
+
     # pouring_reward = torch.where(approach_tip > 1.0, pouring_reward + 1.0, pouring_reward)
-    pouring_reward_scale = 10.0
 
     # drop_reward_scale = 10.0
     is_dropped = torch.where((is_lifted > 0.0) & (liq_pos[:, 2] < 0.03), 1.0, 0.0)
     # drop_reward = torch.exp(-5.0 * liq_cup_dist_xy) * is_dropped
 
     rewards = dist_reward_scale * dist_reward + rot_reward_scale * rot_reward + \
+              lift_reward_scale * lift_reward + pouring_motion_reward_scale * pouring_motion_reward + \
               pouring_reward_scale * pouring_reward \
               - action_penalty_scale * action_penalty \
 
