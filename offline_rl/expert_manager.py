@@ -33,7 +33,7 @@ class ExpertManager:
 
         # rollout expert demonstration
         for it in range(0, num_transitions_per_env):
-            print("it: ", it)
+            # print("it: ", it)
             # actions = torch.rand((self.vec_env.num_envs,) + self.action_space.shape)
             actions = self.vec_env.task.calc_expert_action()
             next_obs, rews, dones, infors = self.vec_env.step(actions)

@@ -882,15 +882,16 @@ class DemoUR3Pouring(BaseTask):
                 pass
 
     def init_task_viapoints(self):
-        self.task_step = 0
+        self.task_step = torch.zeros(self.num_envs, device=self.device)
         self.init_ur3_grasp_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
         self.init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
 
-        # initial pos variation
+        # 1) initial pos variation
         pos_var_meter = 0.05
         pos_var = (torch.rand_like(self.init_ur3_grasp_pos) - 0.5) * 2.0
+        self.init_ur3_grasp_pos += pos_var * pos_var_meter
 
-        # initial rot variation
+        # 2) initial rot variation
         def d2r(deg):
             return deg * (math.pi / 180.0)
 
@@ -899,14 +900,19 @@ class DemoUR3Pouring(BaseTask):
         pitch = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
         yaw = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
         q_var = quat_from_euler_xyz(roll=d2r(roll), pitch=d2r(pitch), yaw=d2r(yaw))
-
-        self.init_ur3_grasp_pos += pos_var * pos_var_meter
         self.init_ur3_grasp_rot = quat_mul(self.init_ur3_grasp_rot, q_var)
 
+        # 3) initial grip variation
         # For 2F-85 gripper, 0x00 --> full open with 85mm, 0xFF --> close
         # Unit: meter ~ [0.0, 0.085]
-        self.init_ur3_grip = to_torch([0.085], device=self.device).repeat((self.num_envs, 1))
-        print("init grip: ", self.init_ur3_grip)
+        self.init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))
+        grip_var = (torch.rand_like(self.init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
+        self.init_ur3_grip = torch.min(self.init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
+
+        # 4) make the desired task pose list
+
+    def calc_task_error(self):
+        pass
 
     def calc_expert_action(self):
         if not self.init_expert_flag:
@@ -920,11 +926,16 @@ class DemoUR3Pouring(BaseTask):
         # print("init_ur3_grip_rad: {}, des_grip: {}".format(self.init_ur3_grip_rad, des_grip_meter))
 
         # check arrive
+        env_ids = 61
         e_pos = (des_pos - self.ur3_grasp_pos).norm(dim=-1)
         e_rot = orientation_error(des_rot, self.ur3_grasp_rot).norm(dim=-1)
-        # e_grip = des_grip
+        pos_thres = 1.e-2
+        rot_thres = 1.e-2
+        arrive = torch.where((e_pos < pos_thres) & (e_rot < rot_thres), 1.0, 0.0)
+        self.task_step += arrive
+        # print("arrive: ", arrive[env_ids])
+        print("task step: ", self.task_step)
 
-        env_ids = 61
         # print("init pos: {}, init ori: {}".format(self.init_ur3_grasp_pos[env_ids], self.init_ur3_grasp_rot[env_ids]))
         actions = self.solve(goal_pos=des_pos, goal_rot=des_rot,
                              goal_grip=des_grip_meter, absolute=True)
