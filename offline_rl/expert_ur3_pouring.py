@@ -111,9 +111,6 @@ class DemoUR3Pouring(BaseTask):
         # self.ur3_dof_upper_limits[9] = blim
         # self.ur3_dof_upper_limits[11] = blim
 
-        # expert initialization
-        self.init_expert_flag = False
-
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
         self.sim_params.gravity.x = 0
@@ -651,6 +648,9 @@ class DemoUR3Pouring(BaseTask):
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
 
+        # init viapoints
+        self.init_task_viapoints(env_ids)
+
     def sync_gripper_target(self):
         scale = 1.0
         target = self.ur3_dof_targets[:, 8]
@@ -881,44 +881,51 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
                 pass
 
-    def init_task_viapoints(self):
+    def init_task_viapoints(self, env_ids):
         self.task_step = torch.zeros(self.num_envs, device=self.device)
         self.init_ur3_grasp_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
         self.init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
 
-        # 1) initial pos variation
+        # 1)-1 initial pos variation
         pos_var_meter = 0.05
         pos_var = (torch.rand_like(self.init_ur3_grasp_pos) - 0.5) * 2.0
         self.init_ur3_grasp_pos += pos_var * pos_var_meter
 
-        # 2) initial rot variation
+        # 1)-2 initial rot variation
         def d2r(deg):
             return deg * (math.pi / 180.0)
 
-        rot_var_deg = 15
+        rot_var_deg = 15    # +-
         roll = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
         pitch = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
         yaw = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
         q_var = quat_from_euler_xyz(roll=d2r(roll), pitch=d2r(pitch), yaw=d2r(yaw))
         self.init_ur3_grasp_rot = quat_mul(self.init_ur3_grasp_rot, q_var)
 
-        # 3) initial grip variation
+        # 1)-3 initial grip variation
         # For 2F-85 gripper, 0x00 --> full open with 85mm, 0xFF --> close
         # Unit: meter ~ [0.0, 0.085]
         self.init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))
         grip_var = (torch.rand_like(self.init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
         self.init_ur3_grip = torch.min(self.init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
 
-        # 4) make the desired task pose list
+        # # 2) approach bottle
+        # dir_z = self.bottle_pos - self.cup_pos
+        # dir_z[:, 2] = 0.0  # zero padding to z-axis
+        # dir_z = dir_z / dir_z.norm(dim=-1).unsqueeze(-1)  # normalize
+        # appr_bottle_pos = self.bottle_pos.clone()
+        # appr_bottle_pos[:, 2] *= 1.2
+        # appr_bottle_pos[:, :2] -= dir_z[:, :2] * self.bottle_diameter * 2.0
+
+        if not hasattr(self, 'task_pos'):
+            num_task_steps = 1  # TODO
+            self.task_pos = None
+            pass
 
     def calc_task_error(self):
         pass
 
     def calc_expert_action(self):
-        if not self.init_expert_flag:
-            self.init_task_viapoints()
-            self.init_expert_flag = True
-
         des_pos = self.init_ur3_grasp_pos
         des_rot = self.init_ur3_grasp_rot
         des_grip_meter = self.init_ur3_grip
