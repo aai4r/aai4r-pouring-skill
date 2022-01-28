@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from utils.torch_jit_utils import quat_conjugate, quat_mul
 
 PI = 3.1415926535
 
@@ -50,6 +51,12 @@ def mat_to_quat(m):
     return torch.stack([x, y, z, w], dim=-1).to(m.device)
 
 
+def orientation_error(desired, current):
+    cc = quat_conjugate(current)
+    q_r = quat_mul(desired, cc)
+    return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
+
+
 class TaskPathManager:
     def __init__(self, num_env, num_task_steps, device):
         self.num_env = num_env
@@ -57,9 +64,8 @@ class TaskPathManager:
         self.device = device
 
         # __step shape: [num_env, 1, dim=(3 / 4 / 1)]
-        step = torch.zeros(num_env, device=device, dtype=torch.long)
-        self.__step = step.unsqueeze(-1).repeat(1, 4).unsqueeze(1)
-        self.__push_idx = 0
+        self.__step = torch.zeros(num_env, device=device, dtype=torch.long).unsqueeze(-1).repeat(1, 4).unsqueeze(1)
+        self.__push_idx = torch.zeros(num_env, device=device, dtype=torch.long)
 
         self.err_thres = {"pos": 1.e-2, "rot": 1.e-2, "grip": 5.e-3}
 
@@ -68,34 +74,40 @@ class TaskPathManager:
         self.__task_grip = torch.zeros(num_env, num_task_steps, 1, device=device)
 
     def reset_task(self, env_ids):
-        self.__push_idx = 0
-        self.__step[env_ids] = torch.zeros(len(env_ids), device=self.device)
+        self.__push_idx[env_ids] = torch.zeros_like(self.__push_idx[env_ids])
+        self.__step[env_ids] = torch.zeros_like(self.__step[env_ids])
 
     def push_task_pose(self, env_ids, pos, rot, grip):
-        if self.__push_idx >= self.num_task_steps:
+        if torch.where(self.__push_idx >= self.num_task_steps, 1, 0).sum() > 0:
             raise ValueError('Task index is out of bound.. Index {} should be less than {}'
                              .format(self.__push_idx, self.num_task_steps))
-        self.__task_pos[env_ids, self.__push_idx] = pos[env_ids]
-        self.__task_rot[env_ids, self.__push_idx] = rot[env_ids]
-        self.__task_grip[env_ids, self.__push_idx] = grip[env_ids]
-        self.__push_idx += 1
+        self.__task_pos[env_ids, self.__push_idx[env_ids]] = pos[env_ids]
+        self.__task_rot[env_ids, self.__push_idx[env_ids]] = rot[env_ids]
+        self.__task_grip[env_ids, self.__push_idx[env_ids]] = grip[env_ids]
+        self.__push_idx[env_ids] += 1
 
-    def check_arrive(self, ee_pos, ee_rot, ee_grip):
-        des_pos, des_rot, des_grip = self.get_pose()
+    def update_step_by_checking_arrive(self, ee_pos, ee_rot, ee_grip):
+        des_pos, des_rot, des_grip = self.get_desired_pose()
         err_pos = (des_pos - ee_pos).norm(dim=-1)
-        err_rot = (des_rot - ee_rot).norm(dim=-1)
+        err_rot = orientation_error(des_rot, ee_rot).norm(dim=-1)
         err_grip = (des_grip - ee_grip).norm(dim=-1)
 
         arrive = torch.where((err_pos < self.err_thres["pos"]) &
                              (err_rot < self.err_thres["rot"]) &
-                             (err_grip < self.err_thres["grip"]), 1, 0)
+                             (err_grip < self.err_thres["grip"]), 1, 0)   # TODO,
 
-        self.__step += arrive.unsqueeze(-1).repeat(1, 1, 4)
+        self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
+        done = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
+        self.reset_task(done)
+        if done.sum() > 0:
+            print("done: ", done)
+        self.__step = torch.where(self.__step >= self.num_task_steps, torch.tensor(0, device=self.device), self.__step)
+        # return done
 
-    def get_pose(self):
-        pos = torch.gather(self.__task_pos, 1, self.__step[:, :, :3])
-        rot = torch.gather(self.__task_rot, 1, self.__step[:, :, :])
-        grip = torch.gather(self.__task_grip, 1, self.__step[:, :, :1])
+    def get_desired_pose(self):
+        pos = torch.gather(self.__task_pos, 1, self.__step[:, :, :3]).squeeze(-2)
+        rot = torch.gather(self.__task_rot, 1, self.__step[:, :, :]).squeeze(-2)
+        grip = torch.gather(self.__task_grip, 1, self.__step[:, :, :1]).squeeze(-2)
         return pos, rot, grip
 
     def print_task_status(self):

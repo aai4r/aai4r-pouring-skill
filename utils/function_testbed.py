@@ -18,11 +18,11 @@ def function_test():
         rot += 1
         grip += 1
     task.print_task_status()
-    pos, rot, grip = task.get_pose()
+    pos, rot, grip = task.get_desired_pose()
     print("get pos: \n{}, rot: \n{}, grip: \n{}".format(pos, rot, grip))
     print("shapes, pos: {}, rot: {}, grip: {}".format(pos.shape, rot.shape, grip.shape))
 
-    task.check_arrive(torch.rand_like(pos), torch.rand_like(rot), torch.rand_like(grip))
+    task.update_step_by_checking_arrive(torch.rand_like(pos), torch.rand_like(rot), torch.rand_like(grip))
 
 
 if __name__ == '__main__':
