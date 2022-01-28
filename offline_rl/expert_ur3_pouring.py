@@ -4,7 +4,7 @@ import torch
 import math
 
 from utils.torch_jit_utils import *
-from utils.utils import TaskPathManager, orientation_error
+from utils.utils import *
 from tasks.base.base_task import BaseTask
 from isaacgym import gymtorch
 from isaacgym import gymapi
@@ -841,15 +841,15 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # # ur3 grasp pose
-                # px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.ur3_grasp_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # ur3 grasp pose
+                px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.ur3_grasp_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # # direction line
                 # p1 = self.bottle_grasp_pos[i].cpu().numpy()
@@ -878,9 +878,9 @@ class DemoUR3Pouring(BaseTask):
 
     def init_task_path(self, env_ids):
         if not hasattr(self, "task"):
-            self.task = TaskPathManager(num_env=self.num_envs, num_task_steps=1, device=self.device)
+            self.task = TaskPathManager(num_env=self.num_envs, num_task_steps=2, device=self.device)
 
-        self.task.reset_task(env_ids=torch.arange(self.num_envs))
+        self.task.reset_task(env_ids=env_ids)
         init_ur3_grasp_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
         init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
 
@@ -908,16 +908,33 @@ class DemoUR3Pouring(BaseTask):
         init_ur3_grip = torch.min(init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
 
         # TODO
-        self.task.push_task_pose(env_ids=torch.arange(self.num_envs),
+        self.task.push_task_pose(env_ids=env_ids,
                                  pos=init_ur3_grasp_pos, rot=init_ur3_grasp_rot, grip=init_ur3_grip)
 
-        # # 2) approach bottle
-        # dir_z = self.bottle_pos - self.cup_pos
-        # dir_z[:, 2] = 0.0  # zero padding to z-axis
-        # dir_z = dir_z / dir_z.norm(dim=-1).unsqueeze(-1)  # normalize
-        # appr_bottle_pos = self.bottle_pos.clone()
-        # appr_bottle_pos[:, 2] *= 1.2
-        # appr_bottle_pos[:, :2] -= dir_z[:, :2] * self.bottle_diameter * 2.0
+        # 2) approach bottle
+        bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
+        bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
+
+        cup_pos = self.cup_states[:, 0:3]
+        cup_rot = self.cup_states[:, 3:7]
+
+        dir_z = bottle_pos - cup_pos
+        dir_z[:, 2] = 0.0  # zero padding to z-axis
+        dir_z = dir_z / dir_z.norm(dim=-1).unsqueeze(-1)  # normalize
+        appr_bottle_pos = bottle_pos.clone()
+        appr_bottle_pos[:, 2] *= 1.2
+        appr_bottle_pos[:, :2] -= dir_z[:, :2] * self.bottle_diameter * 2.0
+
+        mats = quat_to_mat(bottle_rot)
+        dir_x = mats[:, :, 2].cross(dir_z)
+        dir_y = dir_z.cross(dir_x)
+        appr_bottle_rot = mat_to_quat(torch.stack([dir_x, dir_y, dir_z], dim=-1))
+
+        # appr_bottle_rot = init_ur3_grasp_rot.clone()
+        appr_bottle_grip = init_ur3_grip.clone()
+
+        self.task.push_task_pose(env_ids=env_ids,
+                                 pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip)
 
     def calc_task_error(self):
         pass
@@ -925,11 +942,11 @@ class DemoUR3Pouring(BaseTask):
     def calc_expert_action(self):
         des_pos, des_rot, des_grip = self.task.get_desired_pose()
         dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
-        self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot, ee_grip=dof_pos_finger)
+        done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot, ee_grip=dof_pos_finger)
+        self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
         # print("init pos: {}, init ori: {}".format(self.init_ur3_grasp_pos[env_ids], self.init_ur3_grasp_rot[env_ids]))
-        actions = self.solve(goal_pos=des_pos, goal_rot=des_rot,
-                             goal_grip=des_grip, absolute=True)
+        actions = self.solve(goal_pos=des_pos, goal_rot=des_rot, goal_grip=des_grip, absolute=True)
         return actions
 
 

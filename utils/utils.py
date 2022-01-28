@@ -78,9 +78,9 @@ class TaskPathManager:
         self.__step[env_ids] = torch.zeros_like(self.__step[env_ids])
 
     def push_task_pose(self, env_ids, pos, rot, grip):
-        if torch.where(self.__push_idx >= self.num_task_steps, 1, 0).sum() > 0:
-            raise ValueError('Task index is out of bound.. Index {} should be less than {}'
-                             .format(self.__push_idx, self.num_task_steps))
+        # if torch.where(self.__push_idx[env_ids] >= self.num_task_steps, 1, 0).sum() > 0:
+        #     raise ValueError('Task index is out of bound.. Index {} should be less than {}'
+        #                      .format(self.__push_idx[env_ids], self.num_task_steps))
         self.__task_pos[env_ids, self.__push_idx[env_ids]] = pos[env_ids]
         self.__task_rot[env_ids, self.__push_idx[env_ids]] = rot[env_ids]
         self.__task_grip[env_ids, self.__push_idx[env_ids]] = grip[env_ids]
@@ -97,12 +97,12 @@ class TaskPathManager:
                              (err_grip < self.err_thres["grip"]), 1, 0)   # TODO,
 
         self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
-        done = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
-        self.reset_task(done)
-        if done.sum() > 0:
-            print("done: ", done)
+        done_envs = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
+        # self.reset_task(done_envs)    # TODO,
+        if done_envs.sum() > 0:
+            print("done: ", done_envs)
         self.__step = torch.where(self.__step >= self.num_task_steps, torch.tensor(0, device=self.device), self.__step)
-        # return done
+        return done_envs
 
     def get_desired_pose(self):
         pos = torch.gather(self.__task_pos, 1, self.__step[:, :, :3]).squeeze(-2)
