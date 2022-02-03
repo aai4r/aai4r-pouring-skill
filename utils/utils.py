@@ -68,12 +68,16 @@ class TaskPathManager:
         self.__push_idx = torch.zeros(num_env, device=device, dtype=torch.long)
 
         self.err_thres = {"pos": 1.e-2, "rot": 1.e-2, "grip": 5.e-3}
+        # self.err_thres = {"pos": 5.e-2, "rot": 5.e-2, "grip": 1.e-2}
 
         self.__task_pos = torch.zeros(num_env, num_task_steps, 3, device=device)
         self.__task_rot = torch.zeros(num_env, num_task_steps, 4, device=device)
         self.__task_grip = torch.zeros(num_env, num_task_steps, 1, device=device)
 
     def reset_task(self, env_ids):
+        self.__task_pos[env_ids] = torch.zeros_like(self.__task_pos[env_ids])
+        self.__task_rot[env_ids] = torch.zeros_like(self.__task_rot[env_ids])
+        self.__task_grip[env_ids] = torch.zeros_like(self.__task_grip[env_ids])
         self.__push_idx[env_ids] = torch.zeros_like(self.__push_idx[env_ids])
         self.__step[env_ids] = torch.zeros_like(self.__step[env_ids])
 
@@ -99,8 +103,9 @@ class TaskPathManager:
         self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
         done_envs = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
         # self.reset_task(done_envs)    # TODO,
-        if done_envs.sum() > 0:
-            print("done: ", done_envs)
+        # if done_envs.sum() > 0:
+        #     print("done: ", done_envs)
+        #     print("step: ", self.__step.T)
         self.__step = torch.where(self.__step >= self.num_task_steps, torch.tensor(0, device=self.device), self.__step)
         return done_envs
 

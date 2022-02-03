@@ -1,8 +1,8 @@
 # if given, will override the device setting in gym.
 env:
-  numEnvs: 64
-  envSpacing: 1.5
-  episodeLength: 350
+  numEnvs: 1
+  envSpacing: 1.
+  episodeLength: 350 # 350
   enableDebugVis: True
 
   startPositionNoise: 0.1

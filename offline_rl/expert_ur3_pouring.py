@@ -5,6 +5,7 @@ import math
 
 from utils.torch_jit_utils import *
 from utils.utils import *
+from torch.nn.functional import normalize
 from tasks.base.base_task import BaseTask
 from isaacgym import gymtorch
 from isaacgym import gymapi
@@ -95,6 +96,11 @@ class DemoUR3Pouring(BaseTask):
         self.global_indices = torch.arange(self.num_envs * self.num_actors, dtype=torch.int32, device=self.device).view(self.num_envs, -1)
 
         self.reset(torch.arange(self.num_envs, device=self.device))
+        self.refresh_env_tensors()
+        self.init_task_path(torch.arange(self.num_envs, device=self.device))
+
+        # expert demo. params.
+        self.task_update_buf = torch.zeros_like(self.progress_buf)
 
         # gripper limit for bottle
         # blim = self.stroke_to_angle(self.bottle_diameter - 0.005)
@@ -105,6 +111,11 @@ class DemoUR3Pouring(BaseTask):
         # self.ur3_dof_upper_limits[8] = blim
         # self.ur3_dof_upper_limits[9] = blim
         # self.ur3_dof_upper_limits[11] = blim
+
+        # TODO, cam setting for debugging with single env.
+        cam_pos = gymapi.Vec3(0.9263, 0.4617, 0.5420)
+        cam_target = gymapi.Vec3(0.0, -0.3, 0.0)
+        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -460,12 +471,15 @@ class DemoUR3Pouring(BaseTask):
             self.action_penalty_scale, self.max_episode_length
         )
 
-    def compute_observations(self):
+    def refresh_env_tensors(self):
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.gym.refresh_jacobian_tensors(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
+
+    def compute_observations(self):
+        self.refresh_env_tensors()
         self.sync_gripper()
 
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
@@ -542,6 +556,10 @@ class DemoUR3Pouring(BaseTask):
                                   self.cup_pos, self.liq_pos,
                                   tip_pos_diff), dim=-1)
 
+        # TODO, cam transform
+        # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
+        # print("cam tr: ", cam_tr.p)
+
         return self.obs_buf
 
     def reset(self, env_ids):
@@ -583,8 +601,8 @@ class DemoUR3Pouring(BaseTask):
         pick = self.default_bottle_states[env_ids]
         # print("default bottle: ".format(pick[env_ids]))
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.2, 0.5, 0.0,            # position
-                             0.0, 0.0, 0.0, 0.0,       # rotation (quat)
+        xy_scale = to_torch([0.15, 0.45, 0.0,            # position
+                             0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
         rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
         self.bottle_states[env_ids] = pick + rand_bottle_pos
@@ -642,9 +660,6 @@ class DemoUR3Pouring(BaseTask):
 
         self.progress_buf[env_ids] = 0
         self.reset_buf[env_ids] = 0
-
-        # init viapoints
-        self.init_task_path(env_ids)
 
     def sync_gripper_target(self):
         scale = 1.0
@@ -727,6 +742,10 @@ class DemoUR3Pouring(BaseTask):
         return _u.squeeze(-1)
 
     def pre_physics_step(self, actions):
+        dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
+        done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
+                                                             ee_grip=dof_pos_finger)
+
         # print("actions: ", actions[61])
         # joint space control
         # self.actions = torch.zeros(self.num_envs, 12, device=self.device, dtype=torch.float)
@@ -775,6 +794,19 @@ class DemoUR3Pouring(BaseTask):
 
         self.compute_observations()
         self.compute_reward(self.actions)
+
+        # compute task update status
+        self.task_update_buf = torch.where(self.progress_buf == 1,
+                                           torch.ones_like(self.progress_buf), torch.zeros_like(self.progress_buf))
+
+        env_ids = self.task_update_buf.nonzero(as_tuple=False).squeeze(-1)
+        if len(env_ids) > 0:
+            self.init_task_path(env_ids)
+
+        dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
+        done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
+                                                             ee_grip=dof_pos_finger)
+        self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
         # debug viz
         if self.viewer and self.debug_viz:
@@ -851,6 +883,37 @@ class DemoUR3Pouring(BaseTask):
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
+                # TODO
+                # appr bottle pose for debug
+                px = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.appr_bottle_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
+                # bottle pos init
+                px = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.bottle_pos_init[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
+                # # cup pos init
+                # px = (self.cup_pos_init[i] + quat_apply(self.cup_rot_init[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.cup_pos_init[i] + quat_apply(self.cup_rot_init[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.cup_pos_init[i] + quat_apply(self.cup_rot_init[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                #
+                # p0 = self.cup_pos_init[i].cpu().numpy()
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
                 # # direction line
                 # p1 = self.bottle_grasp_pos[i].cpu().numpy()
                 # p0 = self.ur3_grasp_pos[i].cpu().numpy()
@@ -885,7 +948,7 @@ class DemoUR3Pouring(BaseTask):
         init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
 
         # 1)-1 initial pos variation
-        pos_var_meter = 0.05
+        pos_var_meter = 0.03
         pos_var = (torch.rand_like(init_ur3_grasp_pos) - 0.5) * 2.0
         init_ur3_grasp_pos += pos_var * pos_var_meter
 
@@ -914,21 +977,36 @@ class DemoUR3Pouring(BaseTask):
         # 2) approach bottle
         bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
         bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
+        self.bottle_pos_init, self.bottle_rot_init = bottle_pos, bottle_rot
 
         cup_pos = self.cup_states[:, 0:3]
         cup_rot = self.cup_states[:, 3:7]
+        self.cup_pos_init, self.cup_rot_init = cup_pos, cup_rot
 
-        dir_z = bottle_pos - cup_pos
-        dir_z[:, 2] = 0.0  # zero padding to z-axis
-        dir_z = dir_z / dir_z.norm(dim=-1).unsqueeze(-1)  # normalize
-        appr_bottle_pos = bottle_pos.clone()
-        appr_bottle_pos[:, 2] *= 1.2
-        appr_bottle_pos[:, :2] -= dir_z[:, :2] * self.bottle_diameter * 2.0
+        vec = bottle_pos - cup_pos
+        # dir_z[:, 2] = 0.0  # zero padding on z-axis to make it a planar vectors
+        dir_xy = normalize(vec[:, :2], p=2.0, dim=-1)
+        appr_bottle_pos = bottle_pos.clone().detach()
+        appr_bottle_pos[:, :2] -= (dir_xy * self.bottle_diameter * 2.0)
+        appr_bottle_pos[:, 2] *= 1.5
 
-        mats = quat_to_mat(bottle_rot)
-        dir_x = mats[:, :, 2].cross(dir_z)
-        dir_y = dir_z.cross(dir_x)
-        appr_bottle_rot = mat_to_quat(torch.stack([dir_x, dir_y, dir_z], dim=-1))
+        # roll = torch.tensor([[0.0]] * len(bottle_pos), device=self.device)
+        # pitch = torch.tensor([[0.0]] * len(bottle_pos), device=self.device)
+        # bottle_rot_mat = quat_to_mat(bottle_rot)
+        # rads = torch.bmm(bottle_rot_mat[:, :, 0].view(len(bottle_rot_mat), 1, 3), dir_z.view(len(dir_z), 3, 1)).arccos()
+        # yaw = rads.squeeze(1)
+        # to_bottle = quat_from_euler_xyz(roll, pitch, yaw).squeeze(1)
+
+        appr_bottle_rot = bottle_rot.clone().detach()
+        # appr_bottle_rot = quat_mul(appr_bottle_rot, to_bottle)    # TODO
+
+        # mats = quat_to_mat(bottle_rot)
+        # dir_x = mats[:, :, 2].cross(dir_z)
+        # dir_y = dir_z.cross(dir_x)
+        # appr_bottle_rot = mat_to_quat(torch.stack([dir_x, dir_y, dir_z], dim=-1))
+
+        self.appr_bottle_pos = appr_bottle_pos
+        self.appr_bottle_rot = appr_bottle_rot
 
         # appr_bottle_rot = init_ur3_grasp_rot.clone()
         appr_bottle_grip = init_ur3_grip.clone()
@@ -942,8 +1020,9 @@ class DemoUR3Pouring(BaseTask):
     def calc_expert_action(self):
         des_pos, des_rot, des_grip = self.task.get_desired_pose()
         dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
-        done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot, ee_grip=dof_pos_finger)
-        self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
+        # done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
+        #                                                      ee_grip=dof_pos_finger)
+        # self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
         # print("init pos: {}, init ori: {}".format(self.init_ur3_grasp_pos[env_ids], self.init_ur3_grasp_rot[env_ids]))
         actions = self.solve(goal_pos=des_pos, goal_rot=des_rot, goal_grip=des_grip, absolute=True)
