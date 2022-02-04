@@ -97,7 +97,7 @@ class DemoUR3Pouring(BaseTask):
 
         self.reset(torch.arange(self.num_envs, device=self.device))
         self.refresh_env_tensors()
-        self.init_task_path(torch.arange(self.num_envs, device=self.device))
+        self.init_pouring_task(torch.arange(self.num_envs, device=self.device))
 
         # expert demo. params.
         self.task_update_buf = torch.zeros_like(self.progress_buf)
@@ -338,6 +338,7 @@ class DemoUR3Pouring(BaseTask):
             self.bottles.append(bottle_actor)
             self.cups.append(cup_actor)
 
+        self.robot_base_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "base_link")
         self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "tool0")
         self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_left_finger_tip_link")
         self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_right_finger_tip_link")
@@ -804,7 +805,7 @@ class DemoUR3Pouring(BaseTask):
 
         env_ids = self.task_update_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(env_ids) > 0:
-            self.init_task_path(env_ids)
+            self.init_pouring_task(env_ids)
 
         # debug viz
         if self.viewer and self.debug_viz:
@@ -937,7 +938,7 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
                 pass
 
-    def init_task_path(self, env_ids):
+    def init_pouring_task(self, env_ids):
         if not hasattr(self, "task"):
             self.task = TaskPathManager(num_env=self.num_envs, num_task_steps=2, device=self.device)
 
@@ -946,7 +947,7 @@ class DemoUR3Pouring(BaseTask):
         init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
 
         # 1)-1 initial pos variation
-        pos_var_meter = 0.03
+        pos_var_meter = 0.02
         pos_var = (torch.rand_like(init_ur3_grasp_pos) - 0.5) * 2.0
         init_ur3_grasp_pos += pos_var * pos_var_meter
 
@@ -984,33 +985,23 @@ class DemoUR3Pouring(BaseTask):
             self.cup_pos_init, self.cup_rot_init = cup_pos, cup_rot
         self.cup_pos_init[env_ids], self.cup_rot_init[env_ids] = cup_pos[env_ids], cup_rot[env_ids]
 
-        vec = bottle_pos - cup_pos
-        # dir_z[:, 2] = 0.0  # zero padding on z-axis to make it a planar vectors
-        dir_xy = normalize(vec[:, :2], p=2.0, dim=-1)
-        appr_bottle_pos = bottle_pos.clone().detach()
-        appr_bottle_pos[:, :2] -= (dir_xy * self.bottle_diameter * 2.0)
-        appr_bottle_pos[:, 2] *= 1.5
+        robot_base_pos = self.rigid_body_states[:, self.robot_base_handle][:, 0:3]
+        vx = bottle_pos - robot_base_pos
+        vx[:, 2] = 0.0
+        vx = normalize(vx, p=2.0, dim=-1)
+        appr_bottle_pos = bottle_pos.clone().detach() - (vx * self.bottle_diameter * 1.6)
 
-        # roll = torch.tensor([[0.0]] * len(bottle_pos), device=self.device)
-        # pitch = torch.tensor([[0.0]] * len(bottle_pos), device=self.device)
-        # bottle_rot_mat = quat_to_mat(bottle_rot)
-        # rads = torch.bmm(bottle_rot_mat[:, :, 0].view(len(bottle_rot_mat), 1, 3), dir_z.view(len(dir_z), 3, 1)).arccos()
-        # yaw = rads.squeeze(1)
-        # to_bottle = quat_from_euler_xyz(roll, pitch, yaw).squeeze(1)
+        q_z90 = torch.tensor([[0.0, 0.0, 0.707, 0.707]] * self.num_envs, device=self.device)
+        vy = quat_apply(q_z90, vx)
+        vz = vx.cross(vy)
 
-        appr_bottle_rot = bottle_rot.clone().detach()
-        # appr_bottle_rot = quat_mul(appr_bottle_rot, to_bottle)    # TODO
-
-        # mats = quat_to_mat(bottle_rot)
-        # dir_x = mats[:, :, 2].cross(dir_z)
-        # dir_y = dir_z.cross(dir_x)
-        # appr_bottle_rot = mat_to_quat(torch.stack([dir_x, dir_y, dir_z], dim=-1))
+        mat = torch.stack([vx, vy, vz], dim=-1)
+        appr_bottle_rot = mat_to_quat(mat)
 
         if not hasattr(self, "appr_bottle_pos") and not hasattr(self, "appr_bottle_rot"):
             self.appr_bottle_pos, self.appr_bottle_rot = appr_bottle_pos, appr_bottle_rot
         self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
 
-        # appr_bottle_rot = init_ur3_grasp_rot.clone()
         appr_bottle_grip = init_ur3_grip.clone()
 
         self.task.push_task_pose(env_ids=env_ids,

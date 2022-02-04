@@ -63,12 +63,11 @@ class TaskPathManager:
         self.num_task_steps = num_task_steps
         self.device = device
 
-        # __step shape: [num_env, 1, dim=(3 / 4 / 1)]
+        # __step shape: [num_env, 1, dim=([3 , 4 , 1])]
         self.__step = torch.zeros(num_env, device=device, dtype=torch.long).unsqueeze(-1).repeat(1, 4).unsqueeze(1)
         self.__push_idx = torch.zeros(num_env, device=device, dtype=torch.long)
 
         self.err_thres = {"pos": 1.e-2, "rot": 1.e-2, "grip": 5.e-3}
-        # self.err_thres = {"pos": 5.e-2, "rot": 5.e-2, "grip": 1.e-2}
 
         self.__task_pos = torch.zeros(num_env, num_task_steps, 3, device=device)
         self.__task_rot = torch.zeros(num_env, num_task_steps, 4, device=device)
@@ -82,9 +81,6 @@ class TaskPathManager:
         self.__step[env_ids] = torch.zeros_like(self.__step[env_ids])
 
     def push_task_pose(self, env_ids, pos, rot, grip):
-        # if torch.where(self.__push_idx[env_ids] >= self.num_task_steps, 1, 0).sum() > 0:
-        #     raise ValueError('Task index is out of bound.. Index {} should be less than {}'
-        #                      .format(self.__push_idx[env_ids], self.num_task_steps))
         self.__task_pos[env_ids, self.__push_idx[env_ids]] = pos[env_ids]
         self.__task_rot[env_ids, self.__push_idx[env_ids]] = rot[env_ids]
         self.__task_grip[env_ids, self.__push_idx[env_ids]] = grip[env_ids]
@@ -102,9 +98,6 @@ class TaskPathManager:
 
         self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
         done_envs = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
-        # self.reset_task(done_envs)    # TODO,
-        # if done_envs.sum() > 0:
-        #     print("done: ", done_envs)
         self.__step = torch.where(self.__step >= self.num_task_steps, torch.zeros_like(self.__step), self.__step)
         return done_envs
 
