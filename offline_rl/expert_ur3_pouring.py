@@ -945,7 +945,7 @@ class DemoUR3Pouring(BaseTask):
         """ 
             1)-1 initial pos variation 
         """
-        init_ur3_hand_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
+        init_ur3_hand_pos = to_torch([0.5, 0.0, 0.32], device=self.device).repeat((self.num_envs, 1))
         init_ur3_hand_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         pos_var_meter = 0.02
         pos_var = (torch.rand_like(init_ur3_hand_pos) - 0.5) * 2.0
@@ -1016,6 +1016,7 @@ class DemoUR3Pouring(BaseTask):
         """
             4) grasp
         """
+        # TODO, 여기에서는 좀 더 빡쎈 error 기준을 적용해야 함..
         grasp_pos = grasp_ready_pos.clone().detach()
         grasp_rot = grasp_ready_rot.clone().detach()
         grasp_grip = to_torch([self.bottle_diameter - 0.001], device=self.device).repeat((self.num_envs, 1))
@@ -1025,16 +1026,31 @@ class DemoUR3Pouring(BaseTask):
             5) lift
         """
         lift_pos = grasp_pos.clone().detach()
-        lift_pos[:, 2] += 0.13
+        lift_pos[:, 2] += 0.2
         lift_rot = grasp_rot.clone().detach()
         lift_grip = grasp_grip.clone().detach()
         self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip)
+
+        """
+            6) approach cup
+        """
+        a = bottle_pos - cup_pos
+        b = torch.tensor([[0.0, 1.0, 0.0]] * self.num_envs, device=self.device)
+        nom = torch.bmm(a.view(len(a), 1, 3), b.view(len(b), 3, 1)).squeeze(-1)
+        denom = torch.bmm(b.view(len(b), 1, 3), b.view(len(b), 3, 1)).squeeze(-1)
+        proj = (nom / denom) * b
+        appr_cup_pos = cup_pos + proj * 0.5
+        appr_cup_pos[:, 2] = self.cup_height + 0.05
+        appr_cup_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
+        appr_cup_grip = lift_grip.clone().detach()
+        self.task_pose_list.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip)
 
         """
             Last) push poses to the task path manager
         """
         if not hasattr(self, "task"):
             num_task_steps = self.task_pose_list.length()
+            print("num_task_steps: ", num_task_steps)
             self.task = TaskPathManager(num_env=self.num_envs, num_task_steps=num_task_steps, device=self.device)
         self.task.reset_task(env_ids=env_ids)
 

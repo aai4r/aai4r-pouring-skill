@@ -90,7 +90,7 @@ class TaskPathManager:
         self.__step = torch.zeros(num_env, device=device, dtype=torch.long).unsqueeze(-1).repeat(1, 4).unsqueeze(1)
         self.__push_idx = torch.zeros(num_env, device=device, dtype=torch.long)
 
-        self.err_thres = {"pos": 1.e-2, "rot": 1.e-2, "grip": 2.e-3}
+        self.err_thres = {"pos": 1.e-2, "rot": 1.e-2, "grip": 5.e-3}
 
         self.__task_pos = torch.zeros(num_env, num_task_steps, 3, device=device)
         self.__task_rot = torch.zeros(num_env, num_task_steps, 4, device=device)
@@ -117,9 +117,13 @@ class TaskPathManager:
 
         arrive = torch.where((err_pos < self.err_thres["pos"]) &
                              (err_rot < self.err_thres["rot"]) &
-                             (err_grip < self.err_thres["grip"]), 1, 0)   # TODO,
+                             (err_grip < self.err_thres["grip"]), 1, 0)
+        # print("p_err: {}, r_err: {}, g_err: {}".format(err_pos, err_rot, err_grip))
 
         self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
+        if arrive.sum() > 0:
+            print("arrive: ", arrive, self.num_task_steps)
+            print("step: ", self.__step)
         done_envs = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
         self.__step = torch.where(self.__step >= self.num_task_steps, torch.zeros_like(self.__step), self.__step)
         return done_envs
