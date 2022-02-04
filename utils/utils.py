@@ -105,8 +105,7 @@ class TaskPathManager:
         # self.reset_task(done_envs)    # TODO,
         # if done_envs.sum() > 0:
         #     print("done: ", done_envs)
-        #     print("step: ", self.__step.T)
-        self.__step = torch.where(self.__step >= self.num_task_steps, torch.tensor(0, device=self.device), self.__step)
+        self.__step = torch.where(self.__step >= self.num_task_steps, torch.zeros_like(self.__step), self.__step)
         return done_envs
 
     def get_desired_pose(self):

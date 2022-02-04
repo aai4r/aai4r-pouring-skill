@@ -742,10 +742,6 @@ class DemoUR3Pouring(BaseTask):
         return _u.squeeze(-1)
 
     def pre_physics_step(self, actions):
-        dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
-        done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
-                                                             ee_grip=dof_pos_finger)
-
         # print("actions: ", actions[61])
         # joint space control
         # self.actions = torch.zeros(self.num_envs, 12, device=self.device, dtype=torch.float)
@@ -796,17 +792,19 @@ class DemoUR3Pouring(BaseTask):
         self.compute_reward(self.actions)
 
         # compute task update status
+        # self.compute_task()
+
+        dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
+        done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
+                                                             ee_grip=dof_pos_finger)
+        self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
+
         self.task_update_buf = torch.where(self.progress_buf == 1,
                                            torch.ones_like(self.progress_buf), torch.zeros_like(self.progress_buf))
 
         env_ids = self.task_update_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(env_ids) > 0:
             self.init_task_path(env_ids)
-
-        dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
-        done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
-                                                             ee_grip=dof_pos_finger)
-        self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
         # debug viz
         if self.viewer and self.debug_viz:
@@ -970,18 +968,21 @@ class DemoUR3Pouring(BaseTask):
         grip_var = (torch.rand_like(init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
         init_ur3_grip = torch.min(init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
 
-        # TODO
         self.task.push_task_pose(env_ids=env_ids,
                                  pos=init_ur3_grasp_pos, rot=init_ur3_grasp_rot, grip=init_ur3_grip)
 
         # 2) approach bottle
         bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
         bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
-        self.bottle_pos_init, self.bottle_rot_init = bottle_pos, bottle_rot
+        if not hasattr(self, "bottle_pos_init") and not hasattr(self, "bottle_rot_init"):
+            self.bottle_pos_init, self.bottle_rot_init = bottle_pos, bottle_rot
+        self.bottle_pos_init[env_ids], self.bottle_rot_init[env_ids] = bottle_pos[env_ids], bottle_rot[env_ids]
 
         cup_pos = self.cup_states[:, 0:3]
         cup_rot = self.cup_states[:, 3:7]
-        self.cup_pos_init, self.cup_rot_init = cup_pos, cup_rot
+        if not hasattr(self, "cup_pos_init") and not hasattr(self, "cup_rot_init"):
+            self.cup_pos_init, self.cup_rot_init = cup_pos, cup_rot
+        self.cup_pos_init[env_ids], self.cup_rot_init[env_ids] = cup_pos[env_ids], cup_rot[env_ids]
 
         vec = bottle_pos - cup_pos
         # dir_z[:, 2] = 0.0  # zero padding on z-axis to make it a planar vectors
@@ -1005,8 +1006,9 @@ class DemoUR3Pouring(BaseTask):
         # dir_y = dir_z.cross(dir_x)
         # appr_bottle_rot = mat_to_quat(torch.stack([dir_x, dir_y, dir_z], dim=-1))
 
-        self.appr_bottle_pos = appr_bottle_pos
-        self.appr_bottle_rot = appr_bottle_rot
+        if not hasattr(self, "appr_bottle_pos") and not hasattr(self, "appr_bottle_rot"):
+            self.appr_bottle_pos, self.appr_bottle_rot = appr_bottle_pos, appr_bottle_rot
+        self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
 
         # appr_bottle_rot = init_ur3_grasp_rot.clone()
         appr_bottle_grip = init_ur3_grip.clone()
@@ -1019,12 +1021,6 @@ class DemoUR3Pouring(BaseTask):
 
     def calc_expert_action(self):
         des_pos, des_rot, des_grip = self.task.get_desired_pose()
-        dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
-        # done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
-        #                                                      ee_grip=dof_pos_finger)
-        # self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
-
-        # print("init pos: {}, init ori: {}".format(self.init_ur3_grasp_pos[env_ids], self.init_ur3_grasp_rot[env_ids]))
         actions = self.solve(goal_pos=des_pos, goal_rot=des_rot, goal_grip=des_grip, absolute=True)
         return actions
 
