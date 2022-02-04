@@ -939,40 +939,41 @@ class DemoUR3Pouring(BaseTask):
                 pass
 
     def init_pouring_task(self, env_ids):
-        if not hasattr(self, "task"):
-            self.task = TaskPathManager(num_env=self.num_envs, num_task_steps=2, device=self.device)
+        if not hasattr(self, "task_pose_list"):
+            self.task_pose_list = TaskPoseList(task_name="pouring")
 
-        self.task.reset_task(env_ids=env_ids)
-        init_ur3_grasp_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
-        init_ur3_grasp_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
-
-        # 1)-1 initial pos variation
+        """ 
+            1)-1 initial pos variation 
+        """
+        init_ur3_hand_pos = to_torch([0.5, 0.0, 0.35], device=self.device).repeat((self.num_envs, 1))
+        init_ur3_hand_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         pos_var_meter = 0.02
-        pos_var = (torch.rand_like(init_ur3_grasp_pos) - 0.5) * 2.0
-        init_ur3_grasp_pos += pos_var * pos_var_meter
+        pos_var = (torch.rand_like(init_ur3_hand_pos) - 0.5) * 2.0
+        init_ur3_hand_pos += pos_var * pos_var_meter
 
-        # 1)-2 initial rot variation
-        def d2r(deg):
-            return deg * (math.pi / 180.0)
-
+        """ 
+            1)-2 initial rot variation 
+        """
         rot_var_deg = 15    # +-
         roll = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
         pitch = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
         yaw = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
-        q_var = quat_from_euler_xyz(roll=d2r(roll), pitch=d2r(pitch), yaw=d2r(yaw))
-        init_ur3_grasp_rot = quat_mul(init_ur3_grasp_rot, q_var)
+        q_var = quat_from_euler_xyz(roll=deg2rad(roll), pitch=deg2rad(pitch), yaw=deg2rad(yaw))
+        init_ur3_hand_rot = quat_mul(init_ur3_hand_rot, q_var)
 
-        # 1)-3 initial grip variation
-        # For 2F-85 gripper, 0x00 --> full open with 85mm, 0xFF --> close
-        # Unit: meter ~ [0.0, 0.085]
+        """
+            1)-3 initial grip variation
+            For 2F-85 gripper, 0x00 --> full open with 85mm, 0xFF --> close
+            Unit: meter ~ [0.0, 0.085]
+        """
         init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))
         grip_var = (torch.rand_like(init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
         init_ur3_grip = torch.min(init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
+        self.task_pose_list.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
 
-        self.task.push_task_pose(env_ids=env_ids,
-                                 pos=init_ur3_grasp_pos, rot=init_ur3_grasp_rot, grip=init_ur3_grip)
-
-        # 2) approach bottle
+        """
+            2) approach bottle
+        """
         bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
         bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
         if not hasattr(self, "bottle_pos_init") and not hasattr(self, "bottle_rot_init"):
@@ -1001,11 +1002,45 @@ class DemoUR3Pouring(BaseTask):
         if not hasattr(self, "appr_bottle_pos") and not hasattr(self, "appr_bottle_rot"):
             self.appr_bottle_pos, self.appr_bottle_rot = appr_bottle_pos, appr_bottle_rot
         self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
-
         appr_bottle_grip = init_ur3_grip.clone()
+        self.task_pose_list.append_pose(pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip)
 
-        self.task.push_task_pose(env_ids=env_ids,
-                                 pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip)
+        """
+            3) grasp ready
+        """
+        grasp_ready_pos = bottle_pos.clone().detach()
+        grasp_ready_rot = appr_bottle_rot.clone().detach()
+        grasp_ready_grip = appr_bottle_grip.clone().detach()
+        self.task_pose_list.append_pose(pos=grasp_ready_pos, rot=grasp_ready_rot, grip=grasp_ready_grip)
+
+        """
+            4) grasp
+        """
+        grasp_pos = grasp_ready_pos.clone().detach()
+        grasp_rot = grasp_ready_rot.clone().detach()
+        grasp_grip = to_torch([self.bottle_diameter - 0.001], device=self.device).repeat((self.num_envs, 1))
+        self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip)
+
+        """
+            5) lift
+        """
+        lift_pos = grasp_pos.clone().detach()
+        lift_pos[:, 2] += 0.13
+        lift_rot = grasp_rot.clone().detach()
+        lift_grip = grasp_grip.clone().detach()
+        self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip)
+
+        """
+            Last) push poses to the task path manager
+        """
+        if not hasattr(self, "task"):
+            num_task_steps = self.task_pose_list.length()
+            self.task = TaskPathManager(num_env=self.num_envs, num_task_steps=num_task_steps, device=self.device)
+        self.task.reset_task(env_ids=env_ids)
+
+        for i in range(self.task_pose_list.length()):
+            p, r, g = self.task_pose_list.pose_pop_first()
+            self.task.push_pose(env_ids=env_ids, pos=p, rot=r, grip=g)
 
     def calc_task_error(self):
         pass

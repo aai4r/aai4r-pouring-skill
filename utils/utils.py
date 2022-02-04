@@ -57,6 +57,29 @@ def orientation_error(desired, current):
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
 
+class TaskPoseList:
+    def __init__(self, task_name):
+        self.task_name = task_name
+
+        self.pos = []
+        self.rot = []
+        self.grip = []
+
+    def append_pose(self, pos, rot, grip):
+        self.pos.append(pos)
+        self.rot.append(rot)
+        self.grip.append(grip)
+
+    def pose_pop_first(self):
+        return self.pos.pop(0), self.rot.pop(0), self.grip.pop(0)
+
+    def pose_pop_last(self):
+        return self.pos.pop(), self.rot.pop(), self.grip.pop()
+
+    def length(self):
+        return len(self.pos)
+
+
 class TaskPathManager:
     def __init__(self, num_env, num_task_steps, device):
         self.num_env = num_env
@@ -67,7 +90,7 @@ class TaskPathManager:
         self.__step = torch.zeros(num_env, device=device, dtype=torch.long).unsqueeze(-1).repeat(1, 4).unsqueeze(1)
         self.__push_idx = torch.zeros(num_env, device=device, dtype=torch.long)
 
-        self.err_thres = {"pos": 1.e-2, "rot": 1.e-2, "grip": 5.e-3}
+        self.err_thres = {"pos": 1.e-2, "rot": 1.e-2, "grip": 2.e-3}
 
         self.__task_pos = torch.zeros(num_env, num_task_steps, 3, device=device)
         self.__task_rot = torch.zeros(num_env, num_task_steps, 4, device=device)
@@ -80,7 +103,7 @@ class TaskPathManager:
         self.__push_idx[env_ids] = torch.zeros_like(self.__push_idx[env_ids])
         self.__step[env_ids] = torch.zeros_like(self.__step[env_ids])
 
-    def push_task_pose(self, env_ids, pos, rot, grip):
+    def push_pose(self, env_ids, pos, rot, grip):
         self.__task_pos[env_ids, self.__push_idx[env_ids]] = pos[env_ids]
         self.__task_rot[env_ids, self.__push_idx[env_ids]] = rot[env_ids]
         self.__task_grip[env_ids, self.__push_idx[env_ids]] = grip[env_ids]
