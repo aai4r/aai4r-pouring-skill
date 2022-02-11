@@ -1016,11 +1016,10 @@ class DemoUR3Pouring(BaseTask):
         """
             4) grasp
         """
-        # TODO, 여기에서는 좀 더 빡쎈 error 기준을 적용해야 함..
         grasp_pos = grasp_ready_pos.clone().detach()
         grasp_rot = grasp_ready_rot.clone().detach()
         grasp_grip = to_torch([self.bottle_diameter - 0.001], device=self.device).repeat((self.num_envs, 1))
-        self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip)
+        self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip, err=TaskErrThres(grip=1.e-3))
 
         """
             5) lift
@@ -1055,14 +1054,14 @@ class DemoUR3Pouring(BaseTask):
         self.task.reset_task(env_ids=env_ids)
 
         for i in range(self.task_pose_list.length()):
-            p, r, g = self.task_pose_list.pose_pop_first()
-            self.task.push_pose(env_ids=env_ids, pos=p, rot=r, grip=g)
+            p, r, g, e = self.task_pose_list.pose_pop_first()
+            self.task.push_pose(env_ids=env_ids, pos=p, rot=r, grip=g, err=e)
 
     def calc_task_error(self):
         pass
 
     def calc_expert_action(self):
-        des_pos, des_rot, des_grip = self.task.get_desired_pose()
+        des_pos, des_rot, des_grip, _ = self.task.get_desired_pose()
         actions = self.solve(goal_pos=des_pos, goal_rot=des_rot, goal_grip=des_grip, absolute=True)
         return actions
 
