@@ -56,7 +56,8 @@ class DemoUR3Pouring(BaseTask):
         # set gripper params
         self.grasp_z_offset = 0.135      # (meter)
         self.gripper_stroke = 85 / 1000  # (meter), robotiq 85 gripper stroke: 85 mm -> 0.085 m
-        self.angle_stroke_ratio = self.ur3_dof_upper_limits[8] / self.gripper_stroke
+        self.max_grip_rad = torch.tensor(0.80285, device=self.device)
+        self.angle_stroke_ratio = self.max_grip_rad / self.gripper_stroke
 
         # get gym GPU state tensors
         actor_root_state_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
@@ -102,15 +103,15 @@ class DemoUR3Pouring(BaseTask):
         # expert demo. params.
         self.task_update_buf = torch.zeros_like(self.progress_buf)
 
-        # gripper limit for bottle
-        # blim = self.stroke_to_angle(self.bottle_diameter - 0.005)
-        # self.ur3_dof_lower_limits[7] = -blim
-        # self.ur3_dof_lower_limits[10] = -blim
-        #
-        # self.ur3_dof_upper_limits[6] = blim
-        # self.ur3_dof_upper_limits[8] = blim
-        # self.ur3_dof_upper_limits[9] = blim
-        # self.ur3_dof_upper_limits[11] = blim
+        # set gripper limit to fit the bottle's diameter
+        blim = self.stroke_to_angle(self.bottle_diameter - 0.001)
+        self.ur3_dof_lower_limits[7] = -blim
+        self.ur3_dof_lower_limits[10] = -blim
+
+        self.ur3_dof_upper_limits[6] = blim
+        self.ur3_dof_upper_limits[8] = blim
+        self.ur3_dof_upper_limits[9] = blim
+        self.ur3_dof_upper_limits[11] = blim
 
         # TODO, cam setting for debugging with single env.
         cam_pos = gymapi.Vec3(0.9263, 0.4617, 0.5420)
@@ -224,7 +225,7 @@ class DemoUR3Pouring(BaseTask):
         self.ur3_dof_props["stiffness"][:6].fill(300.0)
         self.ur3_dof_props["damping"][:6].fill(80.0)
         # robotiq 85 gripper
-        self.ur3_dof_props["stiffness"][6:].fill(100000.0)
+        self.ur3_dof_props["stiffness"][6:].fill(1000.0)
         self.ur3_dof_props["damping"][6:].fill(100.0)
 
         self.ur3_dof_lower_limits = self.ur3_dof_props['lower']
@@ -693,11 +694,11 @@ class DemoUR3Pouring(BaseTask):
         self.gym.set_dof_state_tensor(self.sim, gymtorch.unwrap_tensor(self.dof_state))
 
     def stroke_to_angle(self, m):
-        temp = self.ur3_dof_upper_limits[8] - self.angle_stroke_ratio * m
+        temp = self.max_grip_rad - self.angle_stroke_ratio * m
         return tensor_clamp(temp, self.ur3_dof_lower_limits[8], self.ur3_dof_upper_limits[8])
 
     def angle_to_stroke(self, rad):
-        temp = (self.ur3_dof_upper_limits[8] - rad) / self.angle_stroke_ratio
+        temp = (self.max_grip_rad - rad) / self.angle_stroke_ratio
         return tensor_clamp(temp, to_torch(0.0, device=self.device), to_torch(self.gripper_stroke, device=self.device))
 
     def solve(self, goal_pos, goal_rot, goal_grip, absolute=False):
@@ -728,8 +729,6 @@ class DemoUR3Pouring(BaseTask):
         u2 = torch.zeros_like(u, device=self.device, dtype=torch.float)
         angle_err = self.stroke_to_angle(goal_grip) - self.stroke_to_angle(finger_dist)
 
-        # PID control to avoid gripper oscillation
-        Kp = 2.1
         u2[:, 8-6] = angle_err
 
         scale = 1.0
@@ -966,7 +965,7 @@ class DemoUR3Pouring(BaseTask):
             For 2F-85 gripper, 0x00 --> full open with 85mm, 0xFF --> close
             Unit: meter ~ [0.0, 0.085]
         """
-        init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))
+        init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))     # meter
         grip_var = (torch.rand_like(init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
         init_ur3_grip = torch.min(init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
         self.task_pose_list.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
@@ -1038,11 +1037,24 @@ class DemoUR3Pouring(BaseTask):
         nom = torch.bmm(a.view(len(a), 1, 3), b.view(len(b), 3, 1)).squeeze(-1)
         denom = torch.bmm(b.view(len(b), 1, 3), b.view(len(b), 3, 1)).squeeze(-1)
         proj = (nom / denom) * b
-        appr_cup_pos = cup_pos + proj * 0.5
+        appr_cup_pos = cup_pos + proj * 0.55
         appr_cup_pos[:, 2] = self.cup_height + 0.05
         appr_cup_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         appr_cup_grip = lift_grip.clone().detach()
         self.task_pose_list.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip)
+
+        """
+            7) pouring
+        """
+        pour_cup_pos = appr_cup_pos.clone().detach()
+        pour_cup_rot = appr_cup_rot.clone().detach()
+
+        roll = deg2rad(torch.tensor(130, device=self.device).repeat(self.num_envs))
+        d = torch.where(bottle_pos[:, 1] > cup_pos[:, 1], torch.ones_like(roll), -1.0 * torch.ones_like(roll))
+        pour_rot = quat_from_euler_xyz(roll=roll * d, pitch=torch.zeros_like(roll), yaw=torch.zeros_like(roll))
+        pour_cup_rot = quat_mul(pour_cup_rot, pour_rot)
+        pour_cup_grip = appr_cup_grip.clone().detach()
+        self.task_pose_list.append_pose(pos=pour_cup_pos, rot=pour_cup_rot, grip=pour_cup_grip)
 
         """
             Last) push poses to the task path manager
@@ -1210,9 +1222,9 @@ def compute_ur3_reward(
     rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
 
     # early stopping
-    reset_buf = torch.where((bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6), torch.ones_like(reset_buf), reset_buf)   # bottle fallen
+    # reset_buf = torch.where((bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6), torch.ones_like(reset_buf), reset_buf)   # bottle fallen
     reset_buf = torch.where(dot4 < 0.5, torch.ones_like(reset_buf), reset_buf)  # paper cup fallen
-    reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
+    # reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
     reset_buf = torch.where(is_dropped > 0.0, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where((liq_cup_dist_xy > 0.5) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range
 
