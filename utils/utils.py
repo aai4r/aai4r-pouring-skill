@@ -60,8 +60,8 @@ def orientation_error(desired, current):
 
 @dataclass
 class TaskErrThres:
-    pos: float = 5.e-2
-    rot: float = 5.e-2
+    pos: float = 3.e-2
+    rot: float = 3.e-2
     grip: float = 5.e-3
 
 

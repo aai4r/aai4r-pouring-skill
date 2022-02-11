@@ -104,7 +104,7 @@ class DemoUR3Pouring(BaseTask):
         self.task_update_buf = torch.zeros_like(self.progress_buf)
 
         # set gripper limit to fit the bottle's diameter
-        blim = self.stroke_to_angle(self.bottle_diameter - 0.001)
+        blim = self.stroke_to_angle(self.bottle_diameter - 0.002)
         self.ur3_dof_lower_limits[7] = -blim
         self.ur3_dof_lower_limits[10] = -blim
 
@@ -1017,7 +1017,7 @@ class DemoUR3Pouring(BaseTask):
         """
         grasp_pos = grasp_ready_pos.clone().detach()
         grasp_rot = grasp_ready_rot.clone().detach()
-        grasp_grip = to_torch([self.bottle_diameter - 0.001], device=self.device).repeat((self.num_envs, 1))
+        grasp_grip = to_torch([self.bottle_diameter - 0.002], device=self.device).repeat((self.num_envs, 1))
         self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip, err=TaskErrThres(grip=1.e-3))
 
         """
@@ -1038,7 +1038,7 @@ class DemoUR3Pouring(BaseTask):
         denom = torch.bmm(b.view(len(b), 1, 3), b.view(len(b), 3, 1)).squeeze(-1)
         proj = (nom / denom) * b
         appr_cup_pos = cup_pos + proj * 0.55
-        appr_cup_pos[:, 2] = self.cup_height + 0.05
+        appr_cup_pos[:, 2] = self.cup_height + 0.06
         appr_cup_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         appr_cup_grip = lift_grip.clone().detach()
         self.task_pose_list.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip)
@@ -1049,7 +1049,7 @@ class DemoUR3Pouring(BaseTask):
         pour_cup_pos = appr_cup_pos.clone().detach()
         pour_cup_rot = appr_cup_rot.clone().detach()
 
-        roll = deg2rad(torch.tensor(130, device=self.device).repeat(self.num_envs))
+        roll = deg2rad(torch.tensor(120, device=self.device).repeat(self.num_envs))
         d = torch.where(bottle_pos[:, 1] > cup_pos[:, 1], torch.ones_like(roll), -1.0 * torch.ones_like(roll))
         pour_rot = quat_from_euler_xyz(roll=roll * d, pitch=torch.zeros_like(roll), yaw=torch.zeros_like(roll))
         pour_cup_rot = quat_mul(pour_cup_rot, pour_rot)
