@@ -1018,7 +1018,7 @@ class DemoUR3Pouring(BaseTask):
         grasp_pos = grasp_ready_pos.clone().detach()
         grasp_rot = grasp_ready_rot.clone().detach()
         grasp_grip = to_torch([self.bottle_diameter - 0.002], device=self.device).repeat((self.num_envs, 1))
-        self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip, err=TaskErrThres(grip=1.e-3))
+        self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip, err=TaskProperty(grip=1.e-3))
 
         """
             5) lift

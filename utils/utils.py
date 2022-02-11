@@ -59,10 +59,11 @@ def orientation_error(desired, current):
 
 
 @dataclass
-class TaskErrThres:
+class TaskProperty:
     pos: float = 3.e-2
     rot: float = 3.e-2
     grip: float = 5.e-3
+    wait: int = 0
 
 
 class TaskPoseList:
@@ -74,7 +75,7 @@ class TaskPoseList:
         self.grip = []
         self.err_th = []
 
-    def append_pose(self, pos, rot, grip, err=TaskErrThres()):
+    def append_pose(self, pos, rot, grip, err=TaskProperty()):
         self.pos.append(pos)
         self.rot.append(rot)
         self.grip.append(grip)
@@ -103,7 +104,7 @@ class TaskPathManager:
         self.__task_pos = torch.zeros(num_env, num_task_steps, 3, device=device)
         self.__task_rot = torch.zeros(num_env, num_task_steps, 4, device=device)
         self.__task_grip = torch.zeros(num_env, num_task_steps, 1, device=device)
-        self.__task_err = torch.zeros(num_env, num_task_steps, 3, device=device)    # (pos_err, rot_err, grip_err)
+        self.__task_err = torch.zeros(num_env, num_task_steps, 4, device=device)    # (pos_err, rot_err, grip_err, wait)
 
     def reset_task(self, env_ids):
         self.__task_pos[env_ids] = torch.zeros_like(self.__task_pos[env_ids])
@@ -113,12 +114,12 @@ class TaskPathManager:
         self.__push_idx[env_ids] = torch.zeros_like(self.__push_idx[env_ids])
         self.__step[env_ids] = torch.zeros_like(self.__step[env_ids])
 
-    def push_pose(self, env_ids, pos, rot, grip, err=TaskErrThres()):
+    def push_pose(self, env_ids, pos, rot, grip, err=TaskProperty()):
         self.__task_pos[env_ids, self.__push_idx[env_ids]] = pos[env_ids]
         self.__task_rot[env_ids, self.__push_idx[env_ids]] = rot[env_ids]
         self.__task_grip[env_ids, self.__push_idx[env_ids]] = grip[env_ids]
 
-        err_th = torch.tensor([err.pos, err.rot, err.grip], device=self.device).repeat(self.num_env, 1)
+        err_th = torch.tensor([err.pos, err.rot, err.grip, err.wait], device=self.device).repeat(self.num_env, 1)
         self.__task_err[env_ids, self.__push_idx[env_ids]] = err_th[env_ids]
         self.__push_idx[env_ids] += 1
 
