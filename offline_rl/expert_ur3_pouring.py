@@ -98,7 +98,7 @@ class DemoUR3Pouring(BaseTask):
 
         self.reset(torch.arange(self.num_envs, device=self.device))
         self.refresh_env_tensors()
-        self.init_pouring_task(torch.arange(self.num_envs, device=self.device))
+        self.set_pouring_task(torch.arange(self.num_envs, device=self.device))
 
         # expert demo. params.
         self.task_update_buf = torch.zeros_like(self.progress_buf)
@@ -173,7 +173,7 @@ class DemoUR3Pouring(BaseTask):
         asset_options = gymapi.AssetOptions()
         asset_options.density = 997
         asset_options.armature = 0.01
-        liquid_asset = self.gym.create_sphere(self.sim, 0.015, asset_options)   # radius
+        liquid_asset = self.gym.create_sphere(self.sim, 0.01, asset_options)   # radius
         return liquid_asset
 
     def _create_asset_ur3(self):
@@ -806,7 +806,7 @@ class DemoUR3Pouring(BaseTask):
 
         env_ids = self.task_update_buf.nonzero(as_tuple=False).squeeze(-1)
         if len(env_ids) > 0:
-            self.init_pouring_task(env_ids)
+            self.set_pouring_task(env_ids)
 
         # debug viz
         if self.viewer and self.debug_viz:
@@ -939,7 +939,7 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
                 pass
 
-    def init_pouring_task(self, env_ids):
+    def set_pouring_task(self, env_ids):
         if not hasattr(self, "task_pose_list"):
             self.task_pose_list = TaskPoseList(task_name="pouring")
 
@@ -1012,7 +1012,8 @@ class DemoUR3Pouring(BaseTask):
         grasp_ready_pos = bottle_pos.clone().detach()
         grasp_ready_rot = appr_bottle_rot.clone().detach()
         grasp_ready_grip = appr_bottle_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=grasp_ready_pos, rot=grasp_ready_rot, grip=grasp_ready_grip)
+        self.task_pose_list.append_pose(pos=grasp_ready_pos, rot=grasp_ready_rot, grip=grasp_ready_grip,
+                                        err=TaskProperty(pos=3.e-2, rot=3.e-2, grip=3.e-3))
 
         """
             4) grasp
@@ -1020,7 +1021,8 @@ class DemoUR3Pouring(BaseTask):
         grasp_pos = grasp_ready_pos.clone().detach()
         grasp_rot = grasp_ready_rot.clone().detach()
         grasp_grip = to_torch([self.bottle_diameter - 0.002], device=self.device).repeat((self.num_envs, 1))
-        self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip, err=TaskProperty(grip=1.e-3))
+        self.task_pose_list.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip,
+                                        err=TaskProperty(pos=3.e-2, rot=3.e-2, grip=1.e-3))
 
         """
             5) lift
@@ -1029,7 +1031,7 @@ class DemoUR3Pouring(BaseTask):
         lift_pos[:, 2] += 0.2
         lift_rot = grasp_rot.clone().detach()
         lift_grip = grasp_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip, err=TaskProperty(wait=3.0))
+        self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip)
 
         """
             6) approach cup
@@ -1039,8 +1041,9 @@ class DemoUR3Pouring(BaseTask):
         nom = torch.bmm(a.view(len(a), 1, 3), b.view(len(b), 3, 1)).squeeze(-1)
         denom = torch.bmm(b.view(len(b), 1, 3), b.view(len(b), 3, 1)).squeeze(-1)
         proj = (nom / denom) * b
-        appr_cup_pos = cup_pos + proj * 0.55
-        appr_cup_pos[:, 2] = self.cup_height + 0.06
+        proj = proj / proj.norm(dim=-1).unsqueeze(-1)
+        appr_cup_pos = cup_pos + proj * 0.12
+        appr_cup_pos[:, 2] = self.cup_height + 0.068
         appr_cup_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         appr_cup_grip = lift_grip.clone().detach()
         self.task_pose_list.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip)
@@ -1051,12 +1054,29 @@ class DemoUR3Pouring(BaseTask):
         pour_cup_pos = appr_cup_pos.clone().detach()
         pour_cup_rot = appr_cup_rot.clone().detach()
 
-        roll = deg2rad(torch.tensor(120, device=self.device).repeat(self.num_envs))
-        d = torch.where(bottle_pos[:, 1] > cup_pos[:, 1], torch.ones_like(roll), -1.0 * torch.ones_like(roll))
-        pour_rot = quat_from_euler_xyz(roll=roll * d, pitch=torch.zeros_like(roll), yaw=torch.zeros_like(roll))
+        roll = deg2rad(torch.tensor(110, device=self.device).repeat(self.num_envs))
+        direction = torch.where(bottle_pos[:, 1] > cup_pos[:, 1], torch.ones_like(roll), -1.0 * torch.ones_like(roll))
+        pour_rot = quat_from_euler_xyz(roll=roll * direction, pitch=torch.zeros_like(roll), yaw=torch.zeros_like(roll))
         pour_cup_rot = quat_mul(pour_cup_rot, pour_rot)
         pour_cup_grip = appr_cup_grip.clone().detach()
         self.task_pose_list.append_pose(pos=pour_cup_pos, rot=pour_cup_rot, grip=pour_cup_grip, err=TaskProperty(wait=0.5))
+
+        """
+            8) put up bottle
+        """
+        put_up_bottle_pos = pour_cup_pos.clone().detach()
+        put_up_bottle_rot = appr_cup_rot.clone().detach()
+        put_up_bottle_grip = pour_cup_grip.clone().detach()
+        self.task_pose_list.append_pose(pos=put_up_bottle_pos, rot=put_up_bottle_rot, grip=put_up_bottle_grip)
+
+        """
+            9) return bottle 
+        """
+
+        return_bottle_pos = lift_pos.clone().detach()
+        return_bottle_rot = lift_rot.clone().detach()
+        return_bottle_grip = lift_grip.clone().detach()
+        self.task_pose_list.append_pose(pos=return_bottle_pos, rot=return_bottle_rot, grip=return_bottle_grip)
 
         """
             Last) push poses to the task path manager
@@ -1227,7 +1247,7 @@ def compute_ur3_reward(
     # reset_buf = torch.where((bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6), torch.ones_like(reset_buf), reset_buf)   # bottle fallen
     reset_buf = torch.where(dot4 < 0.5, torch.ones_like(reset_buf), reset_buf)  # paper cup fallen
     # reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
-    reset_buf = torch.where(is_dropped > 0.0, torch.ones_like(reset_buf), reset_buf)
+    # reset_buf = torch.where(is_dropped > 0.0, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where((liq_cup_dist_xy > 0.5) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range
 
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)

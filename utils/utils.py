@@ -60,10 +60,11 @@ def orientation_error(desired, current):
 
 @dataclass
 class TaskProperty:
-    pos: float = 3.e-2
-    rot: float = 3.e-2
-    grip: float = 5.e-3
+    pos: float = 5.e-2
+    rot: float = 5.e-2
+    grip: float = 7.e-3
     wait: float = 0
+    tag: str = ""
 
 
 class TaskPoseList:
