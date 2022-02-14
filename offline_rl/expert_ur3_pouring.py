@@ -873,36 +873,36 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # ur3 grasp pose
-                px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                py = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pz = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                # # ur3 grasp pose
+                # px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                #
+                # p0 = self.ur3_grasp_pos[i].cpu().numpy()
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                p0 = self.ur3_grasp_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
-
-                # TODO
-                # appr bottle pose for debug
-                px = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                py = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pz = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                p0 = self.appr_bottle_pos[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
-
-                # bottle pos init
-                px = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                py = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                pz = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-
-                p0 = self.bottle_pos_init[i].cpu().numpy()
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # # TODO
+                # # appr bottle pose for debug
+                # px = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.appr_bottle_pos[i] + quat_apply(self.appr_bottle_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                #
+                # p0 = self.appr_bottle_pos[i].cpu().numpy()
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                #
+                # # bottle pos init
+                # px = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                # py = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                # pz = (self.bottle_pos_init[i] + quat_apply(self.bottle_rot_init[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+                #
+                # p0 = self.bottle_pos_init[i].cpu().numpy()
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # # cup pos init
                 # px = (self.cup_pos_init[i] + quat_apply(self.cup_rot_init[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
@@ -1003,7 +1003,7 @@ class DemoUR3Pouring(BaseTask):
         if not hasattr(self, "appr_bottle_pos") and not hasattr(self, "appr_bottle_rot"):
             self.appr_bottle_pos, self.appr_bottle_rot = appr_bottle_pos, appr_bottle_rot
         self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
-        appr_bottle_grip = init_ur3_grip.clone()
+        appr_bottle_grip = to_torch([0.085], device=self.device).repeat((self.num_envs, 1))  # full open
         self.task_pose_list.append_pose(pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip)
 
         """
@@ -1059,24 +1059,24 @@ class DemoUR3Pouring(BaseTask):
         pour_rot = quat_from_euler_xyz(roll=roll * direction, pitch=torch.zeros_like(roll), yaw=torch.zeros_like(roll))
         pour_cup_rot = quat_mul(pour_cup_rot, pour_rot)
         pour_cup_grip = appr_cup_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=pour_cup_pos, rot=pour_cup_rot, grip=pour_cup_grip, err=TaskProperty(wait=0.5))
+        self.task_pose_list.append_pose(pos=pour_cup_pos, rot=pour_cup_rot, grip=pour_cup_grip, err=TaskProperty(wait=2.))
 
-        """
-            8) put up bottle
-        """
-        put_up_bottle_pos = pour_cup_pos.clone().detach()
-        put_up_bottle_rot = appr_cup_rot.clone().detach()
-        put_up_bottle_grip = pour_cup_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=put_up_bottle_pos, rot=put_up_bottle_rot, grip=put_up_bottle_grip)
-
-        """
-            9) return bottle 
-        """
-
-        return_bottle_pos = lift_pos.clone().detach()
-        return_bottle_rot = lift_rot.clone().detach()
-        return_bottle_grip = lift_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=return_bottle_pos, rot=return_bottle_rot, grip=return_bottle_grip)
+        # """
+        #     8) put up bottle
+        # """
+        # put_up_bottle_pos = pour_cup_pos.clone().detach()
+        # put_up_bottle_rot = appr_cup_rot.clone().detach()
+        # put_up_bottle_grip = pour_cup_grip.clone().detach()
+        # self.task_pose_list.append_pose(pos=put_up_bottle_pos, rot=put_up_bottle_rot, grip=put_up_bottle_grip)
+        #
+        # """
+        #     9) return bottle
+        # """
+        #
+        # return_bottle_pos = lift_pos.clone().detach()
+        # return_bottle_rot = lift_rot.clone().detach()
+        # return_bottle_grip = lift_grip.clone().detach()
+        # self.task_pose_list.append_pose(pos=return_bottle_pos, rot=return_bottle_rot, grip=return_bottle_grip)
 
         """
             Last) push poses to the task path manager
@@ -1218,11 +1218,10 @@ def compute_ur3_reward(
               pouring_reward_scale * pouring_reward \
               - action_penalty_scale * action_penalty \
 
-    poured_reward_scale = 20.0
     poured_reward = torch.zeros_like(rewards)
     is_poured = (liq_cup_dist_xy < 0.015) & (liq_pos[:, 2] < 0.06)
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
-    rewards = torch.max(rewards, poured_reward_scale * poured_reward * is_lifted)
+    rewards = poured_reward
 
     # check the collisions of both fingers
     # _lfinger_contact_net_force = (lfinger_contact_net_force.T / (lfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
@@ -1241,11 +1240,12 @@ def compute_ur3_reward(
     # # bottle / cup fallen penalty
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
-    rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
+    is_cup_fallen = dot4 < 0.5
+    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
 
     # early stopping
     # reset_buf = torch.where((bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6), torch.ones_like(reset_buf), reset_buf)   # bottle fallen
-    reset_buf = torch.where(dot4 < 0.5, torch.ones_like(reset_buf), reset_buf)  # paper cup fallen
+    reset_buf = torch.where(is_cup_fallen, torch.ones_like(reset_buf), reset_buf)  # paper cup fallen
     # reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
     # reset_buf = torch.where(is_dropped > 0.0, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where((liq_cup_dist_xy > 0.5) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range
