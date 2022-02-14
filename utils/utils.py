@@ -63,7 +63,7 @@ class TaskProperty:
     pos: float = 3.e-2
     rot: float = 3.e-2
     grip: float = 5.e-3
-    wait: int = 0
+    wait: float = 0
 
 
 class TaskPoseList:
@@ -106,6 +106,11 @@ class TaskPathManager:
         self.__task_grip = torch.zeros(num_env, num_task_steps, 1, device=device)
         self.__task_err = torch.zeros(num_env, num_task_steps, 4, device=device)    # (pos_err, rot_err, grip_err, wait)
 
+        # time properties
+        self.curr_time = 0
+        self.prev_time = 0
+        self.elapsed = torch.zeros(num_env, device=device)
+
     def reset_task(self, env_ids):
         self.__task_pos[env_ids] = torch.zeros_like(self.__task_pos[env_ids])
         self.__task_rot[env_ids] = torch.zeros_like(self.__task_rot[env_ids])
@@ -123,14 +128,21 @@ class TaskPathManager:
         self.__task_err[env_ids, self.__push_idx[env_ids]] = err_th[env_ids]
         self.__push_idx[env_ids] += 1
 
-    def update_step_by_checking_arrive(self, ee_pos, ee_rot, ee_grip):
+    def update_step_by_checking_arrive(self, ee_pos, ee_rot, ee_grip, sim_time):
         des_pos, des_rot, des_grip, err_th = self.get_desired_pose()
         err_pos = (des_pos - ee_pos).norm(dim=-1)
         err_rot = orientation_error(des_rot, ee_rot).norm(dim=-1)
         err_grip = (des_grip - ee_grip).norm(dim=-1)
 
-        arrive = torch.where(((err_pos < err_th[:, 0]) & (err_rot < err_th[:, 1]) & (err_grip < err_th[:, 2])),
-                             1, 0)
+        reach = (err_pos < err_th[:, 0]) & (err_rot < err_th[:, 1]) & (err_grip < err_th[:, 2])
+
+        self.curr_time = sim_time
+        dt = self.curr_time - self.prev_time
+        self.elapsed += torch.where(reach, dt, 0.0)
+        self.elapsed = torch.where(self.elapsed > err_th[:, -1], torch.zeros_like(self.elapsed), self.elapsed)
+        self.prev_time = self.curr_time
+
+        arrive = torch.where(reach & (self.elapsed <= 0), 1, 0)
 
         self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
         if arrive.sum() > 0:
@@ -144,7 +156,7 @@ class TaskPathManager:
         pos = torch.gather(self.__task_pos, 1, self.__step[:, :, :3]).squeeze(-2)
         rot = torch.gather(self.__task_rot, 1, self.__step[:, :, :]).squeeze(-2)
         grip = torch.gather(self.__task_grip, 1, self.__step[:, :, :1]).squeeze(-2)
-        err_th = torch.gather(self.__task_err, 1, self.__step[:, :, :3]).squeeze(-2)
+        err_th = torch.gather(self.__task_err, 1, self.__step[:, :, :4]).squeeze(-2)
         return pos, rot, grip, err_th
 
     def print_task_status(self):

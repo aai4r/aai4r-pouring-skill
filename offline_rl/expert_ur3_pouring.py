@@ -794,9 +794,11 @@ class DemoUR3Pouring(BaseTask):
         # compute task update status
         # self.compute_task()
 
+        t = self.gym.get_sim_time(self.sim)
         dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
         done_envs = self.task.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
-                                                             ee_grip=dof_pos_finger)
+                                                             ee_grip=dof_pos_finger, sim_time=t)
+
         self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
         self.task_update_buf = torch.where(self.progress_buf == 1,
@@ -1027,7 +1029,7 @@ class DemoUR3Pouring(BaseTask):
         lift_pos[:, 2] += 0.2
         lift_rot = grasp_rot.clone().detach()
         lift_grip = grasp_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip)
+        self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip, err=TaskProperty(wait=3.0))
 
         """
             6) approach cup
@@ -1054,7 +1056,7 @@ class DemoUR3Pouring(BaseTask):
         pour_rot = quat_from_euler_xyz(roll=roll * d, pitch=torch.zeros_like(roll), yaw=torch.zeros_like(roll))
         pour_cup_rot = quat_mul(pour_cup_rot, pour_rot)
         pour_cup_grip = appr_cup_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=pour_cup_pos, rot=pour_cup_rot, grip=pour_cup_grip)
+        self.task_pose_list.append_pose(pos=pour_cup_pos, rot=pour_cup_rot, grip=pour_cup_grip, err=TaskProperty(wait=0.5))
 
         """
             Last) push poses to the task path manager
