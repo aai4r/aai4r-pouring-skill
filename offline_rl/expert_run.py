@@ -68,6 +68,9 @@ def task_demonstration():
     # frame params
     num_total_frames = cfg['expert']['num_total_frames']
     num_transitions_per_env = round(num_total_frames / env.num_envs + 0.51)
+    print("===== Frame Info. =====")
+    print("num_total_frames / num_envs: {} / {}".format(num_total_frames, env.num_envs))
+    print("  ==> num_transition_per_env: {}".format(num_transitions_per_env))
 
     expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, device=env.rl_device)
     expert.run(num_transitions_per_env=num_transitions_per_env)

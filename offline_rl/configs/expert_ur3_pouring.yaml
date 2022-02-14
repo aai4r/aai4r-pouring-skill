@@ -23,7 +23,7 @@ env:
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 expert:
-  num_total_frames: 100000
+  num_total_frames: 20000
 
 sim:
   substeps: 1

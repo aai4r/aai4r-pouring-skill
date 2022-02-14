@@ -36,6 +36,15 @@ class ExpertRolloutStorage:
     def clear(self):
         self.step = 0
 
+    def info(self):
+        print("***** Expert Rollout Storage Information *****")
+        print("[Shape, (num_trans, num_envs, shape)]")
+        print("    observations: {}".format(self.observations.shape))
+        print("    states:       {}".format(self.states.shape))
+        print("    rewards:      {}".format(self.rewards.shape))
+        print("    actions:      {}".format(self.actions.shape))
+        print("    dones:        {}".format(self.dones.shape))
+
     def get_statistics(self):
         done = self.dones.cpu()
         done[-1] = 1

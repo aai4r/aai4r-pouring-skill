@@ -32,12 +32,14 @@ class ExpertManager:
         current_states = self.vec_env.get_state()
 
         # rollout expert demonstration
-        for it in range(0, num_transitions_per_env):
-            # print("it: ", it)
-            # actions = torch.rand((self.vec_env.num_envs,) + self.action_space.shape)
+        for iter in range(0, num_transitions_per_env):
+            if iter % 100 == 0:
+                print("iteration: ", iter)
             actions = self.vec_env.task.calc_expert_action()
             next_obs, rews, dones, infors = self.vec_env.step(actions)
             next_states = self.vec_env.get_state()
             self.storage.add_transitions(current_obs, current_states, actions, rews, dones)
             current_obs.copy_(next_obs)
             current_states.copy_(next_states)
+
+        self.storage.info()

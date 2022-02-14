@@ -146,9 +146,9 @@ class TaskPathManager:
         arrive = torch.where(reach & (self.elapsed <= 0), 1, 0)
 
         self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
-        if arrive.sum() > 0:
-            print("arrive: ", arrive, self.num_task_steps)
-            print("step: ", self.__step)
+        # if arrive.sum() > 0:
+        #     print("arrive: ", arrive, self.num_task_steps)
+        #     print("step: ", self.__step)
         done_envs = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
         self.__step = torch.where(self.__step >= self.num_task_steps, torch.zeros_like(self.__step), self.__step)
         return done_envs
