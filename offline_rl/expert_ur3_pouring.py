@@ -39,8 +39,8 @@ class DemoUR3Pouring(BaseTask):
 
         self.use_ik = False
 
-        num_obs = 24 if self.use_ik else 37    # 21 for task space
-        num_acts = 8 if self.use_ik else 12   # 8 for task space
+        num_obs = 24
+        num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
 
         self.cfg["env"]["numObservations"] = num_obs
         self.cfg["env"]["numActions"] = num_acts
@@ -529,12 +529,12 @@ class DemoUR3Pouring(BaseTask):
         self.cup_tip_rot[:], self.cup_tip_pos[:] = \
             tf_combine(self.cup_rot, self.cup_pos, self.cup_local_tip_rot, self.cup_local_tip_pos)
 
-        dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
-                          / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
-        # dof_pos_scaled = self.ur3_dof_pos
-        dof_pos_scaled = torch.index_select(dof_pos_scaled, 1, self.indices)
+        # dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
+        #                   / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
+        dof_pos = self.ur3_dof_pos
+        dof_pos = torch.index_select(dof_pos, 1, self.indices)
         dof_vel = torch.index_select(self.ur3_dof_vel, 1, self.indices)
-        dof_pos_vel = torch.cat((dof_pos_scaled, dof_vel), dim=-1)
+        dof_pos_vel = torch.cat((dof_pos, dof_vel), dim=-1)
 
         to_target_pos = self.bottle_grasp_pos - self.ur3_grasp_pos
         to_target_rot = quat_mul(quat_conjugate(self.bottle_grasp_rot), self.ur3_grasp_rot)
@@ -550,13 +550,12 @@ class DemoUR3Pouring(BaseTask):
         # dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
         dof_pos_finger = self.ur3_dof_pos[:, 8].unsqueeze(-1)
         # finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1).unsqueeze(-1)
-        dof_state = dof_pos_finger if self.use_ik else dof_pos_vel
+        # dof_state = dof_pos_finger if self.use_ik else dof_pos
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
-        self.obs_buf = torch.cat((dof_state,
-                                  self.ur3_grasp_pos, self.ur3_grasp_rot,
+        self.obs_buf = torch.cat((dof_pos,
                                   self.bottle_pos, self.bottle_rot,
-                                  self.cup_pos, self.liq_pos,
-                                  tip_pos_diff), dim=-1)
+                                  self.cup_pos, self.cup_rot,
+                                  self.liq_pos), dim=-1)
 
         # TODO, cam transform
         # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
@@ -729,16 +728,16 @@ class DemoUR3Pouring(BaseTask):
         u2 = torch.zeros_like(u, device=self.device, dtype=torch.float)
         angle_err = self.stroke_to_angle(goal_grip) - self.stroke_to_angle(finger_dist)
 
-        u2[:, 8-6] = angle_err
+        # u2[:, 8-6] = angle_err
+        #
+        # scale = 1.0
+        # u2[:, 6-6] = scale * u2[:, 8-6]
+        # u2[:, 7-6] = -scale * u2[:, 8-6]
+        # u2[:, 9-6] = scale * u2[:, 8-6]
+        # u2[:, 10-6] = -scale * u2[:, 8-6]
+        # u2[:, 11-6] = scale * u2[:, 8-6]
 
-        scale = 1.0
-        u2[:, 6-6] = scale * u2[:, 8-6]
-        u2[:, 7-6] = -scale * u2[:, 8-6]
-        u2[:, 9-6] = scale * u2[:, 8-6]
-        u2[:, 10-6] = -scale * u2[:, 8-6]
-        u2[:, 11-6] = scale * u2[:, 8-6]
-
-        _u = torch.cat((u, u2), dim=1)
+        _u = torch.cat((u, angle_err.unsqueeze(-1)), dim=1)
         return _u.squeeze(-1)
 
     def pre_physics_step(self, actions):
@@ -764,7 +763,9 @@ class DemoUR3Pouring(BaseTask):
             self.actions = self.solve(goal_pos=actions[:, :3], goal_rot=actions[:, 3:7],
                                       goal_grip=actions[:, 7], absolute=False)
         else:
-            self.actions = actions.clone().to(self.device)
+            _actions = actions[:, :7].clone().to(self.device)
+            grip_act = _actions[:, -1].unsqueeze(-1).repeat(1, 5) * torch.tensor([-1., 1., 1., -1., 1.], device=self.device)
+            self.actions = torch.cat((_actions, grip_act), dim=-1)
 
         targets = self.ur3_dof_pos + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
@@ -1061,14 +1062,14 @@ class DemoUR3Pouring(BaseTask):
         pour_cup_grip = appr_cup_grip.clone().detach()
         self.task_pose_list.append_pose(pos=pour_cup_pos, rot=pour_cup_rot, grip=pour_cup_grip, err=TaskProperty(wait=2.))
 
-        # """
-        #     8) put up bottle
-        # """
-        # put_up_bottle_pos = pour_cup_pos.clone().detach()
-        # put_up_bottle_rot = appr_cup_rot.clone().detach()
-        # put_up_bottle_grip = pour_cup_grip.clone().detach()
-        # self.task_pose_list.append_pose(pos=put_up_bottle_pos, rot=put_up_bottle_rot, grip=put_up_bottle_grip)
-        #
+        """
+            8) put up bottle
+        """
+        put_up_bottle_pos = pour_cup_pos.clone().detach()
+        put_up_bottle_rot = appr_cup_rot.clone().detach()
+        put_up_bottle_grip = pour_cup_grip.clone().detach()
+        self.task_pose_list.append_pose(pos=put_up_bottle_pos, rot=put_up_bottle_rot, grip=put_up_bottle_grip)
+
         # """
         #     9) return bottle
         # """

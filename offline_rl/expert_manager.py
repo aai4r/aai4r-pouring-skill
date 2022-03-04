@@ -42,4 +42,5 @@ class ExpertManager:
             current_obs.copy_(next_obs)
             current_states.copy_(next_states)
 
+        # posterior process like print info. save, etc.
         self.storage.info()
