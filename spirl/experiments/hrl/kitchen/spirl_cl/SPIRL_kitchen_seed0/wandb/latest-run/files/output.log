@@ -1,0 +1,139 @@
+Reading configurations for Franka
+[37m[40mInitializing Franka sim
+exp_dir:	../experiments
+conf_path:	/home/twkim/cloudrobot/spirl/spirl/rl/../configs/hrl/kitchen/spirl_cl/conf.py
+general:
+	seed:	0
+	agent:	<class 'spirl.rl.components.agent.FixedIntervalHierarchicalAgent'>
+	environment:	<class 'spirl.rl.envs.kitchen.KitchenEnv'>
+	sampler:	<class 'spirl.rl.components.sampler.HierarchicalSampler'>
+	data_dir:	.
+	num_epochs:	15
+	max_rollout_len:	280
+	n_steps_per_epoch:	100000
+	n_warmup_steps:	5000.0
+agent:
+	hl_agent:	<class 'spirl.rl.agents.prior_sac_agent.ActionPriorSACAgent'>
+	hl_agent_params:
+		batch_size:	256
+		replay:	<class 'spirl.rl.components.replay_buffer.UniformReplayBuffer'>
+		replay_params:
+		clip_q_target:	False
+		policy:	<class 'spirl.rl.policies.prior_policies.LearnedPriorAugmentedPIPolicy'>
+		policy_params:
+			action_dim:	10
+			input_dim:	60
+			max_action_range:	2.0
+			nz_mid:	256
+			n_layers:	5
+			prior_model:	<class 'spirl.models.closed_loop_spirl_mdl.ClSPiRLMdl'>
+			prior_model_params:
+				state_dim:	60
+				action_dim:	9
+				kl_div_weight:	0.0005
+				nz_enc:	128
+				nz_mid:	128
+				n_processing_layers:	5
+				nz_vae:	10
+				n_rollout_steps:	10
+				cond_decode:	True
+			prior_model_checkpoint:	../experiments/skill_prior_learning/kitchen/hierarchical_cl
+		critic:	<class 'spirl.rl.components.critic.MLPCritic'>
+		critic_params:
+			action_dim:	10
+			input_dim:	60
+			output_dim:	1
+			n_layers:	5
+			nz_mid:	256
+			action_input:	True
+		td_schedule_params:
+			p:	5.0
+	ll_agent:	<class 'spirl.rl.agents.ac_agent.SACAgent'>
+	ll_agent_params:
+		policy:	<class 'spirl.rl.policies.cl_model_policies.ClModelPolicy'>
+		policy_params:
+			policy_model:	<class 'spirl.models.closed_loop_spirl_mdl.ClSPiRLMdl'>
+			policy_model_params:
+				state_dim:	60
+				action_dim:	9
+				kl_div_weight:	0.0005
+				nz_enc:	128
+				nz_mid:	128
+				n_processing_layers:	5
+				nz_vae:	10
+				n_rollout_steps:	10
+				cond_decode:	True
+			policy_model_checkpoint:	../experiments/skill_prior_learning/kitchen/hierarchical_cl
+			state_dim:	60
+			action_dim:	9
+			kl_div_weight:	0.0005
+			nz_enc:	128
+			nz_mid:	128
+			n_processing_layers:	5
+			nz_vae:	10
+			n_rollout_steps:	10
+			cond_decode:	True
+		critic:	<class 'spirl.rl.components.critic.MLPCritic'>
+		critic_params:
+			action_dim:	10
+			input_dim:	60
+			output_dim:	1
+			n_layers:	5
+			nz_mid:	256
+			action_input:	True
+	hl_interval:	10
+	log_video_caption:	True
+	update_ll:	False
+	device:	cuda
+	env_params:
+data:
+	dataset_spec:
+		dataset_class:	<class 'spirl.data.kitchen.src.kitchen_data_loader.D4RLSequenceSplitDataset'>
+		n_actions:	9
+		state_dim:	60
+		env_name:	kitchen-mixed-v0
+		res:	128
+		crop_rand_subseq:	True
+		max_seq_len:	280
+env:
+	reward_norm:	1.0
+	device:	cuda
+	seed:	0
+sampler:
+ckpt_path:	None
+notes:	hierarchical RL on the kitchen env
+mpi:
+	rank:	0
+	is_chef:	True
+	num_workers:	1
+Traceback (most recent call last):
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/train.py", line 340, in <module>
+    RLTrainer(args=get_args())
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/train.py", line 63, in __init__
+    self.agent = self._hp.agent(self.conf.agent)
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/components/agent.py", line 326, in __init__
+    super().__init__(config)
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/components/agent.py", line 211, in __init__
+    self.hl_agent = self._hp.hl_agent(self._hp.overwrite(self._hp.hl_agent_params))
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/agents/prior_sac_agent.py", line 12, in __init__
+    SACAgent.__init__(self, config)
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/agents/ac_agent.py", line 73, in __init__
+    ACAgent.__init__(self, config)
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/agents/ac_agent.py", line 16, in __init__
+    self.policy = self._hp.policy(self._hp.policy_params)
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/policies/prior_policies.py", line 145, in __init__
+    LearnedPriorAugmentedPolicy.__init__(self, config)
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/policies/prior_policies.py", line 93, in __init__
+    PriorAugmentedPolicy.__init__(self) #super().__init__()
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/components/policy.py", line 12, in __init__
+    self.net = self._build_network()
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/policies/prior_policies.py", line 46, in _build_network
+    BaseAgent.load_model_weights(net, self._hp.prior_model_checkpoint, self._hp.prior_model_epoch)
+  File "/home/twkim/cloudrobot/spirl/spirl/rl/components/agent.py", line 160, in load_model_weights
+    checkpoint_path = CheckpointHandler.get_resume_ckpt_file(epoch, checkpoint_dir)
+  File "/home/twkim/cloudrobot/spirl/spirl/components/checkpointer.py", line 30, in get_resume_ckpt_file
+    max_epoch = np.max(CheckpointHandler.get_epochs(path))
+  File "/home/twkim/cloudrobot/spirl/spirl/components/checkpointer.py", line 20, in get_epochs
+    raise ValueError("No checkpoints found at {}!".format(path))
+ValueError: No checkpoints found at ../experiments/skill_prior_learning/kitchen/hierarchical_cl/weights!
+Loading from: ../experiments/skill_prior_learning/kitchen/hierarchical_cl/weights

@@ -1,0 +1,245 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.10
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.7.10
+    start_time: 1646270120
+    t:
+      1:
+      - 1
+      2:
+      - 1
+      3:
+      - 5
+      - 16
+      4: 3.7.10
+      5: 0.12.10
+      8:
+      - 5
+agent_device:
+  desc: null
+  value: cuda
+agent_hl_agent_params_batch_size:
+  desc: null
+  value: 256
+agent_hl_agent_params_clip_q_target:
+  desc: null
+  value: false
+agent_hl_agent_params_critic_params_action_dim:
+  desc: null
+  value: 10
+agent_hl_agent_params_critic_params_action_input:
+  desc: null
+  value: true
+agent_hl_agent_params_critic_params_input_dim:
+  desc: null
+  value: 60
+agent_hl_agent_params_critic_params_n_layers:
+  desc: null
+  value: 5
+agent_hl_agent_params_critic_params_nz_mid:
+  desc: null
+  value: 256
+agent_hl_agent_params_critic_params_output_dim:
+  desc: null
+  value: 1
+agent_hl_agent_params_policy_params_action_dim:
+  desc: null
+  value: 10
+agent_hl_agent_params_policy_params_input_dim:
+  desc: null
+  value: 60
+agent_hl_agent_params_policy_params_max_action_range:
+  desc: null
+  value: 2.0
+agent_hl_agent_params_policy_params_n_layers:
+  desc: null
+  value: 5
+agent_hl_agent_params_policy_params_nz_mid:
+  desc: null
+  value: 256
+agent_hl_agent_params_policy_params_prior_model_checkpoint:
+  desc: null
+  value: ../experiments/skill_prior_learning/kitchen/hierarchical_cl
+agent_hl_agent_params_policy_params_prior_model_params_action_dim:
+  desc: null
+  value: 9
+agent_hl_agent_params_policy_params_prior_model_params_cond_decode:
+  desc: null
+  value: true
+agent_hl_agent_params_policy_params_prior_model_params_kl_div_weight:
+  desc: null
+  value: 0.0005
+agent_hl_agent_params_policy_params_prior_model_params_n_processing_layers:
+  desc: null
+  value: 5
+agent_hl_agent_params_policy_params_prior_model_params_n_rollout_steps:
+  desc: null
+  value: 10
+agent_hl_agent_params_policy_params_prior_model_params_nz_enc:
+  desc: null
+  value: 128
+agent_hl_agent_params_policy_params_prior_model_params_nz_mid:
+  desc: null
+  value: 128
+agent_hl_agent_params_policy_params_prior_model_params_nz_vae:
+  desc: null
+  value: 10
+agent_hl_agent_params_policy_params_prior_model_params_state_dim:
+  desc: null
+  value: 60
+agent_hl_agent_params_td_schedule_params_p:
+  desc: null
+  value: 5.0
+agent_hl_interval:
+  desc: null
+  value: 10
+agent_ll_agent_params_critic_params_action_dim:
+  desc: null
+  value: 10
+agent_ll_agent_params_critic_params_action_input:
+  desc: null
+  value: true
+agent_ll_agent_params_critic_params_input_dim:
+  desc: null
+  value: 60
+agent_ll_agent_params_critic_params_n_layers:
+  desc: null
+  value: 5
+agent_ll_agent_params_critic_params_nz_mid:
+  desc: null
+  value: 256
+agent_ll_agent_params_critic_params_output_dim:
+  desc: null
+  value: 1
+agent_ll_agent_params_policy_params_action_dim:
+  desc: null
+  value: 9
+agent_ll_agent_params_policy_params_cond_decode:
+  desc: null
+  value: true
+agent_ll_agent_params_policy_params_kl_div_weight:
+  desc: null
+  value: 0.0005
+agent_ll_agent_params_policy_params_n_processing_layers:
+  desc: null
+  value: 5
+agent_ll_agent_params_policy_params_n_rollout_steps:
+  desc: null
+  value: 10
+agent_ll_agent_params_policy_params_nz_enc:
+  desc: null
+  value: 128
+agent_ll_agent_params_policy_params_nz_mid:
+  desc: null
+  value: 128
+agent_ll_agent_params_policy_params_nz_vae:
+  desc: null
+  value: 10
+agent_ll_agent_params_policy_params_policy_model_checkpoint:
+  desc: null
+  value: ../experiments/skill_prior_learning/kitchen/hierarchical_cl
+agent_ll_agent_params_policy_params_policy_model_params_action_dim:
+  desc: null
+  value: 9
+agent_ll_agent_params_policy_params_policy_model_params_cond_decode:
+  desc: null
+  value: true
+agent_ll_agent_params_policy_params_policy_model_params_kl_div_weight:
+  desc: null
+  value: 0.0005
+agent_ll_agent_params_policy_params_policy_model_params_n_processing_layers:
+  desc: null
+  value: 5
+agent_ll_agent_params_policy_params_policy_model_params_n_rollout_steps:
+  desc: null
+  value: 10
+agent_ll_agent_params_policy_params_policy_model_params_nz_enc:
+  desc: null
+  value: 128
+agent_ll_agent_params_policy_params_policy_model_params_nz_mid:
+  desc: null
+  value: 128
+agent_ll_agent_params_policy_params_policy_model_params_nz_vae:
+  desc: null
+  value: 10
+agent_ll_agent_params_policy_params_policy_model_params_state_dim:
+  desc: null
+  value: 60
+agent_ll_agent_params_policy_params_state_dim:
+  desc: null
+  value: 60
+agent_log_video_caption:
+  desc: null
+  value: true
+agent_update_ll:
+  desc: null
+  value: false
+ckpt_path:
+  desc: null
+  value: null
+conf_path:
+  desc: null
+  value: /home/twkim/cloudrobot/spirl/spirl/rl/../configs/hrl/kitchen/spirl_cl/conf.py
+data_dataset_spec_crop_rand_subseq:
+  desc: null
+  value: true
+data_dataset_spec_env_name:
+  desc: null
+  value: kitchen-mixed-v0
+data_dataset_spec_max_seq_len:
+  desc: null
+  value: 280
+data_dataset_spec_n_actions:
+  desc: null
+  value: 9
+data_dataset_spec_res:
+  desc: null
+  value: 128
+data_dataset_spec_state_dim:
+  desc: null
+  value: 60
+env_device:
+  desc: null
+  value: cuda
+env_reward_norm:
+  desc: null
+  value: 1.0
+exp_dir:
+  desc: null
+  value: ../experiments
+general_data_dir:
+  desc: null
+  value: .
+general_max_rollout_len:
+  desc: null
+  value: 280
+general_n_steps_per_epoch:
+  desc: null
+  value: 100000
+general_n_warmup_steps:
+  desc: null
+  value: 5000.0
+general_num_epochs:
+  desc: null
+  value: 15
+general_seed:
+  desc: null
+  value: 42
+mpi_is_chef:
+  desc: null
+  value: true
+mpi_num_workers:
+  desc: null
+  value: 1
+mpi_rank:
+  desc: null
+  value: 0
+notes:
+  desc: null
+  value: hierarchical RL on the kitchen env

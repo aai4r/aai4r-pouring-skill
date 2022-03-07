@@ -1,0 +1,2 @@
+python /home/twkim/cloudrobot/spirl/spirl/rl/train.py --path=/home/twkim/cloudrobot/spirl/spirl/rl/../configs/hrl/kitchen/spirl_cl --seed=0 --prefix=SPIRL_kitchen_seed0
+

@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRandomSampler
 
-from expert.utils.general_utils import AttrDict
+from spirl.utils.general_utils import AttrDict
 
 
 class ExpertRolloutStorage:

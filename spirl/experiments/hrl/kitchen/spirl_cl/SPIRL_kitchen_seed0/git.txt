@@ -1,0 +1,36 @@
+430ba7660e81ae940dac5f36ca00c976078a2ef1
+diff --git a/spirl/rl/train.py b/spirl/rl/train.py
+index c6f94ba..40b7b16 100644
+--- a/spirl/rl/train.py
++++ b/spirl/rl/train.py
+@@ -324,18 +324,18 @@ class RLTrainer:
+ 
+ 
+ if __name__ == '__main__':
+-    # # for debugging..
+-    # # comment out following codes if you run this script directly
+-    # os.environ["EXP_DIR"] = "../experiments"
+-    # os.environ["DATA_DIR"] = "../data"
+-    #
+-    # # with multi-GPU env, using only single GPU
+-    # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+-    # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+-    #
+-    # sys.argv.append("--path=" + os.getcwd() + "/../configs/hrl/kitchen/spirl_cl")
+-    # sys.argv.append("--seed=0")
+-    # sys.argv.append("--prefix=SPIRL_kitchen_seed0")
++    # for debugging..
++    # comment out following codes if you run this script directly
++    os.environ["EXP_DIR"] = "../experiments"
++    os.environ["DATA_DIR"] = "../data"
++
++    # with multi-GPU env, using only single GPU
++    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
++    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
++
++    sys.argv.append("--path=" + os.getcwd() + "/../configs/hrl/kitchen/spirl_cl")
++    sys.argv.append("--seed=0")
++    sys.argv.append("--prefix=SPIRL_kitchen_seed0")
+ 
+     RLTrainer(args=get_args())
+ 
