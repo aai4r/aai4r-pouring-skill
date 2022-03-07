@@ -7,15 +7,15 @@ Candidates:
 """
 
 from isaacgym import gymutil
-from offline_rl.config import load_cfg
-from offline_rl.expert_manager import ExpertManager
+from expert.config import load_cfg
+from expert.expert_manager import ExpertManager
 from utils.config import parse_sim_params
 from tasks.base.vec_task import VecTaskPython
 
 
 import torch
 
-from offline_rl.expert_ur3_pouring import DemoUR3Pouring
+from expert.expert_ur3_pouring import DemoUR3Pouring
 
 # Task name format: $ROBOT_TASK: $CONFIG
 task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"}}
@@ -72,8 +72,9 @@ def task_demonstration():
     print("num_total_frames / num_envs: {} / {}".format(num_total_frames, env.num_envs))
     print("  ==> num_transition_per_env: {}".format(num_transitions_per_env))
 
-    expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, device=env.rl_device)
-    expert.run(num_transitions_per_env=num_transitions_per_env)
+    expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, cfg=cfg, device=env.rl_device)
+    # expert.run(num_transitions_per_env=num_transitions_per_env)
+    expert.load()
 
 
 if __name__ == '__main__':

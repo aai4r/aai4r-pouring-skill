@@ -23,7 +23,8 @@ env:
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 expert:
-  num_total_frames: 20000
+  num_total_frames: 2000
+  data_path: "data"
 
 sim:
   substeps: 1
@@ -46,4 +47,5 @@ sim:
     relaxation: 0.75
 
 task:
+  name: "pouring_skill"
   randomize: False

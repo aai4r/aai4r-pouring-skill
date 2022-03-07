@@ -1,6 +1,8 @@
 import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRandomSampler
 
+from expert.utils.general_utils import AttrDict
+
 
 class ExpertRolloutStorage:
 
@@ -18,6 +20,8 @@ class ExpertRolloutStorage:
 
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
+
+        self.shapes = AttrDict(obs_shape=obs_shape, states_shape=states_shape, actions_shape=actions_shape)
 
         self.step = 0
 
@@ -37,8 +41,8 @@ class ExpertRolloutStorage:
         self.step = 0
 
     def info(self):
-        print("***** Expert Rollout Storage Information *****")
-        print("[Shape, (num_trans, num_envs, shape)]")
+        print("***** Expert Demo Rollout Storage Information *****")
+        print("[Shape: (num_trans, num_envs, dim)]")
         print("    observations: {}".format(self.observations.shape))
         print("    states:       {}".format(self.states.shape))
         print("    rewards:      {}".format(self.rewards.shape))
