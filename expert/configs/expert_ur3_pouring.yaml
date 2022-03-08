@@ -1,6 +1,6 @@
 # if given, will override the device setting in gym.
 env:
-  numEnvs: 8
+  numEnvs: 4
   envSpacing: 1.
   episodeLength: 800 # 350
   enableDebugVis: True
@@ -23,7 +23,7 @@ env:
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 expert:
-  num_total_frames: 2000
+  num_total_frames: 3000
   data_path: "data"
 
 sim:

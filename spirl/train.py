@@ -1,6 +1,7 @@
 import matplotlib; matplotlib.use('Agg')
 import torch
 import os
+import sys
 import time
 from shutil import copy
 import datetime
@@ -393,4 +394,18 @@ def save_config(conf_path, exp_conf_path):
 
         
 if __name__ == '__main__':
+    # for debugging
+    os.environ["EXP_DIR"] = "../experiments"
+    os.environ["DATA_DIR"] = "../data"
+
+    # with multi-GPU env, using only single GPU
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+    task_name = "isaacgym"
+    mode = "hierarchical_cl"
+
+    sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
+    sys.argv.append("--val_data_size={}".format(160))
+
     ModelTrainer(args=get_args())

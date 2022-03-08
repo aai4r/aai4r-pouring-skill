@@ -73,8 +73,8 @@ def task_demonstration():
     print("  ==> num_transition_per_env: {}".format(num_transitions_per_env))
 
     expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, cfg=cfg, device=env.rl_device)
-    # expert.run(num_transitions_per_env=num_transitions_per_env)
-    expert.load()
+    expert.run(num_transitions_per_env=num_transitions_per_env)
+    # expert.load()
 
 
 if __name__ == '__main__':

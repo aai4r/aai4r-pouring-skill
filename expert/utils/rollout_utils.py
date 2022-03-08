@@ -23,6 +23,8 @@ class RolloutSaverIsaac(RolloutSaver):
         traj_data.create_dataset("observations", data=np.array(episode.observations))
         # traj_data.create_dataset("images", data=np.array(episode.image, dtype=np.uint8))
         traj_data.create_dataset("actions", data=np.array(episode.actions))
+        traj_data.create_dataset("rewards", data=np.array(episode.rewards))
+        traj_data.create_dataset("terminals", data=np.array(episode.dones))
 
         terminals = np.array(episode.dones)
         if np.sum(terminals) == 0:
