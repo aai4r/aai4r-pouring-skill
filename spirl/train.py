@@ -392,8 +392,8 @@ def set_seeds(seed=0, cuda_deterministic=True):
 def save_config(conf_path, exp_conf_path):
     copy(conf_path, exp_conf_path)
 
-        
-if __name__ == '__main__':
+
+def set_run_params():
     # for debugging
     os.environ["EXP_DIR"] = "../experiments"
     os.environ["DATA_DIR"] = "../data"
@@ -402,10 +402,13 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    task_name = "isaacgym"
+    task_name = "pouring_water"
     mode = "hierarchical_cl"
 
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))
 
+
+if __name__ == '__main__':
+    set_run_params()    # comment out if run outside
     ModelTrainer(args=get_args())

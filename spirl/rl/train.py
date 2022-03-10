@@ -334,18 +334,20 @@ class RLTrainer:
 
 
 if __name__ == '__main__':
-    # # for debugging..
-    # # comment out following codes if you run this script directly
-    # os.environ["EXP_DIR"] = "../../experiments"
-    # os.environ["DATA_DIR"] = "../../data"
-    #
-    # # with multi-GPU env, using only single GPU
-    # os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-    #
-    # sys.argv.append("--path=" + os.getcwd() + "/../configs/hrl/kitchen/spirl_cl")
-    # sys.argv.append("--seed=0")
-    # sys.argv.append("--prefix=SPIRL_kitchen_seed0")
-    # sys.argv.append("--mode=val")   # train / val
+    # for debugging..
+    # comment out following codes if you run this script directly
+    os.environ["EXP_DIR"] = "../../experiments"
+    os.environ["DATA_DIR"] = "../../data"
+
+    # with multi-GPU env, using only single GPU
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+    task_name = "pouring_water"
+    mode = "spirl_cl"
+    sys.argv.append("--path=" + "../configs/hrl/{}/{}".format(task_name, mode))
+    sys.argv.append("--seed={}".format(0))
+    sys.argv.append("--prefix={}".format("SPIRL_" + task_name + "_seed0"))
+    # sys.argv.append("--mode={}".format("val"))   # train / val
 
     RLTrainer(args=get_args())

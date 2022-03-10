@@ -21,10 +21,9 @@ class IsaacGymSequenceDataLoader(Dataset):
         self.n_worker = 4
         self.shuffle = shuffle
 
-        data_path = "../expert/data"
         rollout_index = 0
         filename = "rollout_" + str(rollout_index) + '.h5'
-        path = os.path.join(data_path, filename)
+        path = os.path.join(self.data_dir, filename)
         print('path: ', path)
         with h5py.File(path, 'r') as f:
             data = AttrDict()

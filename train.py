@@ -44,11 +44,18 @@ def skill_train():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    task_name = "isaacgym"
-    mode = "hierarchical_cl"
+    task_name = "pouring_water"
+    skill_mode = "hierarchical_cl"
     skillPriorCmd = ["python", "spirl/train.py",
-                     "--path=spirl/configs/skill_prior_learning/{}/{}".format(task_name, mode),
+                     "--path=spirl/configs/skill_prior_learning/{}/{}".format(task_name, skill_mode),
                      "--val_data_size={}".format(160)]
+
+    rl_mode = "spirl_cl"
+    spirlCmd = ["python3", "spirl/rl/train.py",
+                "--path=spirl/configs/hrl/{}/{}".format(task_name, rl_mode),
+                "--seed={}".format(0),
+                "--prefix=SPIRL_kitchen_seed0",
+                "--mode=val"]  # "train"(default) or "val"
 
     subprocess.call([" ".join(skillPriorCmd)], shell=True)
 
