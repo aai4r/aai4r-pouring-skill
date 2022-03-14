@@ -3,9 +3,9 @@ import numpy as np
 import h5py
 
 from gym.spaces import Space
-from expert.ExpertRolloutStorage import ExpertRolloutStorage
+from skill_rl.ExpertRolloutStorage import ExpertRolloutStorage
 
-from expert.utils.rollout_utils import RolloutSaverIsaac
+from skill_rl.utils.rollout_utils import RolloutSaverIsaac
 from spirl.utils.general_utils import AttrDict
 
 
@@ -52,7 +52,7 @@ class ExpertManager:
         self.saver.save_rollout_to_file(episode)
 
     def load(self):
-        data_path = self.cfg['expert']['data_path']
+        data_path = self.cfg['skill_rl']['data_path']
         rollout_index = 0
         filename = "rollout_" + str(rollout_index) + '.h5'
         path = os.path.join(data_path, filename)
@@ -72,7 +72,7 @@ class ExpertManager:
         current_obs = self.vec_env.reset()
         current_states = self.vec_env.get_state()
 
-        # rollout expert demonstration
+        # rollout skill_rl demonstration
         for frame in range(0, num_transitions_per_env):
             if frame % 100 == 0:
                 print("frames: ", frame)
