@@ -1,6 +1,8 @@
-
+import torch
+import numpy as np
 
 from spirl.utils.general_utils import ParamDict
+from spirl.utils.pytorch_utils import ar2ten, ten2ar
 from spirl.rl.components.environment import BaseEnvironment
 
 from skill_rl.expert_ur3_pouring import DemoUR3Pouring
@@ -47,12 +49,19 @@ class IsaacGymEnv(BaseEnvironment):
         }))
 
     def step(self, action):
-        pass
+        # if isinstance(action, torch.Tensor): action = ten2ar(action)
+        if isinstance(action, np.ndarray): action = ar2ten(action, self._env.rl_device)
+        obs, reward, done, info = self._env.step(action)
+        reward = reward / self.config.reward_norm
+        return self._wrap_observation(obs.cpu()), reward, np.array(done.cpu()), info
 
     def reset(self):
         obs = self._env.reset()
-        # obs = self._wrap_observation(obs)
+        obs = self._wrap_observation(obs.cpu())
         return obs
+
+    def render(self, mode='rgb_array'):
+        pass
 
     def get_episode_info(self):
         pass
