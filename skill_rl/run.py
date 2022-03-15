@@ -137,5 +137,5 @@ if __name__ == '__main__':
     print("Task Demonstration Dataset")
     target = "UR3_POURING"
 
-    # task_demonstration()
-    skill_rl_train()
+    task_demonstration()
+    # skill_rl_train()

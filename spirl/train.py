@@ -405,6 +405,7 @@ def set_run_params():
     task_name = "pouring_water"
     mode = "hierarchical_cl"
 
+    # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))
 

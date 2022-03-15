@@ -73,9 +73,9 @@ class ExpertManager:
         current_states = self.vec_env.get_state()
 
         # rollout skill_rl demonstration
-        for frame in range(0, num_transitions_per_env):
+        for frame in range(num_transitions_per_env):
             if frame % 100 == 0:
-                print("frames: ", frame)
+                print("frames: {} / {}".format(frame * self.vec_env.num_envs, num_transitions_per_env * self.vec_env.num_envs))
             actions = self.vec_env.task.calc_expert_action()
             next_obs, rews, dones, infors = self.vec_env.step(actions)
             next_states = self.vec_env.get_state()
