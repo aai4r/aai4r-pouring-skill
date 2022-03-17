@@ -1,6 +1,6 @@
 import copy
 
-import torch
+# import torch
 import math
 
 from utils.torch_jit_utils import *
@@ -763,6 +763,8 @@ class DemoUR3Pouring(BaseTask):
             self.actions = self.solve(goal_pos=actions[:, :3], goal_rot=actions[:, 3:7],
                                       goal_grip=actions[:, 7], absolute=False)
         else:
+            if len(actions.shape) < 2:
+                actions = actions.unsqueeze(0)
             _actions = actions[:, :7].clone().to(self.device)
             grip_act = _actions[:, -1].unsqueeze(-1).repeat(1, 5) * torch.tensor([-1., 1., 1., -1., 1.], device=self.device)
             self.actions = torch.cat((_actions, grip_act), dim=-1)

@@ -343,7 +343,7 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    task_name = "pouring_water"
+    task_name = "kitchen"     # block_stacking, kitchen, office, maze, pouring_water
     mode = "spirl_cl"
     sys.argv.append("--path=" + "../configs/hrl/{}/{}".format(task_name, mode))
     sys.argv.append("--seed={}".format(0))

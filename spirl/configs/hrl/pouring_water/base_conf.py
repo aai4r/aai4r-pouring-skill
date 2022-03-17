@@ -5,7 +5,6 @@ from spirl.utils.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
 from spirl.rl.policies.mlp_policies import MLPPolicy
 from spirl.rl.components.critic import MLPCritic
-# from spirl.rl.envs.kitchen import KitchenEnv
 from spirl.rl.envs.isaacgym_env import IsaacGymEnv
 from spirl.rl.components.sampler import HierarchicalSampler
 from spirl.rl.components.replay_buffer import UniformReplayBuffer

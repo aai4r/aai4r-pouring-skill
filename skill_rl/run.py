@@ -83,7 +83,7 @@ def task_demonstration():
     # skill_rl.load()
 
 
-def skill_rl_train():
+def task_rl_train():
     print("Target Task: {}".format(target))
     args = gymutil.parse_arguments(description="IsaacGym Task " + target)
     cfg = load_cfg(cfg_file_name=task_list[target]['config'])
@@ -120,7 +120,7 @@ def skill_rl_train():
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     task_name = "pouring_water"
     mode = "spirl_cl"
@@ -137,5 +137,5 @@ if __name__ == '__main__':
     print("Task Demonstration Dataset")
     target = "UR3_POURING"
 
-    task_demonstration()
-    # skill_rl_train()
+    # task_demonstration()
+    task_rl_train()

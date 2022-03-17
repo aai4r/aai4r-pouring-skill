@@ -125,7 +125,12 @@ class Sampler:
 
     def _postprocess_obs(self, obs):
         """Optionally post-process observation."""
+        obs = obs.squeeze(0)
         return obs
+
+    def _postprocess_reward(self, reward):
+        reward = reward.squeeze(0)
+        return reward
 
     def _postprocess_agent_output(self, agent_output):
         """Optionally post-process / store agent output."""
@@ -153,6 +158,7 @@ class HierarchicalSampler(Sampler):
                         agent_output = self._postprocess_agent_output(agent_output)
                         obs, reward, done, info = self._env.step(agent_output.action)
                         obs = self._postprocess_obs(obs)
+                        reward = self._postprocess_reward(reward)
 
                         # update last step's 'observation_next' with HL action
                         if store_ll:

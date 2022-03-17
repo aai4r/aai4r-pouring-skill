@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 
 from spirl.utils.general_utils import ParamDict
@@ -53,7 +52,8 @@ class IsaacGymEnv(BaseEnvironment):
         if isinstance(action, np.ndarray): action = ar2ten(action, self._env.rl_device)
         obs, reward, done, info = self._env.step(action)
         reward = reward / self.config.reward_norm
-        return self._wrap_observation(obs.cpu()), reward, np.array(done.cpu()), info
+        return self._wrap_observation(obs.cpu()), self._wrap_observation(reward.cpu()), \
+               np.where(done.cpu() > 0, True, False)[0], info
 
     def reset(self):
         obs = self._env.reset()
@@ -61,9 +61,6 @@ class IsaacGymEnv(BaseEnvironment):
         return obs
 
     def render(self, mode='rgb_array'):
-        pass
-
-    def get_episode_info(self):
         pass
 
     def _postprocess_info(self, info):
