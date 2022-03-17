@@ -4,7 +4,7 @@ from spirl.utils.general_utils import ParamDict
 from spirl.utils.pytorch_utils import ar2ten, ten2ar
 from spirl.rl.components.environment import BaseEnvironment
 
-from skill_rl.expert_ur3_pouring import DemoUR3Pouring
+from task_rl.expert_ur3_pouring import DemoUR3Pouring
 from tasks.base.vec_task import VecTaskPython
 
 

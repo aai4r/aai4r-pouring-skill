@@ -12,7 +12,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 configuration = {
     'model': ClSPiRLMdl,
     'logger': Logger,
-    'data_dir': '../skill_rl/data',
+    'data_dir': '../task_rl/data',
     'epoch_cycles_train': 50,
     'num_epochs': 100,
     'evaluator': TopOfNSequenceEvaluator,

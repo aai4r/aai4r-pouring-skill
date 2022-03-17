@@ -1,5 +1,5 @@
 from spirl.utils.general_utils import AttrDict
-from skill_rl.data.isaacgym.src.isaacgym_data_loader import IsaacGymSequenceDataLoader
+from task_rl.data.isaacgym.src.isaacgym_data_loader import IsaacGymSequenceDataLoader
 
 
 data_spec = AttrDict(

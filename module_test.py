@@ -10,7 +10,7 @@ from spirl.utils.general_utils import AttrDict
 
 # isaacgym modules
 from isaacgym import gymutil
-from skill_rl.config import load_cfg
+from task_rl.config import load_cfg
 from tasks.base.vec_task import VecTaskPython
 
 

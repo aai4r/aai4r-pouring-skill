@@ -100,7 +100,7 @@ class DemoUR3Pouring(BaseTask):
         self.refresh_env_tensors()
         self.set_pouring_task(torch.arange(self.num_envs, device=self.device))
 
-        # skill_rl demo. params.
+        # task_rl demo. params.
         self.task_update_buf = torch.zeros_like(self.progress_buf)
 
         # set gripper limit to fit the bottle's diameter

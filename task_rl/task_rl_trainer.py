@@ -5,11 +5,11 @@ import h5py
 import numpy as np
 
 from gym.spaces import Space
-from skill_rl.ExpertRolloutStorage import ExpertRolloutStorage
+from task_rl.ExpertRolloutStorage import ExpertRolloutStorage
 from tqdm import tqdm
 from collections import defaultdict
 
-from skill_rl.utils.rollout_utils import RolloutSaverIsaac
+from task_rl.utils.rollout_utils import RolloutSaverIsaac
 from spirl.utils.general_utils import AttrDict, ParamDict, pretty_print, AverageTimer, timing
 from spirl.train import get_exp_dir, make_path, set_seeds, save_config, datetime_str, save_checkpoint
 from spirl.rl.utils.mpi import update_with_mpi_config, set_shutdown_hooks, mpi_gather_experience, mpi_sum
@@ -23,7 +23,7 @@ WANDB_PROJECT_NAME = 'spirl_project'
 WANDB_ENTITY_NAME = 'twkim0812'
 
 
-class SPiRLTrainer:
+class TaskRLTrainer:
     def __init__(self, args, isaac_config):
         self.args = args
         self.setup_device()
@@ -339,7 +339,7 @@ class SPiRLTrainer:
         return self.conf.mpi.num_workers > 1
 
 
-class SkillRLTrainer(SPiRLTrainer):
+class SkillRLTrainer(TaskRLTrainer):
     def __init__(self, args, isaac_config):
         super().__init__(args, isaac_config)
         # if not isinstance(vec_env.observation_space, Space):
@@ -384,7 +384,7 @@ class SkillRLTrainer(SPiRLTrainer):
         pass
 
     def load(self):
-        data_path = self.cfg['skill_rl']['data_path']
+        data_path = self.cfg['task_rl']['data_path']
         rollout_index = 0
         filename = "rollout_" + str(rollout_index) + '.h5'
         path = os.path.join(data_path, filename)
@@ -404,7 +404,7 @@ class SkillRLTrainer(SPiRLTrainer):
         current_obs = self.vec_env.reset()
         current_states = self.vec_env.get_state()
 
-        # rollout skill_rl demonstration
+        # rollout task_rl demonstration
         for frame in range(0, num_transitions_per_env):
             if frame % 100 == 0:
                 print("frames: ", frame)

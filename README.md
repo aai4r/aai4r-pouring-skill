@@ -36,7 +36,7 @@ On-going project for learning pouring skill.
   
 * Policy learning
   - spirl/rl/train.py (for pycharm debugging)
-  - skill_rl/run.py -> task_rl_train()
+  - task_rl/run.py -> task_rl_train()
   ```
     warmup()    # gathering initial dataset and make replay buffer
       * warmup_batch <- sampler: HierarchicalSampler__Sampler

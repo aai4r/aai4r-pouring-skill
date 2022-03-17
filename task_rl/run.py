@@ -8,9 +8,9 @@ Candidates:
 import time
 
 from isaacgym import gymutil
-from skill_rl.config import load_cfg
-from skill_rl.expert_manager import ExpertManager
-from skill_rl.skill_rl_trainer import SkillRLTrainer
+from task_rl.config import load_cfg
+from task_rl.expert_manager import ExpertManager
+from task_rl.task_rl_trainer import SkillRLTrainer
 from spirl.rl.components.params import get_args
 from utils.config import parse_sim_params
 from tasks.base.vec_task import VecTaskPython
@@ -21,7 +21,7 @@ import os
 import sys
 import torch
 
-from skill_rl.expert_ur3_pouring import DemoUR3Pouring
+from task_rl.expert_ur3_pouring import DemoUR3Pouring
 
 # Task name format: $ROBOT_TASK: $CONFIG
 task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"}}
@@ -80,7 +80,7 @@ def task_demonstration():
 
     expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, cfg=cfg, device=env.rl_device)
     expert.run(num_transitions_per_env=num_transitions_per_env)
-    # skill_rl.load()
+    # task_rl.load()
 
 
 def task_rl_train():
@@ -130,7 +130,7 @@ def task_rl_train():
 
     train = SkillRLTrainer(args=get_args(), isaac_config=isaac_config)
     # train.run(num_transitions_per_env=num_transitions_per_env)
-    # skill_rl.load()
+    # task_rl.load()
 
 
 if __name__ == '__main__':
