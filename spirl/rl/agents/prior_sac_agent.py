@@ -17,7 +17,7 @@ class ActionPriorSACAgent(SACAgent):
             'alpha_min': None,                # minimum value alpha is clipped to, no clipping if None
             'td_schedule': ConstantSchedule,  # schedule used for target divergence param
             'td_schedule_params': AttrDict(   # parameters for target divergence schedule
-                p = 1.,
+                p=1.,
             ),
         })
         return super()._default_hparams().overwrite(default_dict)
