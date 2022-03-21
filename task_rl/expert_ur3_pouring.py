@@ -43,9 +43,15 @@ class DemoUR3Pouring(BaseTask):
         self.camera_props.height = 128
         self.camera_props.enable_tensors = True
 
-        num_obs = (self.camera_props.height, self.camera_props.width, 3)
-        # num_obs = (24, )
-        num_states = 24
+        self.img_obs = False    # TODO, should be argument later.
+
+        if self.img_obs:
+            num_obs = (self.camera_props.height, self.camera_props.width, 3)
+            num_states = 24
+        else:
+            num_obs = (24, )
+            num_states = 0
+
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
 
         self.cfg["env"]["numObservations"] = num_obs
@@ -567,28 +573,33 @@ class DemoUR3Pouring(BaseTask):
         # dof_state = dof_pos_finger if self.use_ik else dof_pos
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
 
-        # self.obs_buf
-        self.states_buf = torch.cat((dof_pos,
-                                    self.bottle_pos, self.bottle_rot,
-                                    self.cup_pos, self.cup_rot,
-                                    self.liq_pos), dim=-1)
+        if self.img_obs:
+            self.states_buf = torch.cat((dof_pos,
+                                        self.bottle_pos, self.bottle_rot,
+                                        self.cup_pos, self.cup_rot,
+                                        self.liq_pos), dim=-1)
+
+            """ Camera Sensor Visualization """
+            for i in range(len(self.envs)):
+                camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
+                                                                     self.camera_handles[i], gymapi.IMAGE_COLOR)
+                torch_camera_tensor = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
+                self.obs_buf[i, :] = torch_camera_tensor
+                bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
+                if self.debug_cam:
+                    cv2.imshow("camera sensor", bgr_cam)
+                    k = cv2.waitKey(0)
+                    if k == 27:     # ESC
+                        exit()
+        else:
+            self.obs_buf = torch.cat((dof_pos,
+                                      self.bottle_pos, self.bottle_rot,
+                                      self.cup_pos, self.cup_rot,
+                                      self.liq_pos), dim=-1)
 
         # TODO, cam transform
         # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
         # print("cam tr: ", cam_tr.p)
-
-        """ Camera Sensor Visualization """
-        for i in range(len(self.envs)):
-            camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
-                                                                 self.camera_handles[i], gymapi.IMAGE_COLOR)
-            torch_camera_tensor = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
-            self.obs_buf[i, :] = torch_camera_tensor
-            bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
-            if self.debug_cam:
-                cv2.imshow("camera sensor", bgr_cam)
-                k = cv2.waitKey(0)
-                if k == 27:     # ESC
-                    exit()
 
         return self.obs_buf
 
@@ -671,15 +682,16 @@ class DemoUR3Pouring(BaseTask):
         #     #     liq_count += 1
         #     #     z_offset += 1 if liq_count % len(self.expr) == 0 else 0
 
-        # reset camera sensor pose
-        for i in range(len(self.envs)):
-            rand_pos = gymapi.Vec3(0.75 + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                   0.0 + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                   0.3 + np.random.uniform(low=-0.05, high=0.05, size=1))
-            rand_stare = gymapi.Vec3(0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                     0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                     0.0 + np.random.uniform(low=-0.02, high=0.02, size=1))
-            self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
+        if self.img_obs:
+            # reset camera sensor pose
+            for i in range(len(self.envs)):
+                rand_pos = gymapi.Vec3(0.75 + np.random.uniform(low=-0.08, high=0.08, size=1),
+                                       0.0 + np.random.uniform(low=-0.08, high=0.08, size=1),
+                                       0.3 + np.random.uniform(low=-0.05, high=0.05, size=1))
+                rand_stare = gymapi.Vec3(0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
+                                         0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
+                                         0.0 + np.random.uniform(low=-0.02, high=0.02, size=1))
+                self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
 
         # reset apply
         bottle_liquid_indices = self.global_indices[env_ids, 1:].flatten()

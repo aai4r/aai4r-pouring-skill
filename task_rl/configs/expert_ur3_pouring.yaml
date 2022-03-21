@@ -26,7 +26,7 @@ expert:
   num_total_frames: 2000000
   data_path: "data"
   save_data: True
-  debug_cam: True
+  debug_cam: False
 
 sim:
   substeps: 1
