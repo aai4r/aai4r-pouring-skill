@@ -1,7 +1,4 @@
-import copy
-
-# import torch
-import math
+import cv2
 
 from utils.torch_jit_utils import *
 from utils.utils import *
@@ -32,6 +29,7 @@ class DemoUR3Pouring(BaseTask):
         self.action_penalty_scale = self.cfg["env"]["actionPenaltyScale"]
 
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
+        self.debug_cam = self.cfg["expert"]["debug_cam"]
 
         self.up_axis = "x"      # z
         self.up_axis_idx = 0    # 2
@@ -113,7 +111,7 @@ class DemoUR3Pouring(BaseTask):
         self.ur3_dof_upper_limits[9] = blim
         self.ur3_dof_upper_limits[11] = blim
 
-        # TODO, cam setting for debugging with single env.
+        """ Camera Viewer setting """
         cam_pos = gymapi.Vec3(0.9263, 0.4617, 0.5420)
         cam_target = gymapi.Vec3(0.0, -0.3, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
@@ -269,11 +267,18 @@ class DemoUR3Pouring(BaseTask):
         self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies + num_cup_bodies + self.num_water_drops * num_liq_bodies
         self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes + num_cup_shapes + self.num_water_drops * num_liq_shapes
 
+        """ Camera Sensor setting """
+        camera_props = gymapi.CameraProperties()
+        camera_props.width = 128
+        camera_props.height = 128
+        camera_props.enable_tensors = True
+
         self.ur3_robots = []
         self.bottles = []
         self.cups = []
         self.default_bottle_states = []
         self.default_cup_states = []
+        self.camera_handles = []
         self.prop_start = []
         self.envs = []
 
@@ -334,6 +339,11 @@ class DemoUR3Pouring(BaseTask):
             #         self.gym.set_rigid_body_color(env_ptr, liquid_handle, 0, gymapi.MESH_VISUAL_AND_COLLISION, color)
             #         liq_count += 1
 
+            # (3) or (4) Create Camera sensors
+            camera_handle = self.gym.create_camera_sensor(env_ptr, camera_props)
+            self.gym.set_camera_location(camera_handle, env_ptr, gymapi.Vec3(0.75, 0.0, 0.3), gymapi.Vec3(0.0, 0.0, 0.0))
+
+            self.camera_handles.append(camera_handle)
             self.envs.append(env_ptr)
             self.ur3_robots.append(ur3_actor)
             self.bottles.append(bottle_actor)
@@ -479,6 +489,7 @@ class DemoUR3Pouring(BaseTask):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.gym.refresh_jacobian_tensors(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.gym.render_all_camera_sensors(self.sim)
 
     def compute_observations(self):
         self.refresh_env_tensors()
@@ -560,6 +571,18 @@ class DemoUR3Pouring(BaseTask):
         # TODO, cam transform
         # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
         # print("cam tr: ", cam_tr.p)
+
+        """ Camera Sensor Visualization """
+        for i in range(len(self.envs)):
+            camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
+                                                                 self.camera_handles[i], gymapi.IMAGE_COLOR)
+            np_camera_tensor = gymtorch.wrap_tensor(camera_tensor).cpu().numpy()
+            bgr_cam = cv2.cvtColor(np_camera_tensor[:, :, :3], cv2.COLOR_RGB2BGR)
+            if self.debug_cam:
+                cv2.imshow("camera sensor", bgr_cam)
+                k = cv2.waitKey(0)
+                if k == 27:     # ESC
+                    exit()
 
         return self.obs_buf
 
@@ -1245,8 +1268,8 @@ def compute_ur3_reward(
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
     is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6)
-    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
-    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
+    # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
+    # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
     reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)   # bottle fallen

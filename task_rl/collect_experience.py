@@ -13,7 +13,9 @@ import torch
 from task_rl.expert_ur3_pouring import DemoUR3Pouring
 
 # Task name format: $ROBOT_TASK: $CONFIG
-task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"}}
+task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"},
+             "Another_Task": {"task": None, "config": None}
+             }
 
 
 def parse_task_py(args, cfg, sim_params):
@@ -46,6 +48,12 @@ def task_demonstration(task):
     print("args: ", args)
     print("cfg::: ", cfg)
     print("sim_params: ", sim_params)
+
+    # param customization
+    cfg['expert']['num_total_frames'] = 2000000
+    cfg['expert']['save_data'] = False
+    cfg['expert']['debug_cam'] = True
+    cfg['env']['numEnvs'] = 1
 
     if torch.cuda.device_count() > 1:
         args.task = task_list[task]['task']
