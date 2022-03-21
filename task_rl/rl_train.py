@@ -63,6 +63,7 @@ def task_rl_train():
     sys.argv.append("--path=" + "../spirl/configs/hrl/{}/{}".format(task_name, mode))
     sys.argv.append("--seed={}".format(0))
     sys.argv.append("--prefix={}".format("SPIRL_" + task_name + "_seed0"))
+    sys.argv.append("--resume={}".format('latest'))     # or, number..
 
     train = SkillRLTrainer(args=get_args(), isaac_config=isaac_config)
 
