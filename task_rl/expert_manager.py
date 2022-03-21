@@ -85,4 +85,5 @@ class ExpertManager:
 
         # posterior process like print info. save, etc.
         self.storage.info()
-        self.save()
+        if self.cfg['expert']['save_data']:
+            self.save()
