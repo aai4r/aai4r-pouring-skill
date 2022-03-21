@@ -12,7 +12,8 @@ class ExpertRolloutStorage:
         self.sampler = sampler
 
         # Core
-        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device)
+        obs_dtype = torch.uint8 if len(obs_shape) > 2 else torch.float32    # uint8 in case of image observation
+        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device, dtype=obs_dtype)
         self.states = torch.zeros(num_transitions_per_env, num_envs, *states_shape, device=self.device)
         self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
         self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
@@ -41,13 +42,17 @@ class ExpertRolloutStorage:
         self.step = 0
 
     def info(self):
+        dataset = {"observations": self.observations, "states": self.states,
+                   "rewards": self.rewards, "actions": self.actions, "dones": self.dones}
+        key_max_len = len(max(dataset.keys(), key=len))
+        shp_max_val = max(list(map(lambda x: len(str(x.shape)), dataset.values())))
         print("***** Expert Demo Rollout Storage Information *****")
         print("[Shape: (num_trans, num_envs, dim)]")
-        print("    observations: {}".format(self.observations.shape))
-        print("    states:       {}".format(self.states.shape))
-        print("    rewards:      {}".format(self.rewards.shape))
-        print("    actions:      {}".format(self.actions.shape))
-        print("    dones:        {}".format(self.dones.shape))
+        for key, val in dataset.items():
+            print("     {}{}, shape: {}{}, min/max: {:.3f} / {:.3f}, datatype: {}".format(
+                key, ''.join([' ' for i in range(key_max_len - len(key))]),
+                val.shape, ''.join([' ' for i in range(shp_max_val - len(str(val.shape)))]),
+                val.min(), val.max(), val.dtype))
 
     def get_statistics(self):
         done = self.dones.cpu()

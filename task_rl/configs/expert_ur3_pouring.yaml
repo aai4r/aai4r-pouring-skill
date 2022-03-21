@@ -23,7 +23,7 @@ env:
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 expert:
-  num_total_frames: 200000
+  num_total_frames: 2000000
   data_path: "data"
   save_data: True
   debug_cam: True

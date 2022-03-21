@@ -33,18 +33,14 @@ class ExpertManager:
 
     def save(self):
         np_observations = self.storage.observations.permute(1, 0, 2).reshape(-1, *self.storage.shapes.obs_shape).cpu().numpy()
-        # np_states = self.storage.states.permute(1, 0, 2).reshape(-1, *self.storage.shapes.states_shape).cpu().numpy()
+        np_states = self.storage.states.permute(1, 0, 2).reshape(-1, *self.storage.shapes.states_shape).cpu().numpy()
         np_actions = self.storage.actions.permute(1, 0, 2).reshape(-1, *self.storage.shapes.actions_shape).cpu().numpy()
         np_rewards = self.storage.rewards.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
         np_dones = self.storage.dones.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
 
-        print("trans_observations: ", np_observations.shape)
-        # print("trans_states: ", np_states.shape)
-        print("trans_actions: ", np_actions.shape)
-        print("trans_rewards: ", np_rewards.shape)
-        print("trans_dones: ", np_dones.shape)
         episode = AttrDict(
             observations=np_observations,
+            states=np_states,
             actions=np_actions,
             rewards=np_rewards,
             dones=np_dones

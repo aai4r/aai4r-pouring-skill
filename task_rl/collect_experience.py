@@ -50,7 +50,7 @@ def task_demonstration(task):
     print("sim_params: ", sim_params)
 
     # param customization
-    cfg['expert']['num_total_frames'] = 2000000
+    cfg['expert']['num_total_frames'] = 10
     cfg['expert']['save_data'] = False
     cfg['expert']['debug_cam'] = True
     cfg['env']['numEnvs'] = 1

@@ -37,10 +37,19 @@ class DemoUR3Pouring(BaseTask):
 
         self.use_ik = False
 
-        num_obs = 24
+        """ Camera Sensor setting """
+        self.camera_props = gymapi.CameraProperties()
+        self.camera_props.width = 128
+        self.camera_props.height = 128
+        self.camera_props.enable_tensors = True
+
+        num_obs = (self.camera_props.height, self.camera_props.width, 3)
+        # num_obs = (24, )
+        num_states = 24
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
 
         self.cfg["env"]["numObservations"] = num_obs
+        self.cfg["env"]["numStates"] = num_states
         self.cfg["env"]["numActions"] = num_acts
 
         self.cfg["device_type"] = device_type
@@ -267,12 +276,6 @@ class DemoUR3Pouring(BaseTask):
         self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies + num_cup_bodies + self.num_water_drops * num_liq_bodies
         self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes + num_cup_shapes + self.num_water_drops * num_liq_shapes
 
-        """ Camera Sensor setting """
-        camera_props = gymapi.CameraProperties()
-        camera_props.width = 128
-        camera_props.height = 128
-        camera_props.enable_tensors = True
-
         self.ur3_robots = []
         self.bottles = []
         self.cups = []
@@ -340,7 +343,7 @@ class DemoUR3Pouring(BaseTask):
             #         liq_count += 1
 
             # (3) or (4) Create Camera sensors
-            camera_handle = self.gym.create_camera_sensor(env_ptr, camera_props)
+            camera_handle = self.gym.create_camera_sensor(env_ptr, self.camera_props)
             self.gym.set_camera_location(camera_handle, env_ptr, gymapi.Vec3(0.75, 0.0, 0.3), gymapi.Vec3(0.0, 0.0, 0.0))
 
             self.camera_handles.append(camera_handle)
@@ -563,10 +566,12 @@ class DemoUR3Pouring(BaseTask):
         # finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1).unsqueeze(-1)
         # dof_state = dof_pos_finger if self.use_ik else dof_pos
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
-        self.obs_buf = torch.cat((dof_pos,
-                                  self.bottle_pos, self.bottle_rot,
-                                  self.cup_pos, self.cup_rot,
-                                  self.liq_pos), dim=-1)
+
+        # self.obs_buf
+        self.states_buf = torch.cat((dof_pos,
+                                    self.bottle_pos, self.bottle_rot,
+                                    self.cup_pos, self.cup_rot,
+                                    self.liq_pos), dim=-1)
 
         # TODO, cam transform
         # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
@@ -576,8 +581,9 @@ class DemoUR3Pouring(BaseTask):
         for i in range(len(self.envs)):
             camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
                                                                  self.camera_handles[i], gymapi.IMAGE_COLOR)
-            np_camera_tensor = gymtorch.wrap_tensor(camera_tensor).cpu().numpy()
-            bgr_cam = cv2.cvtColor(np_camera_tensor[:, :, :3], cv2.COLOR_RGB2BGR)
+            torch_camera_tensor = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
+            self.obs_buf[i, :] = torch_camera_tensor
+            bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
             if self.debug_cam:
                 cv2.imshow("camera sensor", bgr_cam)
                 k = cv2.waitKey(0)
