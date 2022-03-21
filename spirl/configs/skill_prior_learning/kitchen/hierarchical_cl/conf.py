@@ -1,6 +1,7 @@
 import os
 
-from spirl.models.closed_loop_spirl_mdl import ClSPiRLMdl
+from spirl.models.closed_loop_spirl_mdl import ClSPiRLMdl, ImageClSPiRLMdl
+from spirl.models.skill_prior_mdl import SkillSpaceLogger
 from spirl.components.logger import Logger
 from spirl.utils.general_utils import AttrDict
 from spirl.configs.default_data_configs.kitchen import data_spec
@@ -10,8 +11,8 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 configuration = {
-    'model': ClSPiRLMdl,
-    'logger': Logger,
+    'model': ImageClSPiRLMdl,           # TODO, ClSPiRLMdl, ImageClSPiRLMdl
+    'logger': SkillSpaceLogger,         # TODO, Logger, SkillSpaceLogger
     'data_dir': '.',
     'epoch_cycles_train': 50,
     'num_epochs': 100,

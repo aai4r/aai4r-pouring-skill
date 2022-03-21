@@ -125,11 +125,11 @@ class Sampler:
 
     def _postprocess_obs(self, obs):
         """Optionally post-process observation."""
-        obs = obs.squeeze(0)
+        obs = obs.squeeze(0) if len(obs.shape) > 1 else obs
         return obs
 
     def _postprocess_reward(self, reward):
-        reward = reward.squeeze(0)
+        reward = reward.squeeze(0) if len(reward.shape) > 0 else reward
         return reward
 
     def _postprocess_agent_output(self, agent_output):

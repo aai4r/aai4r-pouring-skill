@@ -168,21 +168,22 @@ class TaskRLTrainer:
                     for _ in range(WandBLogger.N_LOGGED_SAMPLES):   # for efficiency instead of self.args.n_val_samples
                         val_rollout_storage.append(self.sampler.sample_episode(is_train=False, render=True))
 
-        import cv2
-        for i in range(len(val_rollout_storage.rollouts)):
-            print("seq: ", i)
-            for img in val_rollout_storage.rollouts[i].image:
-                img = cv2.cvtColor(img.astype('float32'), cv2.COLOR_BGR2RGB)
-                cv2.imshow('Image', img)
-                cv2.waitKey()
-                print("img type / dtype: {} / {}".format(type(img), img.dtype))
-                print("img shape: {}".format(img.shape))
+        # TODO,
+        # import cv2
+        # for i in range(len(val_rollout_storage.rollouts)):
+        #     print("seq: ", i)
+        #     for img in val_rollout_storage.rollouts[i].image:
+        #         img = cv2.cvtColor(img.astype('float32'), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('Image', img)
+        #         cv2.waitKey()
+        #         print("img type / dtype: {} / {}".format(type(img), img.dtype))
+        #         print("img shape: {}".format(img.shape))
 
         rollout_stats = val_rollout_storage.rollout_stats()
         if self.is_chef:
             with timing("Eval log time: "):
                 self.agent.log_outputs(rollout_stats, val_rollout_storage,
-                                       self.logger, log_images=True, step=self.global_step)
+                                       self.logger, log_images=False, step=self.global_step)  # default: log_images=True
             print("Evaluation Avg_Reward: {}".format(rollout_stats.avg_reward))
         del val_rollout_storage
 

@@ -402,12 +402,14 @@ def set_run_params():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    task_name = "kitchen"     # [block_stacking, kitchen, maze, office, pouring_water]
+    task_name = "block_stacking"     # [block_stacking, kitchen, maze, office, pouring_water]
     mode = "hierarchical_cl"
 
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))
+
+    # "python3 spirl / train.py - -path = spirl / configs / skill_prior_learning / block_stacking / hierarchical_cl --val_data_size = 160"
 
 
 if __name__ == '__main__':

@@ -24,9 +24,9 @@ configuration = {
     'sampler': HierarchicalSampler,
     'data_dir': '.',
     'num_epochs': 15,
-    'max_rollout_len': 280,
+    'max_rollout_len': 800,
     'n_steps_per_epoch': 100000,
-    'n_warmup_steps': 0.5e3,
+    'n_warmup_steps': 5e3,  # 5e3
 }
 configuration = AttrDict(configuration)
 

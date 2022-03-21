@@ -1244,12 +1244,14 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6)
     rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
+    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
-    # reset_buf = torch.where((bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6), torch.ones_like(reset_buf), reset_buf)   # bottle fallen
+    reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)   # bottle fallen
     reset_buf = torch.where(is_cup_fallen, torch.ones_like(reset_buf), reset_buf)  # paper cup fallen
-    # reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
+    reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
     # reset_buf = torch.where(is_dropped > 0.0, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where((liq_cup_dist_xy > 0.5) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range
 

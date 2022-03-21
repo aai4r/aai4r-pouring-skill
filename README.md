@@ -52,7 +52,7 @@ On-going project for learning pouring skill.
     while epoch_loop:
       * batch <- sampler: HierarchicalSampler__Sampler
       * agent.update(batch) : HierarchicalAgent__BaseAgent
-        ** replay_buffer.append(warmup_batch) : UniformReplayBuffer__ReplayBuffer
+        ** replay_buffer.append(batch) : UniformReplayBuffer__ReplayBuffer
         ** batch <- replay_buffer.sample()
         ** policy_out <- policy(batch.obs) : LearnedPriorAugmentedPIPolicy
                                              __PriorInitializedPolicy & LearnedPriorAugmentedPolicy
