@@ -50,10 +50,11 @@ def task_demonstration(task):
     print("sim_params: ", sim_params)
 
     # param customization
-    cfg['expert']['num_total_frames'] = 10
+    cfg['env']['numEnvs'] = 64
+    cfg['expert']['num_total_frames'] = 300000
     cfg['expert']['save_data'] = True
     cfg['expert']['debug_cam'] = False
-    cfg['env']['numEnvs'] = 64
+    cfg['expert']['img_obs'] = False
 
     if torch.cuda.device_count() > 1:
         args.task = task_list[task]['task']

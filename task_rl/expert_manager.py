@@ -21,7 +21,7 @@ class ExpertManager:
             raise TypeError("vec_env.action_space must be a gym Space")
 
         self.cfg = cfg
-        self.task_name = self.cfg['task']['name']
+        self.task_name = self.cfg['task']['name'] + '{}'.format('_img' if self.cfg['expert']['img_obs'] else '')
         self.saver = RolloutSaverIsaac(save_dir=self.cfg['expert']['data_path'], task_name=self.task_name)
 
         self.device = device
@@ -34,11 +34,11 @@ class ExpertManager:
                                             self.state_space.shape, self.action_space.shape, self.device)
 
     def save(self):
-        np_observations = self.storage.observations.permute(1, 0, 2).reshape(-1, *self.storage.shapes.obs_shape).cpu().numpy()
+        np_obs_dim = np.arange(len(self.storage.observations.size()))[2:]
+        np_observations = self.storage.observations.permute(1, 0, *np_obs_dim).reshape(-1, *self.storage.shapes.obs_shape).cpu().numpy()
+        np_states = self.storage.states.permute(1, 0, 2).cpu().numpy()
         if self.storage.states.nelement() > 0:
-            np_states = self.storage.states.permute(1, 0, 2).reshape(-1, *self.storage.shapes.states_shape).cpu().numpy()
-        else:
-            np_states = self.storage.states.cpu().numpy()
+            np_states = np_states.reshape(-1, *self.storage.shapes.states_shape)
         np_actions = self.storage.actions.permute(1, 0, 2).reshape(-1, *self.storage.shapes.actions_shape).cpu().numpy()
         np_rewards = self.storage.rewards.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
         np_dones = self.storage.dones.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
@@ -50,6 +50,7 @@ class ExpertManager:
             rewards=np_rewards,
             dones=np_dones
         )
+
         self.saver.save_rollout_to_file(episode)
 
     def load(self):

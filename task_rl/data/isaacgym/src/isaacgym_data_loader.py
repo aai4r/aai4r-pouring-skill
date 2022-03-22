@@ -23,7 +23,7 @@ class IsaacGymSequenceDataLoader(Dataset):
 
         rollout_index = 0
         filename = "rollout_" + str(rollout_index) + '.h5'
-        path = os.path.join(self.data_dir, filename)
+        path = os.path.join(self.data_dir, data_conf.dataset_spec.env_name, filename)
         print('path: ', path)
         with h5py.File(path, 'r') as f:
             data = AttrDict()

@@ -43,7 +43,7 @@ class DemoUR3Pouring(BaseTask):
         self.camera_props.height = 128
         self.camera_props.enable_tensors = True
 
-        self.img_obs = False    # TODO, should be argument later.
+        self.img_obs = self.cfg["expert"]["img_obs"]
 
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)

@@ -24,9 +24,10 @@ env:
 
 expert:
   num_total_frames: 2000000
-  data_path: "data"
+  data_path: "../data"
   save_data: True
   debug_cam: False
+  img_obs: False
 
 sim:
   substeps: 1
@@ -49,5 +50,5 @@ sim:
     relaxation: 0.75
 
 task:
-  name: "pouring_skill"
+  name: "pouring_water"
   randomize: False
