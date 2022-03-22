@@ -22,7 +22,7 @@ class ExpertManager:
 
         self.cfg = cfg
         self.task_name = self.cfg['task']['name']
-        self.saver = RolloutSaverIsaac(save_dir=self.cfg['expert']['data_path'])
+        self.saver = RolloutSaverIsaac(save_dir=self.cfg['expert']['data_path'], task_name=self.task_name)
 
         self.device = device
         self.observation_space = vec_env.observation_space
@@ -35,7 +35,10 @@ class ExpertManager:
 
     def save(self):
         np_observations = self.storage.observations.permute(1, 0, 2).reshape(-1, *self.storage.shapes.obs_shape).cpu().numpy()
-        np_states = self.storage.states.permute(1, 0, 2).reshape(-1, *self.storage.shapes.states_shape).cpu().numpy()
+        if self.storage.states.nelement() > 0:
+            np_states = self.storage.states.permute(1, 0, 2).reshape(-1, *self.storage.shapes.states_shape).cpu().numpy()
+        else:
+            np_states = self.storage.states.cpu().numpy()
         np_actions = self.storage.actions.permute(1, 0, 2).reshape(-1, *self.storage.shapes.actions_shape).cpu().numpy()
         np_rewards = self.storage.rewards.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
         np_dones = self.storage.dones.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()

@@ -19,6 +19,12 @@ class ExpertRolloutStorage:
         self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
         self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
 
+        self.rollout = AttrDict(observations=self.observations,
+                                states=self.states,
+                                rewards=self.rewards,
+                                actions=self.actions,
+                                dones=self.dones)
+
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
 
@@ -49,9 +55,10 @@ class ExpertRolloutStorage:
         print("***** Expert Demo Rollout Storage Information *****")
         print("[Shape: (num_trans, num_envs, dim)]")
         for key, val in dataset.items():
+            if val.nelement() <= 0: continue
             print("     {}{}, shape: {}{}, min/max: {:.3f} / {:.3f}, datatype: {}".format(
-                key, ''.join([' ' for i in range(key_max_len - len(key))]),
-                val.shape, ''.join([' ' for i in range(shp_max_val - len(str(val.shape)))]),
+                key, ''.join([' ' for _ in range(key_max_len - len(key))]),
+                val.shape, ''.join([' ' for _ in range(shp_max_val - len(str(val.shape)))]),
                 val.min(), val.max(), val.dtype))
 
     def get_statistics(self):

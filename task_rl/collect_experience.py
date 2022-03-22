@@ -50,7 +50,7 @@ def task_demonstration(task):
     print("sim_params: ", sim_params)
 
     # param customization
-    cfg['expert']['num_total_frames'] = 300000
+    cfg['expert']['num_total_frames'] = 10
     cfg['expert']['save_data'] = True
     cfg['expert']['debug_cam'] = False
     cfg['env']['numEnvs'] = 64
@@ -83,5 +83,4 @@ def task_demonstration(task):
 if __name__ == '__main__':
     print("Task Demonstration Dataset")
     task = "UR3_POURING"
-
     task_demonstration(task=task)
