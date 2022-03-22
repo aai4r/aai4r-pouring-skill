@@ -27,8 +27,12 @@ from task_rl.expert_ur3_pouring import DemoUR3Pouring
 task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"}}
 
 
-def task_rl_train():
+def task_rl_run():
     print("Target Task: {}".format(target))
+
+    """ 
+        ** IsaacGym Params ** 
+    """
     args = gymutil.parse_arguments(description="IsaacGym Task " + target)
     cfg = load_cfg(cfg_file_name=task_list[target]['config'])
 
@@ -51,6 +55,9 @@ def task_rl_train():
 
     isaac_config = AttrDict(args=args, cfg=cfg, sim_params=sim_params)
 
+    """ 
+        ** SPiRL Params **
+    """
     os.environ["EXP_DIR"] = "../experiments"
     os.environ["DATA_DIR"] = "../data"
 
@@ -63,7 +70,8 @@ def task_rl_train():
     sys.argv.append("--path=" + "../spirl/configs/hrl/{}/{}".format(task_name, mode))
     sys.argv.append("--seed={}".format(0))
     sys.argv.append("--prefix={}".format("SPIRL_" + task_name + "_seed0"))
-    sys.argv.append("--resume={}".format('latest'))     # or, number..
+    sys.argv.append("--mode={}".format('rollout'))      # ['train', 'val', 'rollout']
+    sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
     train = SkillRLTrainer(args=get_args(), isaac_config=isaac_config)
 
@@ -71,4 +79,4 @@ def task_rl_train():
 if __name__ == '__main__':
     print("Task Demonstration Dataset")
     target = "UR3_POURING"
-    task_rl_train()
+    task_rl_run()

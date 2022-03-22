@@ -855,12 +855,12 @@ class DemoUR3Pouring(BaseTask):
 
         self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
-        self.task_update_buf = torch.where(self.progress_buf == 1,
+        self.task_update_buf = torch.where(self.progress_buf == 30,     # for stability
                                            torch.ones_like(self.progress_buf), torch.zeros_like(self.progress_buf))
 
-        env_ids = self.task_update_buf.nonzero(as_tuple=False).squeeze(-1)
-        if len(env_ids) > 0:
-            self.set_pouring_task(env_ids)
+        _env_ids = self.task_update_buf.nonzero(as_tuple=False).squeeze(-1)
+        if len(_env_ids) > 0:
+            self.set_pouring_task(_env_ids)
 
         # debug viz
         if self.viewer and self.debug_viz:
@@ -1085,7 +1085,8 @@ class DemoUR3Pouring(BaseTask):
         lift_pos[:, 2] += 0.2
         lift_rot = grasp_rot.clone().detach()
         lift_grip = grasp_grip.clone().detach()
-        self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip)
+        self.task_pose_list.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip,
+                                        err=TaskProperty(pos=1.e-1, rot=1.e-1, grip=1.e-3))
 
         """
             6) approach cup

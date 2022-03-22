@@ -1,4 +1,6 @@
 import os
+import time
+import datetime
 import numpy as np
 import h5py
 
@@ -69,9 +71,12 @@ class ExpertManager:
         current_states = self.vec_env.get_state()
 
         # rollout task_rl demonstration
+        start = time.time()
         for frame in range(num_transitions_per_env):
             if frame % 100 == 0:
-                print("frames: {} / {}".format(frame * self.vec_env.num_envs, num_transitions_per_env * self.vec_env.num_envs))
+                print("frames: {} / {}, elapsed: {}".format(
+                    frame * self.vec_env.num_envs, num_transitions_per_env * self.vec_env.num_envs,
+                    str(datetime.timedelta(seconds=int(time.time() - start)))))
             actions = self.vec_env.task.calc_expert_action()
             next_obs, rews, dones, infors = self.vec_env.step(actions)
             next_states = self.vec_env.get_state()

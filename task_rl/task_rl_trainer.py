@@ -83,9 +83,6 @@ class TaskRLTrainer:
         else:
             self.generate_rollouts()
 
-        print("*** initialize....... ")
-        exit()
-
     def _default_hparams(self):
         default_dict = ParamDict({
             'seed': None,
