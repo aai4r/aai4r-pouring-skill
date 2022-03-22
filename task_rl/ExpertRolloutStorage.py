@@ -1,3 +1,4 @@
+import sys
 import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRandomSampler
 
@@ -51,15 +52,29 @@ class ExpertRolloutStorage:
         dataset = {"observations": self.observations, "states": self.states,
                    "rewards": self.rewards, "actions": self.actions, "dones": self.dones}
         key_max_len = len(max(dataset.keys(), key=len))
-        shp_max_val = max(list(map(lambda x: len(str(x.shape)), dataset.values())))
+        shp_max_val = max(list(map(lambda x: len(str(list(x.shape))), dataset.values())))
+        dtype_max_len = max(list(map(lambda x: len(str(x.dtype)), dataset.values())))
+
+        unit_value = {"G.Byte": 1000000000, "M.Byte": 1000000, "K.Byte": 1000, "Byte": 1}
+
+        def num_unit(input):
+            for key, val in unit_value.items():
+                if input >= val:
+                    return round(input / val), key
+
         print("***** Expert Demo Rollout Storage Information *****")
         print("[Shape: (num_trans, num_envs, dim)]")
+        total_size = 0
         for key, val in dataset.items():
             if val.nelement() <= 0: continue
-            print("     {}{}, shape: {}{}, min/max: {:.3f} / {:.3f}, datatype: {}".format(
+            print("    {}{}, shape: {}{}, min/max: {}{:.3f}  / {}{:.3f}, datatype: {}{}, size: {:,} {}".format(
                 key, ''.join([' ' for _ in range(key_max_len - len(key))]),
-                val.shape, ''.join([' ' for _ in range(shp_max_val - len(str(val.shape)))]),
-                val.min(), val.max(), val.dtype))
+                list(val.shape), ''.join([' ' for _ in range(shp_max_val - len(str(list(val.shape))))]),
+                ''.join([' ' if val.min() >= 0 else '']), val.min(), ''.join([' ' if val.max() >= 0 else '']), val.max(),
+                val.dtype, ''.join([' ' for _ in range(dtype_max_len - len(str(val.dtype)))]),
+                *num_unit(val.element_size() * val.nelement())))
+            total_size += val.element_size() * val.nelement()
+        print("    Total Dataset Size: {:,} {}".format(*num_unit(total_size)))
 
     def get_statistics(self):
         done = self.dones.cpu()
