@@ -14,7 +14,7 @@ configuration = {
     'logger': Logger,
     'data_dir': '../data',
     'epoch_cycles_train': 50,
-    'num_epochs': 50,
+    'num_epochs': 70,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',

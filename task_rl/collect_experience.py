@@ -35,6 +35,8 @@ def parse_task_py(args, cfg, sim_params):
         raise Exception("Unrecognized task!\n"
                         "Task should be one of ")
     env = VecTaskPython(task, rl_device)
+    if cfg['expert']['img_obs']:
+        env.clip_obs = 255
     return task, env
 
 
@@ -50,11 +52,11 @@ def task_demonstration(task):
     print("sim_params: ", sim_params)
 
     # param customization
-    cfg['env']['numEnvs'] = 64
-    cfg['expert']['num_total_frames'] = 300000
+    cfg['env']['numEnvs'] = 32
+    cfg['expert']['num_total_frames'] = 1000
     cfg['expert']['save_data'] = True
     cfg['expert']['debug_cam'] = False
-    cfg['expert']['img_obs'] = False
+    cfg['expert']['img_obs'] = True
 
     if torch.cuda.device_count() > 1:
         args.task = task_list[task]['task']
@@ -62,8 +64,8 @@ def task_demonstration(task):
         args.compute_device_id = 1
         args.device_id = 1
         args.graphics_device_id = 1
-        args.rl_device = 'cuda:0'
-        args.sim_device = 'cuda:0'
+        args.rl_device = 'cuda:1'
+        args.sim_device = 'cuda:1'
         args.headless = False
         args.test = True
 
