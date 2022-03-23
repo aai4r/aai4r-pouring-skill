@@ -1,4 +1,6 @@
 import sys
+import math
+import numpy as np
 import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRandomSampler
 
@@ -11,8 +13,17 @@ class ExpertRolloutStorage:
 
         self.device = device
         self.sampler = sampler
+        self.num_transitions_per_env = num_transitions_per_env
+        self.num_envs = num_envs
 
-        # Core
+        self.shapes = AttrDict(obs_shape=obs_shape, states_shape=states_shape, actions_shape=actions_shape,
+                               rewards_shape=(1,), done_shape=(1,))
+
+        _rollout_size = self.expected_rollout_size(print_info=True)
+        SPLIT_SIZE = 50 * (1000 * 1000)  # MB
+        self.n_split = math.ceil(_rollout_size.total / SPLIT_SIZE)
+        self.step = 0
+
         obs_dtype = torch.uint8 if len(obs_shape) > 2 else torch.float32    # uint8 in case of image observation
         self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device, dtype=obs_dtype)
         self.states = torch.zeros(num_transitions_per_env, num_envs, *states_shape, device=self.device)
@@ -25,15 +36,6 @@ class ExpertRolloutStorage:
                                 rewards=self.rewards,
                                 actions=self.actions,
                                 dones=self.dones)
-
-        self.expected_rollout_size(print_info=True)
-
-        self.num_transitions_per_env = num_transitions_per_env
-        self.num_envs = num_envs
-
-        self.shapes = AttrDict(obs_shape=obs_shape, states_shape=states_shape, actions_shape=actions_shape)
-
-        self.step = 0
 
     def add_transitions(self, observations, states, actions, rewards, dones):
         if self.step >= self.num_transitions_per_env:
@@ -51,21 +53,22 @@ class ExpertRolloutStorage:
         self.step = 0
 
     def expected_rollout_size(self, print_info=False):
-        rollout_size = AttrDict()
+        expected_size = AttrDict()
 
         total_size = 0
-        for key, val in self.rollout.items():
-            if val.nelement() <= 0: continue
-            _size = val.element_size() * val.nelement()
-            rollout_size[key] = _size
+        for key, val in self.shapes.items():
+            _size = np.prod(val) * self.num_envs * self.num_transitions_per_env
+            expected_size[key] = _size
             total_size += _size
-        rollout_size.total = total_size
+        expected_size.total = total_size
 
         if print_info:
+            print("----------------------------------------------")
             print("*** Rollout Memory Information ***")
-            print("    Desired steps: {}".format(self.rollout.actions.shape[:2].numel()))
-            print("    Expected Total Rollout Size: {:,} {}".format(*self.num_unit(rollout_size.total)))
-        return rollout_size
+            print("    Desired steps: {} steps".format(self.num_envs * self.num_transitions_per_env))
+            print("    Expected Total Rollout Size: {:,} {}".format(*self.num_unit(expected_size.total)))
+            print("----------------------------------------------")
+        return expected_size
 
     def num_unit(self, input):
         unit_value = {"G.Byte": 1000000000, "M.Byte": 1000000, "K.Byte": 1000, "Byte": 1}
@@ -74,8 +77,6 @@ class ExpertRolloutStorage:
                 return round(input / val), key
 
     def info(self):
-        self.expected_rollout_size()    # TODO
-
         key_max_len = len(max(self.rollout.keys(), key=len))
         shp_max_val = max(list(map(lambda x: len(str(list(x.shape))), self.rollout.values())))
         dtype_max_len = max(list(map(lambda x: len(str(x.dtype)), self.rollout.values())))
