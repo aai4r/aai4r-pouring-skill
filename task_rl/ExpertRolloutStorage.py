@@ -4,14 +4,17 @@ import numpy as np
 import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRandomSampler
 
+from task_rl.utils.rollout_utils import RolloutSaverIsaac
 from spirl.utils.general_utils import AttrDict
 
 
-class ExpertRolloutStorage:
+class ExpertRolloutStorage(RolloutSaverIsaac):
 
-    def __init__(self, num_envs, num_transitions_per_env, obs_shape, states_shape, actions_shape, device='cpu', sampler='sequential'):
+    def __init__(self, num_envs, num_transitions_per_env, obs_shape, states_shape, actions_shape, cfg, sampler='sequential'):
+        super().__init__(save_dir=cfg['expert']['data_path'], task_name=cfg['task']['name'])
 
-        self.device = device
+        self.cfg = cfg
+        self.device = cfg['device']
         self.sampler = sampler
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
@@ -21,21 +24,17 @@ class ExpertRolloutStorage:
 
         _rollout_size = self.expected_rollout_size(print_info=True)
         SPLIT_SIZE = 50 * (1000 * 1000)  # MB
-        self.n_split = math.ceil(_rollout_size.total / SPLIT_SIZE)
+        self._n_split = math.ceil(_rollout_size.total / SPLIT_SIZE)
+        split_list = [int(num_transitions_per_env / self._n_split)] * (self._n_split - 1)
+        self.split_tr_list = split_list + [num_transitions_per_env - sum(split_list)]
+        self.split_count = 0
+
+        print("num split: {}".format(self._n_split))
+        print("split tr: ", self.split_tr_list)
         self.step = 0
 
-        obs_dtype = torch.uint8 if len(obs_shape) > 2 else torch.float32    # uint8 in case of image observation
-        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape, device=self.device, dtype=obs_dtype)
-        self.states = torch.zeros(num_transitions_per_env, num_envs, *states_shape, device=self.device)
-        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
-        self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
-
-        self.rollout = AttrDict(observations=self.observations,
-                                states=self.states,
-                                rewards=self.rewards,
-                                actions=self.actions,
-                                dones=self.dones)
+        self.init_rollout()
+        self.split_count += 1
 
     def add_transitions(self, observations, states, actions, rewards, dones):
         if self.step >= self.num_transitions_per_env:
@@ -49,7 +48,59 @@ class ExpertRolloutStorage:
 
         self.step += 1
 
-    def clear(self):
+        if self.step >= len(self.observations) - 1:
+            if self.cfg['expert']['save_data']:
+                self.save()
+                self.info()
+            self.reset_rollout()
+            self.step = 0
+
+    def save(self):
+        np_obs_dim = np.arange(len(self.observations.size()))[2:]
+        np_observations = self.observations.permute(1, 0, *np_obs_dim).reshape(-1, *self.shapes.obs_shape).cpu().numpy()
+        np_states = self.states.permute(1, 0, 2).cpu().numpy()
+        if self.states.nelement() > 0:
+            np_states = np_states.reshape(-1, *self.shapes.states_shape)
+        np_actions = self.actions.permute(1, 0, 2).reshape(-1, *self.shapes.actions_shape).cpu().numpy()
+        np_rewards = self.rewards.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
+        np_dones = self.dones.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
+
+        episode = AttrDict(
+            observations=np_observations,
+            states=np_states,
+            actions=np_actions,
+            rewards=np_rewards,
+            dones=np_dones
+        )
+        self.save_rollout_to_file(episode)
+
+    def init_rollout(self):
+        obs_dtype = torch.uint8 if len(
+            self.shapes.obs_shape) > 2 else torch.float32  # uint8 in case of image observation
+        num_split_trans_per_env = self.split_tr_list[self.split_count]
+        self.observations = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.obs_shape, device=self.device, dtype=obs_dtype)
+        self.states = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.states_shape, device=self.device)
+        self.rewards = torch.zeros(num_split_trans_per_env, self.num_envs, 1, device=self.device)
+        self.actions = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.actions_shape, device=self.device)
+        self.dones = torch.zeros(num_split_trans_per_env, self.num_envs, 1, device=self.device).byte()
+
+        self.rollout = AttrDict(observations=self.observations,
+                                states=self.states,
+                                rewards=self.rewards,
+                                actions=self.actions,
+                                dones=self.dones)
+
+    def reset_rollout(self):
+        if self._n_split < 2:
+            print("No need to split the rollout...")
+            return
+
+        if self.split_count >= self._n_split:
+            print("End of Split Rollout...")
+            return
+
+        self.init_rollout()
+        self.split_count += 1
         self.step = 0
 
     def expected_rollout_size(self, print_info=False):

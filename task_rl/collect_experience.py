@@ -9,6 +9,7 @@ from utils.config import parse_sim_params
 from tasks.base.vec_task import VecTaskPython
 
 import torch
+import os
 
 from task_rl.expert_ur3_pouring import DemoUR3Pouring
 
@@ -44,16 +45,11 @@ def task_demonstration(task):
     print("Target Task: {}".format(task))
     args = gymutil.parse_arguments(description="IsaacGym Task " + task)
     cfg = load_cfg(cfg_file_name=task_list[task]['config'])
-
-    # sim_params, physics_engine, device_type, device_id, headless
     sim_params = parse_sim_params(args, cfg, None)
-    print("args: ", args)
-    print("cfg::: ", cfg)
-    print("sim_params: ", sim_params)
 
     # param customization
     cfg['env']['numEnvs'] = 32
-    cfg['expert']['num_total_frames'] = 1000
+    cfg['expert']['num_total_frames'] = 2500
     cfg['expert']['save_data'] = True
     cfg['expert']['debug_cam'] = False
     cfg['expert']['img_obs'] = True
@@ -61,24 +57,29 @@ def task_demonstration(task):
     if torch.cuda.device_count() > 1:
         args.task = task_list[task]['task']
         args.device = args.sim_device_type
-        args.compute_device_id = 1
-        args.device_id = 1
-        args.graphics_device_id = 1
-        args.rl_device = 'cuda:1'
-        args.sim_device = 'cuda:1'
+        args.compute_device_id = 0
+        args.device_id = 0
+        args.graphics_device_id = 0
+        args.rl_device = 'cuda:0'
+        args.sim_device = 'cuda:0'
         args.headless = False
         args.test = True
 
     task, env = parse_task_py(args=args, cfg=cfg, sim_params=sim_params)
 
-    # frame params
+    # params
+    cfg['device'] = 'cpu' if cfg['device_type'] == 'cpu' else cfg['device_type'] + ':' + str(cfg['device_id'])
     num_total_frames = cfg['expert']['num_total_frames']
     num_transitions_per_env = round(num_total_frames / env.num_envs + 0.51)
     print("===== Frame Info. =====")
     print("num_total_frames / num_envs: {} / {}".format(num_total_frames, env.num_envs))
     print("  ==> num_transition_per_env: {}".format(num_transitions_per_env))
 
-    expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, cfg=cfg, device=env.rl_device)
+    print("args: ", args)
+    print("cfg::: ", cfg)
+    print("sim_params: ", sim_params)
+
+    expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, cfg=cfg)
     expert.run(num_transitions_per_env=num_transitions_per_env)
     # task_rl.load()
 

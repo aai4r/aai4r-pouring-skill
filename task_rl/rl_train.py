@@ -71,7 +71,7 @@ def task_rl_run():
     sys.argv.append("--seed={}".format(0))
     sys.argv.append("--prefix={}".format("SPIRL_" + task_name + "_seed0"))
     # sys.argv.append("--mode={}".format('rollout'))      # ['train'(default), 'val', 'rollout']
-    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
     train = SkillRLTrainer(args=get_args(), isaac_config=isaac_config)
 

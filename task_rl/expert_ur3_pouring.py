@@ -855,7 +855,7 @@ class DemoUR3Pouring(BaseTask):
 
         self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
-        self.task_update_buf = torch.where(self.progress_buf == 30,     # for stability
+        self.task_update_buf = torch.where(self.progress_buf == 10,     # for stability
                                            torch.ones_like(self.progress_buf), torch.zeros_like(self.progress_buf))
 
         _env_ids = self.task_update_buf.nonzero(as_tuple=False).squeeze(-1)

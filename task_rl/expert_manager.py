@@ -12,7 +12,7 @@ from spirl.utils.general_utils import AttrDict
 
 
 class ExpertManager:
-    def __init__(self, vec_env, num_transition_per_env, cfg, device):
+    def __init__(self, vec_env, num_transition_per_env, cfg):
         if not isinstance(vec_env.observation_space, Space):
             raise TypeError("vec_env.observation_space must be a gym Space")
         if not isinstance(vec_env.state_space, Space):
@@ -21,37 +21,21 @@ class ExpertManager:
             raise TypeError("vec_env.action_space must be a gym Space")
 
         self.cfg = cfg
-        self.task_name = self.cfg['task']['name'] + '{}'.format('_img' if self.cfg['expert']['img_obs'] else '')
-        self.saver = RolloutSaverIsaac(save_dir=self.cfg['expert']['data_path'], task_name=self.task_name)
+        self.task_name = self.cfg['task']['name'] = \
+            self.cfg['task']['name'] + '{}'.format('_img' if self.cfg['expert']['img_obs'] else '')
+        # self.saver = RolloutSaverIsaac(save_dir=self.cfg['expert']['data_path'], task_name=self.task_name)
 
-        self.device = device
+        self.device = cfg['device']
         self.observation_space = vec_env.observation_space
         self.action_space = vec_env.action_space
         self.state_space = vec_env.state_space
 
         self.vec_env = vec_env
         self.storage = ExpertRolloutStorage(self.vec_env.num_envs, num_transition_per_env, self.observation_space.shape,
-                                            self.state_space.shape, self.action_space.shape, self.device)
+                                            self.state_space.shape, self.action_space.shape, self.cfg)
 
     def save(self):
-        np_obs_dim = np.arange(len(self.storage.observations.size()))[2:]
-        np_observations = self.storage.observations.permute(1, 0, *np_obs_dim).reshape(-1, *self.storage.shapes.obs_shape).cpu().numpy()
-        np_states = self.storage.states.permute(1, 0, 2).cpu().numpy()
-        if self.storage.states.nelement() > 0:
-            np_states = np_states.reshape(-1, *self.storage.shapes.states_shape)
-        np_actions = self.storage.actions.permute(1, 0, 2).reshape(-1, *self.storage.shapes.actions_shape).cpu().numpy()
-        np_rewards = self.storage.rewards.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
-        np_dones = self.storage.dones.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
-
-        episode = AttrDict(
-            observations=np_observations,
-            states=np_states,
-            actions=np_actions,
-            rewards=np_rewards,
-            dones=np_dones
-        )
-
-        self.saver.save_rollout_to_file(episode)
+        self.storage.save()
 
     def load(self):
         data_path = self.cfg['task_rl']['data_path']
@@ -90,8 +74,6 @@ class ExpertManager:
 
         # posterior process like print info. save, etc.
         self.storage.info()
-        if self.cfg['expert']['save_data']:
-            self.save()
 
     def run_batch(self, num_transitions_per_env):
         current_obs = self.vec_env.reset()
@@ -113,5 +95,5 @@ class ExpertManager:
 
         # posterior process like print info. save, etc.
         self.storage.info()
-        if self.cfg['expert']['save_data']:
-            self.save()
+        # if self.cfg['expert']['save_data']:
+        #     self.save()
