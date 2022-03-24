@@ -36,6 +36,12 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.init_rollout()
         self.split_count += 1
 
+        self.summary = AttrDict(observations={"min": [], "max": [], "n_trans": [], "size": []},
+                                states={"min": [], "max": [], "n_trans": [], "size": []},
+                                rewards={"min": [], "max": [], "n_trans": [], "size": []},
+                                actions={"min": [], "max": [], "n_trans": [], "size": []},
+                                dones={"min": [], "max": [], "n_trans": [], "size": []})
+
     def add_transitions(self, observations, states, actions, rewards, dones):
         if self.step >= self.num_transitions_per_env:
             raise AssertionError("Rollout buffer overflow")
@@ -49,9 +55,10 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.step += 1
 
         if self.step >= len(self.observations) - 1:
+            self.collect_rollout_info()
             if self.cfg['expert']['save_data']:
                 self.save()
-                self.info()
+                self.show_rollout_info()
             self.reset_rollout()
             self.step = 0
 
@@ -96,7 +103,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
             return
 
         if self.split_count >= self._n_split:
-            print("End of Split Rollout...")
+            print("End of Rollout Split...")
             return
 
         self.init_rollout()
@@ -117,17 +124,25 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
             print("----------------------------------------------")
             print("*** Rollout Memory Information ***")
             print("    Desired steps: {} steps".format(self.num_envs * self.num_transitions_per_env))
-            print("    Expected Total Rollout Size: {:,} {}".format(*self.num_unit(expected_size.total)))
+            print("    Expected Total Rollout Size: {:,} {}".format(*self.num_with_unit(expected_size.total)))
             print("----------------------------------------------")
         return expected_size
 
-    def num_unit(self, input):
+    def num_with_unit(self, input):
         unit_value = {"G.Byte": 1000000000, "M.Byte": 1000000, "K.Byte": 1000, "Byte": 1}
         for key, val in unit_value.items():
             if input >= val:
                 return round(input / val), key
 
-    def info(self):
+    def collect_rollout_info(self):
+        for key, val in self.rollout.items():
+            if val.nelement() <= 0: continue
+            self.summary[key]['min'].append(val.min().item())
+            self.summary[key]['max'].append(val.max().item())
+            self.summary[key]['n_trans'].append(len(val))
+            self.summary[key]['size'].append((val.element_size() * val.nelement()))
+
+    def show_rollout_info(self):
         key_max_len = len(max(self.rollout.keys(), key=len))
         shp_max_val = max(list(map(lambda x: len(str(list(x.shape))), self.rollout.values())))
         dtype_max_len = max(list(map(lambda x: len(str(x.dtype)), self.rollout.values())))
@@ -137,14 +152,40 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         total_size = 0
         for key, val in self.rollout.items():
             if val.nelement() <= 0: continue
+
             print("    {}{}, shape: {}{}, min/max: {}{:.3f}  / {}{:.3f}, datatype: {}{}, size: {:,} {}".format(
                 key, ''.join([' ' for _ in range(key_max_len - len(key))]),
                 list(val.shape), ''.join([' ' for _ in range(shp_max_val - len(str(list(val.shape))))]),
                 ''.join([' ' if val.min() >= 0 else '']), val.min(), ''.join([' ' if val.max() >= 0 else '']), val.max(),
                 val.dtype, ''.join([' ' for _ in range(dtype_max_len - len(str(val.dtype)))]),
-                *self.num_unit(val.element_size() * val.nelement())))
+                *self.num_with_unit(val.element_size() * val.nelement())))
             total_size += val.element_size() * val.nelement()
-        print("    Total Dataset Size: {:,} {}".format(*self.num_unit(total_size)))
+        print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(total_size)))
+
+    def show_summary(self):
+        key_max_len = len(max(self.rollout.keys(), key=len))
+        shp_max_val = max(list(map(lambda x: len(str(list(x.shape))), self.rollout.values())))
+        dtype_max_len = max(list(map(lambda x: len(str(x.dtype)), self.rollout.values())))
+
+        print("*******************")
+        print("***** Summary *****")
+        print("*******************")
+        total_size = 0
+        for key, val in self.summary.items():
+            _shape = [sum(val['n_trans'])] + list(self.rollout[key].shape)[1:]
+            _min = min(val['min'])
+            _max = max(val['max'])
+            _dtype = self.rollout[key].dtype
+            _size = sum(val['size'])
+            total_size += _size
+            print("    {}{},  shape: {}{},  min/max: {}{:.3f} / {}{:.3f},  datatype: {}{},  total size: {:,} {}".format(
+                key, ''.join([' ' for _ in range(key_max_len - len(key))]),
+                _shape, ''.join([' ' for _ in range(shp_max_val - len(str(_shape)))]),
+                ''.join([' ' if _min >= 0 else '']), _min, ''.join([' ' if _max >= 0 else '']), _max,
+                _dtype, ''.join([' ' for _ in range(dtype_max_len - len(str(_dtype)))]),
+                *self.num_with_unit(_size)
+            ))
+        print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(total_size)))
 
     def get_statistics(self):
         done = self.dones.cpu()

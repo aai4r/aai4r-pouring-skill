@@ -71,9 +71,7 @@ class ExpertManager:
             self.storage.add_transitions(current_obs, current_states, actions, rews, dones)
             current_obs.copy_(next_obs)
             current_states.copy_(next_states)
-
-        # posterior process like print info. save, etc.
-        self.storage.info()
+        self.storage.show_summary()
 
     def run_batch(self, num_transitions_per_env):
         current_obs = self.vec_env.reset()
@@ -92,8 +90,3 @@ class ExpertManager:
             self.storage.add_transitions(current_obs, current_states, actions, rews, dones)
             current_obs.copy_(next_obs)
             current_states.copy_(next_states)
-
-        # posterior process like print info. save, etc.
-        self.storage.info()
-        # if self.cfg['expert']['save_data']:
-        #     self.save()
