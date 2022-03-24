@@ -1027,7 +1027,7 @@ class DemoUR3Pouring(BaseTask):
         self.task_pose_list.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
 
         """
-            2) approach bottle high
+            2) approach above the bottle
         """
         bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
         bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]

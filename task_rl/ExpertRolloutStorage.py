@@ -7,6 +7,8 @@ from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRand
 from task_rl.utils.rollout_utils import RolloutSaverIsaac
 from spirl.utils.general_utils import AttrDict
 
+dtype_to_byte = {torch.float32: 4, torch.float: 4, torch.uint8: 1}
+
 
 class ExpertRolloutStorage(RolloutSaverIsaac):
 
@@ -19,8 +21,12 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
 
-        self.shapes = AttrDict(obs_shape=obs_shape, states_shape=states_shape, actions_shape=actions_shape,
-                               rewards_shape=(1,), done_shape=(1,))
+        self.shapes = AttrDict(observations=obs_shape, states=states_shape, actions=actions_shape,
+                               rewards=(1,), done=(1,))
+
+        obs_dtype = torch.uint8 if len(self.shapes.observations) > 2 else torch.float32     # uint8 for image obs
+        self.dtypes = AttrDict(observations=obs_dtype, states=torch.float32, actions=torch.float32,
+                               rewards=torch.float32, done=torch.float32)
 
         _rollout_size = self.expected_rollout_size(print_info=True)
         SPLIT_SIZE = 50 * (1000 * 1000)  # MB
@@ -64,11 +70,11 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
     def save(self):
         np_obs_dim = np.arange(len(self.observations.size()))[2:]
-        np_observations = self.observations.permute(1, 0, *np_obs_dim).reshape(-1, *self.shapes.obs_shape).cpu().numpy()
+        np_observations = self.observations.permute(1, 0, *np_obs_dim).reshape(-1, *self.shapes.observations).cpu().numpy()
         np_states = self.states.permute(1, 0, 2).cpu().numpy()
         if self.states.nelement() > 0:
-            np_states = np_states.reshape(-1, *self.shapes.states_shape)
-        np_actions = self.actions.permute(1, 0, 2).reshape(-1, *self.shapes.actions_shape).cpu().numpy()
+            np_states = np_states.reshape(-1, *self.shapes.states)
+        np_actions = self.actions.permute(1, 0, 2).reshape(-1, *self.shapes.actions).cpu().numpy()
         np_rewards = self.rewards.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
         np_dones = self.dones.permute(1, 0, 2).reshape(-1, 1).cpu().numpy()
 
@@ -82,13 +88,12 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.save_rollout_to_file(episode)
 
     def init_rollout(self):
-        obs_dtype = torch.uint8 if len(
-            self.shapes.obs_shape) > 2 else torch.float32  # uint8 in case of image observation
         num_split_trans_per_env = self.split_tr_list[self.split_count]
-        self.observations = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.obs_shape, device=self.device, dtype=obs_dtype)
-        self.states = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.states_shape, device=self.device)
+        self.observations = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.observations,
+                                        device=self.device, dtype=self.dtypes.observations)
+        self.states = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.states, device=self.device)
         self.rewards = torch.zeros(num_split_trans_per_env, self.num_envs, 1, device=self.device)
-        self.actions = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.actions_shape, device=self.device)
+        self.actions = torch.zeros(num_split_trans_per_env, self.num_envs, *self.shapes.actions, device=self.device)
         self.dones = torch.zeros(num_split_trans_per_env, self.num_envs, 1, device=self.device).byte()
 
         self.rollout = AttrDict(observations=self.observations,
@@ -115,7 +120,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
         total_size = 0
         for key, val in self.shapes.items():
-            _size = np.prod(val) * self.num_envs * self.num_transitions_per_env
+            _size = np.prod(val) * self.num_envs * self.num_transitions_per_env * dtype_to_byte[self.dtypes[key]]
             expected_size[key] = _size
             total_size += _size
         expected_size.total = total_size
@@ -172,6 +177,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         print("*******************")
         total_size = 0
         for key, val in self.summary.items():
+            if self.rollout[key].nelement() <= 0: continue
             _shape = [sum(val['n_trans'])] + list(self.rollout[key].shape)[1:]
             _min = min(val['min'])
             _max = max(val['max'])

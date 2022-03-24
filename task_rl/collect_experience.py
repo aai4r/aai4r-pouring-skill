@@ -48,9 +48,9 @@ def task_demonstration(task):
     sim_params = parse_sim_params(args, cfg, None)
 
     # param customization
-    cfg['env']['numEnvs'] = 32
-    cfg['expert']['num_total_frames'] = 100000
-    cfg['expert']['save_data'] = False
+    cfg['env']['numEnvs'] = 64
+    cfg['expert']['num_total_frames'] = 200000
+    cfg['expert']['save_data'] = True
     cfg['expert']['debug_cam'] = False
     cfg['expert']['img_obs'] = False
 
