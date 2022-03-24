@@ -1027,7 +1027,7 @@ class DemoUR3Pouring(BaseTask):
         self.task_pose_list.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
 
         """
-            2) approach bottle
+            2) approach bottle high
         """
         bottle_pos = self.rigid_body_states[:, self.bottle_handle][:, 0:3]
         bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
@@ -1046,6 +1046,7 @@ class DemoUR3Pouring(BaseTask):
         vx[:, 2] = 0.0
         vx = normalize(vx, p=2.0, dim=-1)
         appr_bottle_pos = bottle_pos.clone().detach() - (vx * self.bottle_diameter * 1.6)
+        appr_bottle_pos[:, 2] = self.bottle_height + 0.05
 
         q_z90 = torch.tensor([[0.0, 0.0, 0.707, 0.707]] * self.num_envs, device=self.device)
         vy = quat_apply(q_z90, vx)
