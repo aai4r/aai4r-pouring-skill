@@ -9,11 +9,13 @@ class RolloutSaverIsaac(RolloutSaver):
     def __init__(self, save_dir, task_name):
         super().__init__(save_dir=save_dir)
         self.task_name = task_name
+        self.batch_count = 1
 
     def save_rollout_to_file(self, episode):
         """Saves an episode to the next file index of the target folder."""
-        # get save path
-        path = os.path.join(self.save_dir, self.task_name)
+        _obs_shape = episode.observations.shape
+        _opt_path = "batch{}".format(self.batch_count) if len(_obs_shape) > 2 else ""
+        path = os.path.join(self.save_dir, self.task_name, _opt_path)
         if not os.path.exists(path):
             os.makedirs(path)
         save_path = os.path.join(path, "rollout_{}.h5".format(self.counter))
