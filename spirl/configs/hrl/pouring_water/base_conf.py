@@ -23,7 +23,7 @@ configuration = {
     'environment': IsaacGymEnv,
     'sampler': HierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 50,
+    'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 100000,
     'n_warmup_steps': 5e3,  # 5e3

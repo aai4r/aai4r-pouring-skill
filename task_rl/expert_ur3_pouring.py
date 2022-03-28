@@ -685,13 +685,14 @@ class DemoUR3Pouring(BaseTask):
         if self.img_obs:
             # reset camera sensor pose
             for i in range(len(self.envs)):
-                rand_pos = gymapi.Vec3(0.75 + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                       0.0 + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                       0.3 + np.random.uniform(low=-0.05, high=0.05, size=1))
-                rand_stare = gymapi.Vec3(0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                         0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                         0.0 + np.random.uniform(low=-0.02, high=0.02, size=1))
-                self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
+                if i in env_ids:
+                    rand_pos = gymapi.Vec3(0.75 + np.random.uniform(low=-0.08, high=0.08, size=1),
+                                           0.0 + np.random.uniform(low=-0.08, high=0.08, size=1),
+                                           0.3 + np.random.uniform(low=-0.05, high=0.05, size=1))
+                    rand_stare = gymapi.Vec3(0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
+                                             0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
+                                             0.0 + np.random.uniform(low=-0.02, high=0.02, size=1))
+                    self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
 
         # reset apply
         bottle_liquid_indices = self.global_indices[env_ids, 1:].flatten()

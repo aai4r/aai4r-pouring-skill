@@ -1,5 +1,7 @@
 import os
 import imp
+import time
+
 import torch
 import h5py
 import numpy as np
@@ -109,6 +111,7 @@ class TaskRLTrainer:
 
         for epoch in range(start_epoch, self._hp.num_epochs):
             print("Epoch {}".format(epoch))
+            start = time.time()
             self.train_epoch(epoch)
 
             if not self.args.dont_save and self.is_chef:
@@ -119,6 +122,8 @@ class TaskRLTrainer:
                 }, os.path.join(self._hp.exp_path, 'weights'), CheckpointHandler.get_ckpt_name(epoch))
                 self.agent.save_state(self._hp.exp_path)
                 self.val()
+            elapsed = time.time() - start
+            print("elapsed time: {}".format(elapsed))
 
     def train_epoch(self, epoch):
         """Run inner training loop."""
