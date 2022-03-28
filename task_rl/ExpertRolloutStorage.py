@@ -42,7 +42,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                                 actions=self.actions,
                                 dones=self.dones)
 
-        self.DESIRED_BATCH_SIZE = 50 * (1000 * 1000)    # MB
+        self.DESIRED_BATCH_SIZE = 100 * (1000 * 1000)
 
         self.summary = AttrDict(observations={"min": [], "max": [], "n_trans": [], "size": []},
                                 states={"min": [], "max": [], "n_trans": [], "size": []},
@@ -75,7 +75,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         np_rewards = self.rewards.permute(1, 0, 2).cpu().numpy()
         np_dones = self.dones.permute(1, 0, 2).cpu().numpy()
 
-        ep_trim = 0
+        trim_last = []
         for i_env in range(0, len(np_dones) - 1):
             ep_idx = np.where(np_dones[i_env] > 0)[0]
             if len(ep_idx) < 1:    # skip no terminal signal
@@ -84,8 +84,8 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
             for i_episode in range(0, len(ep_idx) - 1):
                 ep_idx = np.append([-1], ep_idx)
-                ep_trim += np_dones.shape[1] - ep_idx[-1]
-                print("    epi_idx: {},  trimed ep: {}".format(ep_idx, ep_trim))
+                trim_last.append(np_dones.shape[1] - ep_idx[-1])   # n_trans - last_terminal
+                print("    epi_idx: {},  trimed ep: {}".format(ep_idx, trim_last[-1]))
 
                 start = ep_idx[i_episode] + 1
                 end = ep_idx[i_episode + 1]
@@ -107,8 +107,10 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
                 batch_thres = self.summary.total_size / (self.DESIRED_BATCH_SIZE * self.batch_count)
                 if batch_thres > 1.0:
+                    print("batch up!!")
                     self.batch_count += 1
-        print("ep trim: ", ep_trim)
+                    self.counter = 0
+        print("trim last lengths: ", trim_last)
 
     def save(self):
         np_obs_dim = np.arange(len(self.observations.size()))[2:]

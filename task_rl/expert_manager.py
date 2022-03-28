@@ -34,8 +34,11 @@ class ExpertManager:
         self.storage = ExpertRolloutStorage(self.vec_env.num_envs, num_transition_per_env, self.observation_space.shape,
                                             self.state_space.shape, self.action_space.shape, self.cfg)
 
-    def save(self):
-        self.storage.save_batch()
+    def save(self, batch_wise=False):
+        if batch_wise:
+            self.storage.save_batch()
+        else:
+            self.storage.save()
 
     def load(self):
         data_path = self.cfg['task_rl']['data_path']
@@ -71,7 +74,7 @@ class ExpertManager:
             self.storage.add_transitions(current_obs, current_states, actions, rews, dones)
             current_obs.copy_(next_obs)
             current_states.copy_(next_states)
-        self.save()
+        self.save(batch_wise=True)
         self.storage.show_summary()
 
     def run_batch(self, num_transitions_per_env):

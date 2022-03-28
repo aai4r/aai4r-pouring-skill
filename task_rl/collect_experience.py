@@ -49,7 +49,7 @@ def task_demonstration(task):
 
     # param customization
     cfg['env']['numEnvs'] = 32
-    cfg['expert']['num_total_frames'] = 10000
+    cfg['expert']['num_total_frames'] = 15000
     cfg['expert']['save_data'] = True
     cfg['expert']['debug_cam'] = False
     cfg['expert']['img_obs'] = True
