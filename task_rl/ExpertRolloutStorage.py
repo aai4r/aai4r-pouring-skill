@@ -22,11 +22,11 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.num_envs = num_envs
 
         self.shapes = AttrDict(observations=obs_shape, states=states_shape, actions=actions_shape,
-                               rewards=(1,), done=(1,))
+                               rewards=(1,), dones=(1,))
 
         obs_dtype = torch.uint8 if len(self.shapes.observations) > 2 else torch.float32  # uint8 for image obs
         self.dtypes = AttrDict(observations=obs_dtype, states=torch.float32, actions=torch.float32,
-                               rewards=torch.float32, done=torch.float32)
+                               rewards=torch.float32, dones=torch.float32)
 
         self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape,
                                         device=self.device, dtype=self.dtypes.observations)
@@ -42,28 +42,14 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                                 actions=self.actions,
                                 dones=self.dones)
 
-        # MEMORY_LIMIT = 100 * (1000 * 1000)    # MB
-        # SPLIT_SIZE = 50 * (1000 * 1000)  # MB
-        # BATCH_SPLIT_SIZE = 2 * (1000 * 1000 * 1000)  # GB
-
-        # self.batch_split_size = BATCH_SPLIT_SIZE
-        # _rollout_size = self.expected_rollout_size(print_info=True)
-        # self._n_split = math.ceil(_rollout_size.total / SPLIT_SIZE)
-        # split_list = [int(num_transitions_per_env / self._n_split)] * (self._n_split - 1)
-        # self.split_tr_list = split_list + [num_transitions_per_env - sum(split_list)]
-        # self.split_count = 0
-
-        # print("num split: {}".format(self._n_split))
-        # print("split tr: ", self.split_tr_list)
-
-        # self.init_rollout()
-        # self.split_count += 1
+        self.DESIRED_BATCH_SIZE = 50 * (1000 * 1000)    # MB
 
         self.summary = AttrDict(observations={"min": [], "max": [], "n_trans": [], "size": []},
                                 states={"min": [], "max": [], "n_trans": [], "size": []},
                                 rewards={"min": [], "max": [], "n_trans": [], "size": []},
                                 actions={"min": [], "max": [], "n_trans": [], "size": []},
-                                dones={"min": [], "max": [], "n_trans": [], "size": []})
+                                dones={"min": [], "max": [], "n_trans": [], "size": []},
+                                total_size=0)
 
     def add_transitions(self, observations, states, actions, rewards, dones):
         if self.step >= self.num_transitions_per_env:
@@ -77,15 +63,10 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
         self.step += 1
 
-        if self.step >= len(self.observations) - 1:
-            self.collect_rollout_info()
-            if self.cfg['expert']['save_data']:
-                self.save_per_episode()
-                self.show_rollout_info()
-            # self.reset_rollout()
-            self.step = 0
+    def save_batch(self):
+        if not self.cfg['expert']['save_data']:
+            return
 
-    def save_per_episode(self):
         # (n_trans, n_env, *) --> (n_env, n_trans, *)
         np_obs_dim = np.arange(len(self.observations.size()))[2:]
         np_observations = self.observations.permute(1, 0, *np_obs_dim).cpu().numpy()
@@ -94,46 +75,42 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         np_rewards = self.rewards.permute(1, 0, 2).cpu().numpy()
         np_dones = self.dones.permute(1, 0, 2).cpu().numpy()
 
-        # TODO 1, total save size summary
-        # TODO 2, batch w.r.t the size.
         ep_trim = 0
-        for i in range(0, len(np_dones) - 1):
-            ep_idx = np.where(np_dones[i] > 0)[0]
+        for i_env in range(0, len(np_dones) - 1):
+            ep_idx = np.where(np_dones[i_env] > 0)[0]
             if len(ep_idx) < 1:    # skip no terminal signal
                 continue
-            print("env_num: {}".format(i))
+            print("env_num: {}".format(i_env))
 
-            for j in range(0, len(ep_idx) - 1):
+            for i_episode in range(0, len(ep_idx) - 1):
                 ep_idx = np.append([-1], ep_idx)
                 ep_trim += np_dones.shape[1] - ep_idx[-1]
                 print("    epi_idx: {},  trimed ep: {}".format(ep_idx, ep_trim))
 
-                start = ep_idx[j] + 1
-                end = ep_idx[j + 1]
+                start = ep_idx[i_episode] + 1
+                end = ep_idx[i_episode + 1]
                 ep_len = end - start
                 print("    start: {}, end: {},   length: {}".format(start, end, ep_len))
-                print("    obs:: ", len(np_observations[i, start:end]))
                 if ep_len < 50:     # skip too short episode
                     print("skipped ep_len: {}".format(ep_len))
                     continue
 
                 episode = AttrDict(
-                    observations=np_observations[i, start:end],
-                    states=np_states[i, start:end],
-                    actions=np_actions[i, start:end],
-                    rewards=np_rewards[i, start:end],
-                    dones=np_dones[i, start:end]
+                    observations=np_observations[i_env, start:end],
+                    states=np_states[i_env, start:end],
+                    actions=np_actions[i_env, start:end],
+                    rewards=np_rewards[i_env, start:end],
+                    dones=np_dones[i_env, start:end]
                 )
                 self.save_rollout_to_file(episode)
+                self.collect_rollout_statistics(episode)
 
+                batch_thres = self.summary.total_size / (self.DESIRED_BATCH_SIZE * self.batch_count)
+                if batch_thres > 1.0:
+                    self.batch_count += 1
         print("ep trim: ", ep_trim)
 
     def save(self):
-        # if self.get_accumulated_size() > self.batch_split_size:
-        #     self.batch_count += 1
-        #     self.counter = 0
-        #     print("Next batch: {}, Accumulated size: {}".format(self.batch_count, self.get_accumulated_size()))
-
         np_obs_dim = np.arange(len(self.observations.size()))[2:]
         np_observations = self.observations.permute(1, 0, *np_obs_dim).reshape(-1, *self.shapes.observations).cpu().numpy()
         np_states = self.states.permute(1, 0, 2).cpu().numpy()
@@ -151,6 +128,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
             dones=np_dones
         )
         self.save_rollout_to_file(episode)
+        self.collect_rollout_statistics(episode)
 
     def init_rollout(self):
         self.observations = torch.zeros(self.num_transitions_per_env, self.num_envs, *self.shapes.observations,
@@ -165,19 +143,6 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                                 rewards=self.rewards,
                                 actions=self.actions,
                                 dones=self.dones)
-
-    def reset_rollout(self):
-        if self._n_split < 2:
-            print("No need to split the rollout...")
-            return
-
-        if self.split_count >= self._n_split:
-            print("End of Rollout Split...")
-            return
-
-        self.init_rollout()
-        self.split_count += 1
-        self.step = 0
 
     def expected_rollout_size(self, print_info=False):
         expected_size = AttrDict()
@@ -209,13 +174,17 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
             accumulated_size += sum(val['size'])
         return accumulated_size
 
-    def collect_rollout_info(self):
-        for key, val in self.rollout.items():
-            if val.nelement() <= 0: continue
+    def collect_rollout_statistics(self, episode):
+        total = 0
+        for key, val in episode.items():
+            if key in ['total_size']: continue
+            if val.size <= 0: continue
             self.summary[key]['min'].append(val.min().item())
             self.summary[key]['max'].append(val.max().item())
             self.summary[key]['n_trans'].append(len(val))
-            self.summary[key]['size'].append((val.element_size() * val.nelement()))
+            self.summary[key]['size'].append((val.itemsize * val.size))
+            total += sum(self.summary[key]['size'])
+        self.summary['total_size'] = total
 
     def show_rollout_info(self):
         key_max_len = len(max(self.rollout.keys(), key=len))
@@ -238,22 +207,20 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(total_size)))
 
     def show_summary(self):
-        key_max_len = len(max(self.rollout.keys(), key=len))
+        key_max_len = len(max(self.summary.keys(), key=len))
         shp_max_val = max(list(map(lambda x: len(str(list(x.shape))), self.rollout.values())))
         dtype_max_len = max(list(map(lambda x: len(str(x.dtype)), self.rollout.values())))
 
         print("*******************")
         print("***** Summary *****")
         print("*******************")
-        total_size = 0
         for key, val in self.summary.items():
-            if self.rollout[key].nelement() <= 0: continue
-            _shape = [sum(val['n_trans'])] + list(self.rollout[key].shape)[1:]
+            if key in ['total_size']: continue
+            _shape = [sum(val['n_trans'])] + list(self.shapes[key])
             _min = min(val['min'])
             _max = max(val['max'])
-            _dtype = self.rollout[key].dtype
+            _dtype = self.dtypes[key]
             _size = sum(val['size'])
-            total_size += _size
             print("    {}{},  shape: {}{},  min/max: {}{:.3f} / {}{:.3f},  datatype: {}{},  total size: {:,} {}".format(
                 key, ''.join([' ' for _ in range(key_max_len - len(key))]),
                 _shape, ''.join([' ' for _ in range(shp_max_val - len(str(_shape)))]),
@@ -261,7 +228,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                 _dtype, ''.join([' ' for _ in range(dtype_max_len - len(str(_dtype)))]),
                 *self.num_with_unit(_size)
             ))
-        print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(total_size)))
+        print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(self.summary.total_size)))
 
     def get_statistics(self):
         done = self.dones.cpu()
