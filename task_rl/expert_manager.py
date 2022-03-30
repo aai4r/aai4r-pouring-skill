@@ -76,21 +76,3 @@ class ExpertManager:
             current_states.copy_(next_states)
         self.save(batch_wise=True)
         self.storage.show_summary()
-
-    def run_batch(self, num_transitions_per_env):
-        current_obs = self.vec_env.reset()
-        current_states = self.vec_env.get_state()
-
-        # rollout task_rl demonstration
-        start = time.time()
-        for frame in range(num_transitions_per_env):
-            if frame % 100 == 0:
-                print("frames: {} / {}, elapsed: {}".format(
-                    frame * self.vec_env.num_envs, num_transitions_per_env * self.vec_env.num_envs,
-                    str(datetime.timedelta(seconds=int(time.time() - start)))))
-            actions = self.vec_env.task.calc_expert_action()
-            next_obs, rews, dones, infors = self.vec_env.step(actions)
-            next_states = self.vec_env.get_state()
-            self.storage.add_transitions(current_obs, current_states, actions, rews, dones)
-            current_obs.copy_(next_obs)
-            current_states.copy_(next_states)

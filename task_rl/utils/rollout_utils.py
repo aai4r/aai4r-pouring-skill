@@ -26,11 +26,8 @@ class RolloutSaverIsaac(RolloutSaver):
 
         # store trajectory info in traj0 group
         traj_data = f.create_group("traj0")
-        traj_data.create_dataset("observations", data=np.array(episode.observations, dtype=episode.observations.dtype))
-        traj_data.create_dataset("states", data=np.array(episode.states, dtype=episode.states.dtype))
-        traj_data.create_dataset("actions", data=np.array(episode.actions, dtype=episode.actions.dtype))
-        traj_data.create_dataset("rewards", data=np.array(episode.rewards, dtype=episode.rewards.dtype))
-        traj_data.create_dataset("terminals", data=np.array(episode.dones, episode.dones.dtype))
+        for key, val in episode.items():
+            traj_data.create_dataset(key, data=np.array(episode[key], dtype=episode[key].dtype))
 
         terminals = np.array(episode.dones)
         if np.sum(terminals) == 0:

@@ -44,12 +44,12 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
         self.DESIRED_BATCH_SIZE = 100 * (1000 * 1000)
 
-        self.summary = AttrDict(observations={"min": [], "max": [], "n_trans": [], "size": []},
-                                states={"min": [], "max": [], "n_trans": [], "size": []},
-                                rewards={"min": [], "max": [], "n_trans": [], "size": []},
-                                actions={"min": [], "max": [], "n_trans": [], "size": []},
-                                dones={"min": [], "max": [], "n_trans": [], "size": []},
-                                total_size=0)
+        self.summary = AttrDict(observations={"min": [], "max": [], "n_trans": [], "size": [], "shape": [], "dtype": []},
+                                states={"min": [], "max": [], "n_trans": [], "size": [], "shape": [], "dtype": []},
+                                rewards={"min": [], "max": [], "n_trans": [], "size": [], "shape": [], "dtype": []},
+                                actions={"min": [], "max": [], "n_trans": [], "size": [], "shape": [], "dtype": []},
+                                dones={"min": [], "max": [], "n_trans": [], "size": [], "shape": [], "dtype": []},
+                                )
 
     def add_transitions(self, observations, states, actions, rewards, dones):
         if self.step >= self.num_transitions_per_env:
@@ -79,6 +79,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         for i_env in range(0, len(np_dones) - 1):
             ep_idx = np.where(np_dones[i_env] > 0)[0]
             if len(ep_idx) < 1:    # skip no terminal signal
+                print("Too short episodes... Adjust the total frames or num_envs.")
                 continue
             print("env_num: {}".format(i_env))
 
@@ -105,7 +106,8 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                 self.save_rollout_to_file(episode)
                 self.collect_rollout_statistics(episode)
 
-                batch_thres = self.summary.total_size / (self.DESIRED_BATCH_SIZE * self.batch_count)
+                total_size = sum([sum(val['size']) for _, val in self.summary.items()])
+                batch_thres = total_size / (self.DESIRED_BATCH_SIZE * self.batch_count)
                 if batch_thres > 1.0:
                     print("batch up!!")
                     self.batch_count += 1
@@ -177,16 +179,15 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         return accumulated_size
 
     def collect_rollout_statistics(self, episode):
-        total = 0
         for key, val in episode.items():
-            if key in ['total_size']: continue
             if val.size <= 0: continue
             self.summary[key]['min'].append(val.min().item())
             self.summary[key]['max'].append(val.max().item())
             self.summary[key]['n_trans'].append(len(val))
             self.summary[key]['size'].append((val.itemsize * val.size))
-            total += sum(self.summary[key]['size'])
-        self.summary['total_size'] = total
+            self.summary[key]['shape'] = [sum(self.summary[key]['n_trans'])] + list(val.shape)
+            if not self.summary[key]['dtype']:
+                self.summary[key]['dtype'].append(val.dtype)
 
     def show_rollout_info(self):
         key_max_len = len(max(self.rollout.keys(), key=len))
@@ -210,27 +211,28 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
     def show_summary(self):
         key_max_len = len(max(self.summary.keys(), key=len))
-        shp_max_val = max(list(map(lambda x: len(str(list(x.shape))), self.rollout.values())))
-        dtype_max_len = max(list(map(lambda x: len(str(x.dtype)), self.rollout.values())))
+        shp_max_len = max(list(map(lambda x: len(str(x['shape'])), self.summary.values())))
+        dtype_max_len = max(list(map(lambda x: len(str(x['dtype'])), self.summary.values())))
 
         print("*******************")
         print("***** Summary *****")
         print("*******************")
+        total_size = 0
         for key, val in self.summary.items():
-            if key in ['total_size']: continue
             _shape = [sum(val['n_trans'])] + list(self.shapes[key])
             _min = min(val['min'])
             _max = max(val['max'])
             _dtype = self.dtypes[key]
             _size = sum(val['size'])
+            total_size += _size
             print("    {}{},  shape: {}{},  min/max: {}{:.3f} / {}{:.3f},  datatype: {}{},  total size: {:,} {}".format(
                 key, ''.join([' ' for _ in range(key_max_len - len(key))]),
-                _shape, ''.join([' ' for _ in range(shp_max_val - len(str(_shape)))]),
+                _shape, ''.join([' ' for _ in range(shp_max_len - len(str(_shape)))]),
                 ''.join([' ' if _min >= 0 else '']), _min, ''.join([' ' if _max >= 0 else '']), _max,
                 _dtype, ''.join([' ' for _ in range(dtype_max_len - len(str(_dtype)))]),
                 *self.num_with_unit(_size)
             ))
-        print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(self.summary.total_size)))
+        print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(total_size)))
 
     def get_statistics(self):
         done = self.dones.cpu()

@@ -11,6 +11,7 @@ class IsaacGymSequenceDataLoader(Dataset):
     SPLIT = AttrDict(train=0.95, val=0.05, test=0.0)
 
     def __init__(self, data_dir, data_conf, phase, resolution=None, shuffle=True, dataset_size=-1):
+        # super().__init__(data_dir=data_dir, data_conf=data_conf, phase=phase)
         self.phase = phase
         self.data_dir = data_dir
         self.spec = data_conf.dataset_spec
@@ -23,7 +24,8 @@ class IsaacGymSequenceDataLoader(Dataset):
 
         rollout_index = 0
         filename = "rollout_" + str(rollout_index) + '.h5'
-        path = os.path.join(self.data_dir, data_conf.dataset_spec.env_name, filename)
+        _batch = 'batch{}'.format(1)
+        path = os.path.join(self.data_dir, data_conf.dataset_spec.env_name, _batch, filename)
         print('path: ', path)
         with h5py.File(path, 'r') as f:
             data = AttrDict()
