@@ -11,7 +11,7 @@ class RolloutSaverIsaac(RolloutSaver):
         self.task_name = task_name
         self.batch_count = 1
 
-    def save_rollout_to_file(self, episode):
+    def save_rollout_to_file(self, episode, obs_to_img_key=False):
         """Saves an episode to the next file index of the target folder."""
         _obs_shape = episode.observations.shape
         _opt_path = "batch{}".format(self.batch_count) if len(_obs_shape) > 2 else ""
@@ -27,7 +27,8 @@ class RolloutSaverIsaac(RolloutSaver):
         # store trajectory info in traj0 group
         traj_data = f.create_group("traj0")
         for key, val in episode.items():
-            traj_data.create_dataset(key, data=np.array(episode[key], dtype=episode[key].dtype))
+            _key = 'images' if key in ['observations'] and obs_to_img_key else key  # save 'observations' as 'images'
+            traj_data.create_dataset(_key, data=np.array(episode[key], dtype=episode[key].dtype))
 
         terminals = np.array(episode.dones)
         if np.sum(terminals) == 0:

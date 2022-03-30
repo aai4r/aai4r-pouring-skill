@@ -103,7 +103,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                     rewards=np_rewards[i_env, start:end],
                     dones=np_dones[i_env, start:end]
                 )
-                self.save_rollout_to_file(episode)
+                self.save_rollout_to_file(episode, obs_to_img_key=True)
                 self.collect_rollout_statistics(episode)
 
                 total_size = sum([sum(val['size']) for _, val in self.summary.items()])
@@ -191,8 +191,8 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
     def show_rollout_info(self):
         key_max_len = len(max(self.rollout.keys(), key=len))
-        shp_max_val = max(list(map(lambda x: len(str(list(x.shape))), self.rollout.values())))
-        dtype_max_len = max(list(map(lambda x: len(str(x.dtype)), self.rollout.values())))
+        shp_max_len = max(list(map(lambda x: len(str(x['shape'])), self.summary.values())))
+        dtype_max_len = max(list(map(lambda x: len(str(x['dtype'])), self.summary.values())))
 
         print("***** Expert Demo Rollout Storage Information *****")
         print("[Shape: (num_trans, num_envs, dim)]")
@@ -202,7 +202,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
             print("    {}{}, shape: {}{}, min/max: {}{:.3f}  / {}{:.3f}, datatype: {}{}, size: {:,} {}".format(
                 key, ''.join([' ' for _ in range(key_max_len - len(key))]),
-                list(val.shape), ''.join([' ' for _ in range(shp_max_val - len(str(list(val.shape))))]),
+                list(val.shape), ''.join([' ' for _ in range(shp_max_len - len(str(list(val.shape))))]),
                 ''.join([' ' if val.min() >= 0 else '']), val.min(), ''.join([' ' if val.max() >= 0 else '']), val.max(),
                 val.dtype, ''.join([' ' for _ in range(dtype_max_len - len(str(val.dtype)))]),
                 *self.num_with_unit(val.element_size() * val.nelement())))
