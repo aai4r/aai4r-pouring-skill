@@ -402,7 +402,7 @@ def set_run_params():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    task_name = "pouring_water_img"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
+    task_name = "block_stacking"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
     mode = "hierarchical_cl"
 
     # config path & params

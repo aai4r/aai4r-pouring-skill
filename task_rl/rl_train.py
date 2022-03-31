@@ -65,13 +65,13 @@ def task_rl_run():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    task_name = "pouring_water"
+    task_name = "pouring_water_img"     # ['pouring_water', 'pouring_water_img']
     mode = "spirl_cl"
     sys.argv.append("--path=" + "../spirl/configs/hrl/{}/{}".format(task_name, mode))
     sys.argv.append("--seed={}".format(0))
     sys.argv.append("--prefix={}".format("SPIRL_" + task_name + "_seed0"))
-    sys.argv.append("--mode={}".format('val'))      # ['train'(default), 'val', 'rollout']
-    sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    # sys.argv.append("--mode={}".format('val'))      # ['train'(default), 'val', 'rollout']
+    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
     train = SkillRLTrainer(args=get_args(), isaac_config=isaac_config)
 
