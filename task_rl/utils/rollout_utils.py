@@ -6,10 +6,39 @@ from spirl.rl.utils.rollout_utils import RolloutSaver
 
 
 class RolloutSaverIsaac(RolloutSaver):
-    def __init__(self, save_dir, task_name):
-        super().__init__(save_dir=save_dir)
-        self.task_name = task_name
+    def __init__(self, cfg):
+        self.cfg = cfg
+        super().__init__(save_dir=cfg['expert']['data_path'])
+        self.task_name = cfg['task']['name']
+        self.save_resume = cfg['expert']['save_resume']
         self.batch_count = 1
+        self.pre_size = 0
+
+        if self.save_resume:
+            self.check_batch_resume()
+
+    def check_batch_resume(self):
+        path = os.path.join(self.save_dir, self.task_name)
+        if not os.path.exists(path):
+            return
+
+        # size check
+        self.pre_size = self.get_dir_size(path)
+        folders = os.listdir(path)
+        if folders:
+            latest_num = sorted(folders)[-1][5:]    # assume folder name 'batch'
+            self.batch_count = int(latest_num) + 1
+            print("Dataset pre-size: {}    Current batch count : {}".format(self.pre_size, self.batch_count))
+
+    def get_dir_size(self, path='.'):
+        total = 0
+        with os.scandir(path) as it:
+            for entry in it:
+                if entry.is_file():
+                    total += entry.stat().st_size
+                elif entry.is_dir():
+                    total += self.get_dir_size(entry.path)
+        return total
 
     def save_rollout_to_file(self, episode, obs_to_img_key=False):
         """Saves an episode to the next file index of the target folder."""

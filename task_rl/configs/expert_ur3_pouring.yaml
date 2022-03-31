@@ -26,6 +26,7 @@ expert:
   num_total_frames: 2000000
   data_path: "../data"
   save_data: True
+  save_resume: False
   debug_cam: False
   img_obs: False
 

@@ -13,15 +13,14 @@ dtype_to_byte = {torch.float32: 4, torch.float: 4, torch.uint8: 1}
 class ExpertRolloutStorage(RolloutSaverIsaac):
 
     def __init__(self, num_envs, num_transitions_per_env, obs_shape, states_shape, actions_shape, cfg, sampler='sequential'):
-        super().__init__(save_dir=cfg['expert']['data_path'], task_name=cfg['task']['name'])
+        super().__init__(cfg=cfg)
 
-        self.cfg = cfg
         self.device = cfg['device']
         self.sampler = sampler
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
-        self.DESIRED_BATCH_SIZE = 2 * (1000 * 1000 * 1000)  # 2GB, default
-        self.DESIRED_BATCH_SIZE = cfg['expert']['desired_batch_size']
+        self.DESIRED_BATCH_SIZE = cfg['expert']['desired_batch_size'] if "desired_batch_size" in cfg['expert'] \
+            else 2 * (1000 * 1000 * 1000)  # 2GB, default
 
         self.shapes = AttrDict(observations=obs_shape, states=states_shape, actions=actions_shape,
                                rewards=(1,), dones=(1,))
@@ -107,7 +106,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                 self.collect_rollout_statistics(episode)
 
                 total_size = sum([sum(val['size']) for _, val in self.summary.items()])
-                batch_thres = total_size / (self.DESIRED_BATCH_SIZE * self.batch_count)
+                batch_thres = (total_size + self.pre_size) / (self.DESIRED_BATCH_SIZE * self.batch_count)
                 if batch_thres > 1.0:
                     print("batch up!!")
                     self.batch_count += 1

@@ -49,9 +49,10 @@ def task_demonstration(task):
 
     # param customization
     cfg['env']['numEnvs'] = 32
-    cfg['expert']['num_total_frames'] = 200000  # TODO, mismatch with the actual total frames when large number..
+    cfg['expert']['num_total_frames'] = 200000
     cfg['expert']['desired_batch_size'] = 2 * (1000 * 1000 * 1000)
     cfg['expert']['save_data'] = True
+    cfg['expert']['save_resume'] = True
     cfg['expert']['debug_cam'] = False
     cfg['expert']['img_obs'] = True
 
