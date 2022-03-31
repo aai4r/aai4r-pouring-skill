@@ -20,6 +20,8 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.sampler = sampler
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
+        self.DESIRED_BATCH_SIZE = 2 * (1000 * 1000 * 1000)  # 2GB, default
+        self.DESIRED_BATCH_SIZE = cfg['expert']['desired_batch_size']
 
         self.shapes = AttrDict(observations=obs_shape, states=states_shape, actions=actions_shape,
                                rewards=(1,), dones=(1,))
@@ -41,8 +43,6 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                                 rewards=self.rewards,
                                 actions=self.actions,
                                 dones=self.dones)
-
-        self.DESIRED_BATCH_SIZE = 100 * (1000 * 1000)
 
         self.summary = AttrDict(observations={"min": [], "max": [], "n_trans": [], "size": [], "shape": [], "dtype": []},
                                 states={"min": [], "max": [], "n_trans": [], "size": [], "shape": [], "dtype": []},
@@ -83,8 +83,8 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                 continue
             print("env_num: {}".format(i_env))
 
+            ep_idx = np.append([-1], ep_idx)
             for i_episode in range(0, len(ep_idx) - 1):
-                ep_idx = np.append([-1], ep_idx)
                 trim_last.append(np_dones.shape[1] - ep_idx[-1])   # n_trans - last_terminal
                 print("    epi_idx: {},  trimed ep: {}".format(ep_idx, trim_last[-1]))
 
@@ -167,10 +167,10 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         return expected_size
 
     def num_with_unit(self, input):
-        unit_value = {"G.Byte": 1000000000, "M.Byte": 1000000, "K.Byte": 1000, "Byte": 1}
+        unit_value = {"T.Byte": 1000 ** 4, "G.Byte": 1000 ** 3, "M.Byte": 1000 ** 2, "K.Byte": 1000, "Byte": 1}
         for key, val in unit_value.items():
             if input >= val:
-                return round(input / val), key
+                return round(input / val, 1), key
 
     def get_accumulated_size(self):
         accumulated_size = 0

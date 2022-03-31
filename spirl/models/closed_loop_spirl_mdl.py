@@ -38,6 +38,7 @@ class ClSPiRLMdl(SkillPriorMdl):
 
     def _run_inference(self, inputs):
         # run inference with state sequence conditioning
+        _temp = self._get_seq_enc(inputs)
         inf_input = torch.cat((inputs.actions, self._get_seq_enc(inputs)), dim=-1)
         return MultivariateGaussian(self.q(inf_input)[:, -1])
 

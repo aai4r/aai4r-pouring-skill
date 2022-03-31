@@ -13,7 +13,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
-    'data_dir': os.path.join(os.environ['DATA_DIR']),
+    'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
     'epoch_cycles_train': 50,
     'num_epochs': 100,
     'evaluator': TopOfNSequenceEvaluator,
@@ -25,7 +25,7 @@ configuration = AttrDict(configuration)
 model_config = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    n_rollout_steps=16,
+    n_rollout_steps=10,
     kl_div_weight=5e-4,
     nz_enc=128,
     nz_mid=128,

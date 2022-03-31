@@ -27,6 +27,8 @@ class RolloutSaverIsaac(RolloutSaver):
         # store trajectory info in traj0 group
         traj_data = f.create_group("traj0")
         for key, val in episode.items():
+            if key in ['rewards', 'dones']:     # dataset skip
+                continue
             _key = 'images' if key in ['observations'] and obs_to_img_key else key  # save 'observations' as 'images'
             traj_data.create_dataset(_key, data=np.array(episode[key], dtype=episode[key].dtype))
 
