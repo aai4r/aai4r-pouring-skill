@@ -1,6 +1,4 @@
 from spirl.configs.hrl.pouring_water_img.spirl.conf import *
-from spirl.models.closed_loop_spirl_mdl import ClSPiRLMdl
-from spirl.rl.policies.cl_model_policies import ClModelPolicy
 from spirl.rl.policies.cl_model_policies import ACClModelPolicy
 
 # update model params to conditioned decoder on state

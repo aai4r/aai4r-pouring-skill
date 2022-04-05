@@ -7,8 +7,8 @@ from spirl.data.block_stacking.src.robosuite.utils.mjcf_utils import array_to_st
 class GripperOnlyRobot(Robot):
     """Sawyer is a witty single-arm robot designed by Rethink Robotics."""
 
-    def __init__(self):
-        super().__init__(os.path.join(os.getcwd(), "spirl/data/block_stacking/assets/gripper_only_robot.xml"))
+    def __init__(self):     # TODO, defulat: spirl/~~, --> modified: ../~~
+        super().__init__(os.path.join(os.getcwd(), "../data/block_stacking/assets/gripper_only_robot.xml"))
 
         self.bottom_offset = np.array([0, 0, 0])
 

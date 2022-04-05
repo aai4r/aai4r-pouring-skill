@@ -1,5 +1,7 @@
 import os
 import copy
+import isaacgym
+from init_conf import project_home_path
 
 from spirl.utils.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
@@ -15,6 +17,10 @@ from spirl.rl.agents.ac_agent import SACAgent
 from spirl.rl.agents.skill_space_agent import SkillSpaceAgent
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
+
+from utils.config import parse_sim_params
+from task_rl.config import load_cfg
+from isaacgym import gymutil
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -118,8 +124,17 @@ agent_config = AttrDict(
 data_config = AttrDict()
 data_config.dataset_spec = data_spec_img
 
-# Environment
+# IsaacGym Environment
+task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"}}
+target = "UR3_POURING"
+
+args = gymutil.parse_arguments(description="IsaacGym Task " + target)
+cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
+sim_params = parse_sim_params(args, cfg, None)
 env_config = AttrDict(
     reward_norm=1.,
+    args=args,
+    cfg=cfg,
+    sim_params=sim_params,
 )
 
