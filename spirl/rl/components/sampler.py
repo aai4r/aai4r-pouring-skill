@@ -233,6 +233,7 @@ class MultiImageAugmentedSampler(Sampler):
         super()._episode_reset(global_step)
 
     def _postprocess_obs(self, obs):
+        temp = self._env.render()
         img = self._env.render().transpose(2, 0, 1) * 2. - 1.0
         if not self._past_frames:   # initialize past frames with N copies of current frame
             [self._past_frames.append(img) for _ in range(self._hp.n_frames - 1)]

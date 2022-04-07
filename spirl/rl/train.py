@@ -342,14 +342,14 @@ if __name__ == '__main__':
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
 
     # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
     task_name = "pouring_water_img"
     mode = "spirl_cl"
-    sys.argv.append("--path=" + "../configs/hrl/{}/{}".format(task_name, mode))
-    sys.argv.append("--seed={}".format(0))
-    sys.argv.append("--prefix={}".format("SPIRL_" + task_name + "_seed0"))
-    # sys.argv.append("--mode={}".format("val"))   # train / val
 
-    RLTrainer(args=get_args())
+    args = get_args()
+    args.path = "../configs/hrl/{}/{}".format(task_name, mode)
+    args.seed = 0
+    args.prefix = "--prefix={}".format("SPIRL_" + task_name + "_seed0")
+    RLTrainer(args=args)

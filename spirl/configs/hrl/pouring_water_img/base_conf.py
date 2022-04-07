@@ -1,14 +1,13 @@
 import os
 import copy
 import isaacgym
+import torch
 from init_conf import project_home_path
 
 from spirl.utils.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
-from spirl.rl.policies.mlp_policies import MLPPolicy
-from spirl.rl.components.critic import MLPCritic
 from spirl.rl.components.critic import SplitObsMLPCritic
-from spirl.rl.envs.isaacgym_env import IsaacGymEnv
+from spirl.rl.envs.isaacgym_env import PouringWaterEnv
 from spirl.rl.components.sampler import ACMultiImageAugmentedHierarchicalSampler
 from spirl.rl.components.replay_buffer import UniformReplayBuffer
 from spirl.rl.policies.prior_policies import ACLearnedPriorAugmentedPIPolicy
@@ -29,7 +28,7 @@ notes = 'hierarchical RL on the isaacgym env'
 configuration = {
     'seed': 42,
     'agent': FixedIntervalHierarchicalAgent,
-    'environment': IsaacGymEnv,
+    'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
     'num_epochs': 50,
@@ -47,6 +46,9 @@ replay_params = AttrDict(
 # Observation Normalization
 obs_norm_params = AttrDict(
 )
+sampler_config = AttrDict(
+    n_frames=2,
+)
 
 base_agent_params = AttrDict(
     batch_size=512,
@@ -63,13 +65,15 @@ base_agent_params = AttrDict(
 ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    kl_div_weight=5e-4,
-    nz_enc=128,
-    nz_mid=128,
-    n_processing_layers=5,
+    kl_div_weight=2e-4,
+    n_input_frames=2,
+    prior_input_res=data_spec_img.res,
     nz_vae=10,
     n_rollout_steps=16,
 )
+# nz_enc=128,
+# nz_mid=128,
+# n_processing_layers=5,
 
 # LL Agent
 ll_agent_config = copy.deepcopy(base_agent_params)
@@ -120,6 +124,15 @@ agent_config = AttrDict(
     log_video_caption=True,
 )
 
+# reduce replay capacity because we are training image-based, do not dump (too large)
+from spirl.rl.components.replay_buffer import SplitObsUniformReplayBuffer
+agent_config.ll_agent_params.replay = SplitObsUniformReplayBuffer
+agent_config.ll_agent_params.replay_params.unused_obs_size = ll_model_params.prior_input_res**2*3 * 2 + \
+                                                             hl_agent_config.policy_params.action_dim   # ignore HL action
+agent_config.ll_agent_params.replay_params.dump_replay = False
+agent_config.hl_agent_params.replay_params.dump_replay = False
+
+
 # Dataset - Random data
 data_config = AttrDict()
 data_config.dataset_spec = data_spec_img
@@ -129,7 +142,21 @@ task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pou
 target = "UR3_POURING"
 
 args = gymutil.parse_arguments(description="IsaacGym Task " + target)
+args.task = task_list[target]['task']
+args.device = args.sim_device_type
+args.headless = False
+args.test = False
+
+if torch.cuda.device_count() > 1:
+    args.compute_device_id = 1
+    args.device_id = 1
+    args.graphics_device_id = 1
+    args.rl_device = 'cuda:1'
+    args.sim_device = 'cuda:1'
+
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
+cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
+
 sim_params = parse_sim_params(args, cfg, None)
 env_config = AttrDict(
     reward_norm=1.,
@@ -137,4 +164,3 @@ env_config = AttrDict(
     cfg=cfg,
     sim_params=sim_params,
 )
-

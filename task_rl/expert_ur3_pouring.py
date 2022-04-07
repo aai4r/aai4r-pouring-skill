@@ -39,8 +39,8 @@ class DemoUR3Pouring(BaseTask):
 
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
-        self.camera_props.width = 128
-        self.camera_props.height = 128
+        self.camera_props.width = self.cfg["env"]["cam_width"]
+        self.camera_props.height = self.cfg["env"]["cam_height"]
         self.camera_props.enable_tensors = True
 
         self.img_obs = self.cfg["expert"]["img_obs"]
@@ -499,6 +499,15 @@ class DemoUR3Pouring(BaseTask):
         self.gym.refresh_jacobian_tensors(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.render_all_camera_sensors(self.sim)
+
+    def render_camera(self, to_numpy=False):
+        img = None
+        for i in range(len(self.envs)):
+            camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
+                                                                 self.camera_handles[i], gymapi.IMAGE_COLOR)
+            img = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
+        img = cv2.cvtColor(img.cpu().numpy(), cv2.COLOR_RGB2BGR) if to_numpy else img
+        return img / 255
 
     def compute_observations(self):
         self.refresh_env_tensors()

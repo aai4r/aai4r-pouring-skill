@@ -26,14 +26,13 @@ model_config = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
     n_rollout_steps=10,
-    kl_div_weight=5e-4,
-    nz_enc=128,
-    nz_mid=128,
-    n_processing_layers=5,
+    kl_div_weight=2e-4,
+    prior_input_res=data_spec_img.res,
+    n_input_frames=2,
     cond_decode=True,
 )
 
 # Dataset
 data_config = AttrDict()
 data_config.dataset_spec = data_spec_img
-data_config.dataset_spec.subseq_len = model_config.n_rollout_steps + 1  # flat last action from seq gets cropped
+data_config.dataset_spec.subseq_len = model_config.n_rollout_steps + model_config.n_input_frames

@@ -1,5 +1,5 @@
 from spirl.configs.hrl.pouring_water_img.base_conf import *
-from spirl.rl.policies.prior_policies import LearnedPriorAugmentedPIPolicy
+from spirl.rl.policies.prior_policies import ACLearnedPriorAugmentedPIPolicy
 from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 
 
@@ -9,7 +9,7 @@ hl_policy_params.update(AttrDict(
     prior_model_params=ll_agent_config.model_params,
     prior_model_checkpoint=ll_agent_config.model_checkpoint,
 ))
-hl_agent_config.policy = LearnedPriorAugmentedPIPolicy
+hl_agent_config.policy = ACLearnedPriorAugmentedPIPolicy
 
 # update agent, set target divergence
 agent_config.hl_agent = ActionPriorSACAgent
