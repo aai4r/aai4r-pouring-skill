@@ -2,7 +2,6 @@ import os
 
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.models.skill_prior_mdl import SkillSpaceLogger
-from spirl.components.logger import Logger
 from spirl.utils.general_utils import AttrDict
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
 from spirl.components.evaluator import TopOfNSequenceEvaluator
@@ -15,7 +14,6 @@ configuration = {
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
     'epoch_cycles_train': 50,
-    'num_epochs': 100,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -26,7 +24,7 @@ model_config = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
     n_rollout_steps=10,
-    kl_div_weight=2e-4,
+    kl_div_weight=1e-4,
     prior_input_res=data_spec_img.res,
     n_input_frames=2,
     cond_decode=True,

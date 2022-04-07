@@ -693,14 +693,18 @@ class DemoUR3Pouring(BaseTask):
 
         if self.img_obs:
             # reset camera sensor pose
+            default_cam_pos = [0.75, 0.0, 0.4]
+            default_cam_stare = [0.0, 0.0, 0.0]
             for i in range(len(self.envs)):
                 if i in env_ids:
-                    rand_pos = gymapi.Vec3(0.75 + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                           0.0 + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                           0.3 + np.random.uniform(low=-0.05, high=0.05, size=1))
-                    rand_stare = gymapi.Vec3(0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                             0.0 + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                             0.0 + np.random.uniform(low=-0.02, high=0.02, size=1))
+                    _cp = default_cam_pos
+                    _cs = default_cam_stare
+                    rand_pos = gymapi.Vec3(_cp[0] + np.random.uniform(low=-0.08, high=0.08, size=1),
+                                           _cp[1] + np.random.uniform(low=-0.08, high=0.08, size=1),
+                                           _cp[2] + np.random.uniform(low=-0.05, high=0.05, size=1))
+                    rand_stare = gymapi.Vec3(_cs[0] + np.random.uniform(low=-0.02, high=0.02, size=1),
+                                             _cs[1] + np.random.uniform(low=-0.02, high=0.02, size=1),
+                                             _cs[2] + np.random.uniform(low=-0.02, high=0.02, size=1))
                     self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
 
         # reset apply
