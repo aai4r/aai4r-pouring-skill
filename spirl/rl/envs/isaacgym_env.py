@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 from spirl.utils.general_utils import ParamDict
 from spirl.utils.pytorch_utils import ar2ten, ten2ar
@@ -51,14 +52,14 @@ class IsaacGymEnv(BaseEnvironment):
         # if isinstance(action, torch.Tensor): action = ten2ar(action)
         if isinstance(action, np.ndarray): action = ar2ten(action, self._env.rl_device)
         obs, reward, done, info = self._env.step(action)
-        obs = obs.flatten()     # TODO, multi env case should be handled later.
+        obs = obs.flatten() if len(obs.size()) > 1 else obs    # TODO, multi env case should be handled later.
         reward = reward / self.config.reward_norm
         return self._wrap_observation(obs.cpu()), self._wrap_observation(reward.cpu()), \
                np.where(done.cpu() > 0, True, False)[0], info
 
     def reset(self):
         obs = self._env.reset()
-        obs = obs.flatten()     # TODO, multi env case should be handled later.
+        obs = obs.flatten() if len(obs.size()) > 1 else obs    # TODO, multi env case should be handled later.
         obs = self._wrap_observation(obs.cpu())
         return obs
 
@@ -72,4 +73,10 @@ class IsaacGymEnv(BaseEnvironment):
 class PouringWaterEnv(IsaacGymEnv):
     def render(self, mode='rgb_array'):
         img = self._env.task.render_camera(to_numpy=True)
+
+        # for debugging image observation
+        # cv2.imshow("camera sensor, min: {}, max: {}".format(img.min(), img.max()), img)
+        # k = cv2.waitKey(0)
+        # if k == 27:  # ESC
+        #     exit()
         return img

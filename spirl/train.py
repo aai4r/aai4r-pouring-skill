@@ -188,7 +188,6 @@ class ModelTrainer(BaseTrainer):
             with autograd.no_grad():
                 for batch_idx, sample_batched in enumerate(self.val_loader):
                     inputs = AttrDict(map_dict(lambda x: x.to(self.device), sample_batched))
-
                     # run evaluator with val-mode model
                     with self.model_test.val_mode():
                         self.evaluator.eval(inputs, self.model_test)
