@@ -10,6 +10,7 @@ ll_policy_params = AttrDict(
     policy_model_params=ll_model_params,
     policy_model_checkpoint=os.path.join(os.environ["EXP_DIR"],
                                          "skill_prior_learning/pouring_water_img/hierarchical_cl"),
+    policy_model_epoch='latest',  # default: latest
 )
 ll_policy_params.update(ll_model_params)
 
@@ -26,6 +27,7 @@ hl_policy_params.update(AttrDict(
     prior_model=ll_policy_params.policy_model,
     prior_model_params=ll_policy_params.policy_model_params,
     prior_model_checkpoint=ll_policy_params.policy_model_checkpoint,
+    prior_model_epoch=ll_policy_params.policy_model_epoch,
 ))
 
 # register new LL agent in agent_config and turn off LL agent updates
