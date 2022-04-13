@@ -147,12 +147,13 @@ args.device = args.sim_device_type
 args.headless = False
 args.test = False
 
-if torch.cuda.device_count() > 1:
-    args.compute_device_id = 1
-    args.device_id = 1
-    args.graphics_device_id = 1
-    args.rl_device = 'cuda:1'
-    args.sim_device = 'cuda:1'
+# if torch.cuda.device_count() > 1:
+assert torch.cuda.get_device_name(1)
+args.compute_device_id = 1
+args.device_id = 1
+args.graphics_device_id = 1
+args.rl_device = 'cuda:1'
+args.sim_device = 'cuda:1'
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
@@ -163,4 +164,6 @@ env_config = AttrDict(
     args=args,
     cfg=cfg,
     sim_params=sim_params,
+    img_debug=True,
+    img_disp_delay=1
 )

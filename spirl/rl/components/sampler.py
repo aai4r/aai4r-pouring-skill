@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 import contextlib
 from collections import deque
@@ -232,7 +233,7 @@ class MultiImageAugmentedSampler(Sampler):
         super()._episode_reset(global_step)
 
     def _postprocess_obs(self, obs):
-        img = self._env.render().transpose(2, 0, 1) * 2. - 1.0
+        img = self._env.render(mode='rgb').transpose(2, 0, 1) * 2. - 1.0
         if not self._past_frames:   # initialize past frames with N copies of current frame
             [self._past_frames.append(img) for _ in range(self._hp.n_frames - 1)]
         self._past_frames.append(img)

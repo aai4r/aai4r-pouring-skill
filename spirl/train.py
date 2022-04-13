@@ -3,6 +3,7 @@ import torch
 import os
 import sys
 import time
+import cv2
 from shutil import copy
 import datetime
 import imp
@@ -407,7 +408,7 @@ def set_run_params():
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))
-    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    # sys.argv.append("--resume={}".format('20'))     # latest or number..
 
 
 if __name__ == '__main__':

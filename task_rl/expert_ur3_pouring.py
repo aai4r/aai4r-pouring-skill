@@ -500,13 +500,16 @@ class DemoUR3Pouring(BaseTask):
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.render_all_camera_sensors(self.sim)
 
-    def render_camera(self, to_numpy=False):
+    def render_camera(self, to_numpy=False, color_order='rgb'):
         img = None
         for i in range(len(self.envs)):
             camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
                                                                  self.camera_handles[i], gymapi.IMAGE_COLOR)
             img = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
-        img = cv2.cvtColor(img.cpu().numpy(), cv2.COLOR_RGB2BGR) if to_numpy else img
+
+        if to_numpy:
+            img = img.cpu().numpy()
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) if color_order == 'bgr' else img
         return img / 255
 
     def compute_observations(self):
