@@ -27,6 +27,7 @@ model_config = AttrDict(
     kl_div_weight=1e-4,
     prior_input_res=data_spec_img.res,
     n_input_frames=2,
+    # encoder_ngf=12,      # number of feature maps in shallowest level of encoder
     cond_decode=True,
 )
 

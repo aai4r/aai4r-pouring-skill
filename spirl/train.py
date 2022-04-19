@@ -91,7 +91,7 @@ class ModelTrainer(BaseTrainer):
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 200,
             'epoch_cycles_train': 1,
-            'optimizer': 'radam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
+            'optimizer': 'adam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
             'lr': 1e-3,
             'gradient_clip': None,
             'init_grad_clip': 0.001,
@@ -408,7 +408,7 @@ def set_run_params():
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))
-    # sys.argv.append("--resume={}".format('20'))     # latest or number..
+    # sys.argv.append("--resume={}".format('199'))     # latest or number..
 
 
 if __name__ == '__main__':

@@ -95,12 +95,13 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                     print("skipped ep_len: {}".format(ep_len))
                     continue
 
+                skip_init_frames = 3    # to remove noisy frames during initialization
                 episode = AttrDict(
-                    observations=np_observations[i_env, start:end],
-                    states=np_states[i_env, start:end],
-                    actions=np_actions[i_env, start:end],
-                    rewards=np_rewards[i_env, start:end],
-                    dones=np_dones[i_env, start:end]
+                    observations=np_observations[i_env, start + skip_init_frames:end],
+                    states=np_states[i_env, start + skip_init_frames:end],
+                    actions=np_actions[i_env, start + skip_init_frames:end],
+                    rewards=np_rewards[i_env, start + skip_init_frames:end],
+                    dones=np_dones[i_env, start + skip_init_frames:end]
                 )
                 self.save_rollout_to_file(episode, obs_to_img_key=True)
                 self.collect_rollout_statistics(episode)

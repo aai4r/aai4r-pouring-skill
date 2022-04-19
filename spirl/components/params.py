@@ -26,7 +26,7 @@ def get_args():
     # Misc
     parser.add_argument('--gpu', default=-1, type=int,
                         help='will set CUDA_VISIBLE_DEVICES to selected value')
-    parser.add_argument('--strict_weight_loading', default=True, type=int,
+    parser.add_argument('--strict_weight_loading', default=False, type=int,     # TODO, default: True
                         help='if True, uses strict weight loading function')
     parser.add_argument('--deterministic', default=False, type=int,
                         help='if True, sets fixed seeds for torch and numpy')

@@ -78,7 +78,7 @@ class PouringWaterEnv(IsaacGymEnv):
         # for debugging image observation
         if self.config.img_debug:
             _img = cv2.cvtColor((img * 255).astype('uint8'), cv2.COLOR_BGR2RGB) if self.config.img_debug else img
-            cv2.imshow("render, min/max={:.3}/{:.3}, shape={}".format(img.min(), img.max(), img.shape), _img)
+            cv2.imshow("render", _img)
             k = cv2.waitKey(max(0, self.config.img_disp_delay))
             if k == 27:  # ESC
                 exit()

@@ -48,8 +48,8 @@ def task_demonstration(task):
     sim_params = parse_sim_params(args, cfg, None)
 
     # param customization
-    cfg['env']['numEnvs'] = 32
-    cfg['expert']['num_total_frames'] = 200000
+    cfg['env']['numEnvs'] = 64
+    cfg['expert']['num_total_frames'] = 300000
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB
     cfg['expert']['save_data'] = True
     cfg['expert']['save_resume'] = True

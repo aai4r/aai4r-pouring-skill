@@ -3,7 +3,7 @@ import torch
 from utils.torch_jit_utils import quat_conjugate, quat_mul
 from dataclasses import dataclass
 
-PI = 3.1415926535
+PI = np.pi
 
 
 def rad2deg(rad):
@@ -58,8 +58,11 @@ def orientation_error(desired, current):
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
 
+from isaacgym.torch_utils import *
+
+
 @dataclass
-class TaskProperty:
+class ViaPointProperty:
     pos: float = 5.e-2
     rot: float = 5.e-2
     grip: float = 7.e-3
@@ -68,25 +71,47 @@ class TaskProperty:
 
 
 class TaskPoseList:
-    def __init__(self, task_name):
+    def __init__(self, task_name, num_envs, device):
         self.task_name = task_name
+        self.num_envs = num_envs
+        self.device = device
 
         self.pos = []
         self.rot = []
         self.grip = []
-        self.err_th = []
+        self.err_thres = []
 
-    def append_pose(self, pos, rot, grip, err=TaskProperty()):
+    def gen_pos_variation(self, pivot_pos, pos_var_meter=0.02):
+        _pos = to_torch(pivot_pos, device=self.device).repeat((self.num_envs, 1))
+        var = (torch.rand_like(_pos) - 0.5) * 2.0
+        var_pos = _pos + var * pos_var_meter
+        return var_pos
+
+    def gen_rot_variation(self, pivot_quat, rot_var_deg=15):
+        _rot = to_torch(pivot_quat, device=self.device).repeat((self.num_envs, 1))
+        roll_d = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        pitch_d = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        yaw_d = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+
+        q_var = quat_from_euler_xyz(roll=deg2rad(roll_d), pitch=deg2rad(pitch_d), yaw=deg2rad(yaw_d))
+        var_rot = quat_mul(_rot, q_var)
+        return var_rot
+
+    def gen_grip_variation(self, pivot_grip, grip_var_meter=0.01):
+        _grip = to_torch(pivot_grip, device=self.device).repeat((self.num_envs, 1))  # meter
+        grip_var = (torch.rand_like(_grip) - 0.5) * 2.0
+        var_grip = _grip + grip_var * grip_var_meter
+        return var_grip
+
+    def append_pose(self, pos, rot, grip, err=ViaPointProperty()):
+        assert len(pos) == len(rot) == len(grip) == self.num_envs
         self.pos.append(pos)
         self.rot.append(rot)
         self.grip.append(grip)
-        self.err_th.append(err)
+        self.err_thres.append(err)
 
-    def pose_pop_first(self):
-        return self.pos.pop(0), self.rot.pop(0), self.grip.pop(0), self.err_th.pop(0)
-
-    def pose_pop_last(self):
-        return self.pos.pop(), self.rot.pop(), self.grip.pop(), self.err_th.pop()
+    def pose_pop(self, index=-1):
+        return self.pos.pop(index), self.rot.pop(index), self.grip.pop(index), self.err_thres.pop(index)
 
     def length(self):
         return len(self.pos)
@@ -99,13 +124,16 @@ class TaskPathManager:
         self.device = device
 
         # __step shape: [num_env, 1, dim=([3 , 4 , 1])]
-        self.__step = torch.zeros(num_env, device=device, dtype=torch.long).unsqueeze(-1).repeat(1, 4).unsqueeze(1)
-        self.__push_idx = torch.zeros(num_env, device=device, dtype=torch.long)
+        self._step = torch.zeros(num_env, device=device, dtype=torch.long).unsqueeze(-1).repeat(1, 4).unsqueeze(1)
+        self._push_idx = torch.zeros(num_env, device=device, dtype=torch.long)
 
-        self.__task_pos = torch.zeros(num_env, num_task_steps, 3, device=device)
-        self.__task_rot = torch.zeros(num_env, num_task_steps, 4, device=device)
-        self.__task_grip = torch.zeros(num_env, num_task_steps, 1, device=device)
-        self.__task_err = torch.zeros(num_env, num_task_steps, 4, device=device)    # (pos_err, rot_err, grip_err, wait)
+        """
+        (num_env, task_steps, dim)
+        """
+        self._task_pos = torch.zeros(num_env, num_task_steps, 3, device=device)
+        self._task_rot = torch.zeros(num_env, num_task_steps, 4, device=device)
+        self._task_grip = torch.zeros(num_env, num_task_steps, 1, device=device)
+        self._task_err = torch.zeros(num_env, num_task_steps, 4, device=device)    # (pos_err, rot_err, grip_err, wait)
 
         # time properties
         self.curr_time = 0
@@ -113,21 +141,21 @@ class TaskPathManager:
         self.elapsed = torch.zeros(num_env, device=device)
 
     def reset_task(self, env_ids):
-        self.__task_pos[env_ids] = torch.zeros_like(self.__task_pos[env_ids])
-        self.__task_rot[env_ids] = torch.zeros_like(self.__task_rot[env_ids])
-        self.__task_grip[env_ids] = torch.zeros_like(self.__task_grip[env_ids])
-        self.__task_err[env_ids] = torch.zeros_like(self.__task_err[env_ids])
-        self.__push_idx[env_ids] = torch.zeros_like(self.__push_idx[env_ids])
-        self.__step[env_ids] = torch.zeros_like(self.__step[env_ids])
+        self._task_pos[env_ids] = torch.zeros_like(self._task_pos[env_ids])
+        self._task_rot[env_ids] = torch.zeros_like(self._task_rot[env_ids])
+        self._task_grip[env_ids] = torch.zeros_like(self._task_grip[env_ids])
+        self._task_err[env_ids] = torch.zeros_like(self._task_err[env_ids])
+        self._push_idx[env_ids] = torch.zeros_like(self._push_idx[env_ids])
+        self._step[env_ids] = torch.zeros_like(self._step[env_ids])
 
-    def push_pose(self, env_ids, pos, rot, grip, err=TaskProperty()):
-        self.__task_pos[env_ids, self.__push_idx[env_ids]] = pos[env_ids]
-        self.__task_rot[env_ids, self.__push_idx[env_ids]] = rot[env_ids]
-        self.__task_grip[env_ids, self.__push_idx[env_ids]] = grip[env_ids]
+    def push_pose(self, env_ids, pos, rot, grip, err=ViaPointProperty()):
+        self._task_pos[env_ids, self._push_idx[env_ids]] = pos[env_ids]
+        self._task_rot[env_ids, self._push_idx[env_ids]] = rot[env_ids]
+        self._task_grip[env_ids, self._push_idx[env_ids]] = grip[env_ids]
 
         err_th = torch.tensor([err.pos, err.rot, err.grip, err.wait], device=self.device).repeat(self.num_env, 1)
-        self.__task_err[env_ids, self.__push_idx[env_ids]] = err_th[env_ids]
-        self.__push_idx[env_ids] += 1
+        self._task_err[env_ids, self._push_idx[env_ids]] = err_th[env_ids]
+        self._push_idx[env_ids] += 1
 
     def update_step_by_checking_arrive(self, ee_pos, ee_rot, ee_grip, sim_time):
         des_pos, des_rot, des_grip, err_th = self.get_desired_pose()
@@ -145,25 +173,25 @@ class TaskPathManager:
 
         arrive = torch.where(reach & (self.elapsed <= 0), 1, 0)
 
-        self.__step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
+        self._step += arrive.unsqueeze(-1).repeat(1, 4).unsqueeze(-2)
         # if arrive.sum() > 0:
         #     print("arrive: ", arrive, self.num_task_steps)
         #     print("step: ", self.__step)
-        done_envs = torch.where(self.__step[:, 0, 0] >= self.num_task_steps, 1, 0)
-        self.__step = torch.where(self.__step >= self.num_task_steps, torch.zeros_like(self.__step), self.__step)
+        done_envs = torch.where(self._step[:, 0, 0] >= self.num_task_steps, 1, 0)
+        self._step = torch.where(self._step >= self.num_task_steps, torch.zeros_like(self._step), self._step)
         return done_envs
 
     def get_desired_pose(self):
-        pos = torch.gather(self.__task_pos, 1, self.__step[:, :, :3]).squeeze(-2)
-        rot = torch.gather(self.__task_rot, 1, self.__step[:, :, :]).squeeze(-2)
-        grip = torch.gather(self.__task_grip, 1, self.__step[:, :, :1]).squeeze(-2)
-        err_th = torch.gather(self.__task_err, 1, self.__step[:, :, :4]).squeeze(-2)
+        pos = torch.gather(self._task_pos, 1, self._step[:, :, :3]).squeeze(-2)
+        rot = torch.gather(self._task_rot, 1, self._step[:, :, :]).squeeze(-2)
+        grip = torch.gather(self._task_grip, 1, self._step[:, :, :1]).squeeze(-2)
+        err_th = torch.gather(self._task_err, 1, self._step[:, :, :4]).squeeze(-2)
         return pos, rot, grip, err_th
 
     def print_task_status(self):
         print("================== Task Info. ==================")
         print("Num_env: {}, Num_task_steps: {}, Device: {}".format(self.num_env, self.num_task_steps, self.device))
-        print("[Shapes] Pos: {}, *** Rot: {}, *** Grip: {}".format(self.__task_pos.shape, self.__task_rot.shape, self.__task_grip.shape))
-        print("[Data] Task Pos: \n{}".format(self.__task_pos))
-        print("[Data] Task Rot: \n{}".format(self.__task_rot))
-        print("[Data] Task Grip: \n{}".format(self.__task_grip))
+        print("[Shapes] Pos: {}, *** Rot: {}, *** Grip: {}".format(self._task_pos.shape, self._task_rot.shape, self._task_grip.shape))
+        print("[Data] Task Pos: \n{}".format(self._task_pos))
+        print("[Data] Task Rot: \n{}".format(self._task_rot))
+        print("[Data] Task Grip: \n{}".format(self._task_grip))
