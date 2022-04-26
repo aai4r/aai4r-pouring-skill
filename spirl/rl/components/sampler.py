@@ -126,6 +126,7 @@ class Sampler:
 
     def _postprocess_obs(self, obs):
         """Optionally post-process observation."""
+        img = self._env.render(mode='rgb').transpose(2, 0, 1) * 2. - 1.0
         obs = obs.squeeze(0) if len(obs.shape) > 1 else obs
         return obs
 

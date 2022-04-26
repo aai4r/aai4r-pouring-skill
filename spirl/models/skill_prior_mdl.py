@@ -64,11 +64,11 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
             'state_dim': 1,             # dimensionality of the state space
             'action_dim': 1,            # dimensionality of the action space
             'nz_enc': 32,               # number of dimensions in encoder-latent space
-            'nz_vae': 10,               # number of dimensions in vae-latent space
+            'nz_vae': 12,               # number of dimensions in vae-latent space
             'nz_mid': 32,               # number of dimensions for internal feature spaces
-            'nz_mid_lstm': 128,         # size of middle LSTM layers
-            'n_lstm_layers': 1,         # number of LSTM layers
-            'n_processing_layers': 3,   # number of layers in MLPs
+            'nz_mid_lstm': 256,         # size of middle LSTM layers
+            'n_lstm_layers': 2,         # number of LSTM layers
+            'n_processing_layers': 4,   # number of layers in MLPs
         })
 
         # Learned prior

@@ -97,6 +97,6 @@ if __name__ == '__main__':
     task_name = "pouring_water_img"      # block_stacking, pouring_water_img
 
     du = DatasetUtil(data_path=data_path, task_name=task_name)
-    # du.statistics()
-    du.rollout_play()
+    du.statistics()
+    # du.rollout_play()
 

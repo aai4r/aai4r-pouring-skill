@@ -75,4 +75,4 @@ class ExpertManager:
             current_obs.copy_(next_obs)
             current_states.copy_(next_states)
         self.save(batch_wise=True)
-        self.storage.show_summary()
+        self.storage.show_summary(start_time=start)

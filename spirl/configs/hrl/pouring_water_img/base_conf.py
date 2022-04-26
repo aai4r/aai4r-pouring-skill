@@ -68,8 +68,8 @@ ll_model_params = AttrDict(
     kl_div_weight=1e-4,
     n_input_frames=2,
     prior_input_res=data_spec_img.res,
-    nz_vae=10,
-    n_rollout_steps=10,
+    nz_vae=12,
+    n_rollout_steps=20,
     # encoder_ngf=12,
 )
 # nz_enc=128,
@@ -138,7 +138,7 @@ agent_config.hl_agent_params.replay_params.dump_replay = False
 data_config = AttrDict()
 data_config.dataset_spec = data_spec_img
 
-# IsaacGym Environment
+# IsaacGym Environment config setup
 task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"}}
 target = "UR3_POURING"
 

@@ -1,5 +1,8 @@
 import sys
 import math
+import time
+import datetime
+
 import numpy as np
 import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRandomSampler
@@ -209,7 +212,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
             total_size += val.element_size() * val.nelement()
         print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(total_size)))
 
-    def show_summary(self):
+    def show_summary(self, start_time):
         key_max_len = len(max(self.summary.keys(), key=len))
         shp_max_len = max(list(map(lambda x: len(str(x['shape'])), self.summary.values())))
         dtype_max_len = max(list(map(lambda x: len(str(x['dtype'])), self.summary.values())))
@@ -233,6 +236,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                 *self.num_with_unit(_size)
             ))
         print("    Total Dataset Size: {:,} {}".format(*self.num_with_unit(total_size)))
+        print("    Total Elapsed Time for Collection: {}".format(str(datetime.timedelta(seconds=int(time.time() - start_time)))))
 
     def get_statistics(self):
         done = self.dones.cpu()
