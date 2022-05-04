@@ -69,7 +69,10 @@ ll_model_params = AttrDict(
     n_input_frames=2,
     prior_input_res=data_spec_img.res,
     nz_vae=12,
-    n_rollout_steps=20,
+    n_rollout_steps=10,
+    nz_enc=128,
+    nz_mid=128,
+    n_processing_layers=6,
     # encoder_ngf=12,
 )
 # nz_enc=128,
@@ -149,12 +152,12 @@ args.headless = False
 args.test = False
 
 # if torch.cuda.device_count() > 1:
-assert torch.cuda.get_device_name(1)
-args.compute_device_id = 1
-args.device_id = 1
-args.graphics_device_id = 1
-args.rl_device = 'cuda:1'
-args.sim_device = 'cuda:1'
+assert torch.cuda.get_device_name(0)
+args.compute_device_id = 0
+args.device_id = 0
+args.graphics_device_id = 0
+args.rl_device = 'cuda:0'
+args.sim_device = 'cuda:0'
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")

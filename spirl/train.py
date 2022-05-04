@@ -92,7 +92,7 @@ class ModelTrainer(BaseTrainer):
             'num_epochs': 300,
             'epoch_cycles_train': 1,
             'optimizer': 'radam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
-            'lr': 3e-4,
+            'lr': 1e-4,
             'gradient_clip': None,
             'init_grad_clip': 0.001,
             'init_grad_clip_step': 100,     # clip gradients in initial N steps to avoid NaNs
@@ -400,7 +400,7 @@ def set_run_params():
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     task_name = "pouring_water_img"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
     mode = "hierarchical_cl"
@@ -408,7 +408,7 @@ def set_run_params():
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))
-    # sys.argv.append("--resume={}".format('17'))     # latest or number..
+    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
 
 if __name__ == '__main__':
