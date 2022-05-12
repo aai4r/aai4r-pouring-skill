@@ -33,8 +33,8 @@ configuration = {
     'data_dir': '.',
     'num_epochs': 50,
     'max_rollout_len': 500,
-    'n_steps_per_epoch': 100000,
-    'n_warmup_steps': 1e3,  # 5e3
+    'n_steps_per_epoch': 10000,    # 100000
+    'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)
 

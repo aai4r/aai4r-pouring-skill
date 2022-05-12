@@ -71,7 +71,7 @@ class RLTrainer:
         self.global_step, self.n_update_steps, start_epoch = 0, 0, 0
         if args.resume or self.conf.ckpt_path is not None:
             start_epoch = self.resume(args.resume, self.conf.ckpt_path)
-            self._hp.n_warmup_steps = 0     # no warmup if we reload from checkpoint!
+            self._hp.n_warmup_steps = 1000     # (default: 0) no warmup if we reload from checkpoint!
 
         # start training/evaluation
         if args.mode == 'train':
@@ -163,15 +163,15 @@ class RLTrainer:
                     for _ in range(WandBLogger.N_LOGGED_SAMPLES):   # for efficiency instead of self.args.n_val_samples
                         val_rollout_storage.append(self.sampler.sample_episode(is_train=False, render=True))
 
-        import cv2
-        for i in range(len(val_rollout_storage.rollouts)):
-            print("seq: ", i)
-            for img in val_rollout_storage.rollouts[i].image:
-                img = cv2.cvtColor(img.astype('float32'), cv2.COLOR_BGR2RGB)
-                cv2.imshow('Image', img)
-                cv2.waitKey()
-                print("img type / dtype: {} / {}".format(type(img), img.dtype))
-                print("img shape: {}".format(img.shape))
+        # import cv2
+        # for i in range(len(val_rollout_storage.rollouts)):
+        #     print("seq: ", i)
+        #     for img in val_rollout_storage.rollouts[i].image:
+        #         img = cv2.cvtColor(img.astype('float32'), cv2.COLOR_BGR2RGB)
+        #         cv2.imshow('Image', img)
+        #         cv2.waitKey()
+        #         print("img type / dtype: {} / {}".format(type(img), img.dtype))
+        #         print("img shape: {}".format(img.shape))
 
         rollout_stats = val_rollout_storage.rollout_stats()
         if self.is_chef:
@@ -352,4 +352,5 @@ if __name__ == '__main__':
     args.path = "../configs/hrl/{}/{}".format(task_name, mode)
     args.seed = 0
     args.prefix = "--prefix={}".format("SPIRL_" + task_name + "_seed0")
+    args.resume = "latest"
     RLTrainer(args=args)
