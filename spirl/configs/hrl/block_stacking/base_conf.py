@@ -82,7 +82,7 @@ hl_policy_params = AttrDict(
     action_dim=10,       # z-dimension of the skill VAE
     input_dim=data_spec.state_dim,
     max_action_range=2.,        # prior is Gaussian with unit variance
-    unused_obs_size=ll_model_params.prior_input_res **2 * 3 * ll_model_params.n_input_frames,
+    unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
 )
 
 # HL Critic
