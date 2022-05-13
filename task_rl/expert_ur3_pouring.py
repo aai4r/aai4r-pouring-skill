@@ -1002,15 +1002,15 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # # bottle grasp pose
-                # px = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.bottle_grasp_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # bottle grasp pose
+                px = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.bottle_grasp_pos[i] + quat_apply(self.bottle_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.bottle_grasp_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # # bottle tip pose
                 # px = (self.bottle_tip_pos[i] + quat_apply(self.bottle_tip_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
@@ -1052,15 +1052,15 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # # ur3 grasp pose
-                # px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.ur3_grasp_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # ur3 grasp pose
+                px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.ur3_grasp_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # # TODO
                 # # appr bottle pose for debug
@@ -1331,12 +1331,12 @@ def compute_ur3_reward(
 
     # dist_reward = torch.exp(-5.0 * (0.2 * d1 + 0.4 * lfd + 0.4 * rfd))
     dist_reward = 0.2 * torch.exp(-7.0 * d1) + 0.8 * torch.exp(-7.0 * (lfd + rfd)) * approach_done
-    dist_reward = torch.where(approach_done > 0.0,
-                              torch.where((lfd < 0.035) & (rfd < 0.035), dist_reward + 7.0,
-                                          torch.where((lfd < 0.037) & (rfd < 0.037), dist_reward + 5.0,
-                                                      torch.where((lfd < 0.04) & (rfd < 0.04), dist_reward + 3.0,
-                                                                  dist_reward + 1.0))),
-                              dist_reward)
+    # dist_reward = torch.where(approach_done > 0.0,
+    #                           torch.where((lfd < 0.035) & (rfd < 0.035), dist_reward + 7.0,
+    #                                       torch.where((lfd < 0.037) & (rfd < 0.037), dist_reward + 5.0,
+    #                                                   torch.where((lfd < 0.04) & (rfd < 0.04), dist_reward + 3.0,
+    #                                                               dist_reward + 1.0))),
+    #                           dist_reward)
 
     # finger reward
     cube_z_axis = tf_vector(bottle_rot, gripper_up_axis)
@@ -1402,10 +1402,15 @@ def compute_ur3_reward(
               pouring_reward_scale * pouring_reward \
               - action_penalty_scale * action_penalty \
 
+    dist_reward = torch.exp(-5.0 * d1)  # between bottle and ur3 grasp
+    bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
+    rewards = 0.5 * dist_reward + 0.5 * bottle_lean_rew
+
     poured_reward = torch.zeros_like(rewards)
+    poured_reward_scale = 5.0
     is_poured = (liq_cup_dist_xy < 0.015) & (liq_pos[:, 2] < 0.06)
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
-    rewards = poured_reward
+    rewards += poured_reward_scale * poured_reward
 
     # check the collisions of both fingers
     # _lfinger_contact_net_force = (lfinger_contact_net_force.T / (lfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
