@@ -17,6 +17,8 @@ env:
   openRewardScale: 4.0
   actionPenaltyScale: 0.01
 
+  action_noise: True
+
   cam_width: 128
   cam_height: 128
 

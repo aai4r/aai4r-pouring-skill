@@ -13,7 +13,6 @@ from spirl.rl.components.replay_buffer import UniformReplayBuffer
 from spirl.rl.policies.prior_policies import ACLearnedPriorAugmentedPIPolicy
 from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 from spirl.rl.agents.ac_agent import SACAgent
-from spirl.rl.agents.skill_space_agent import SkillSpaceAgent
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
 
@@ -33,7 +32,7 @@ configuration = {
     'data_dir': '.',
     'num_epochs': 50,
     'max_rollout_len': 500,
-    'n_steps_per_epoch': 10000,    # 100000
+    'n_steps_per_epoch': 100000,
     'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)
@@ -161,6 +160,7 @@ args.sim_device = 'cuda:0'
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
+cfg["env"]["action_noise"] = False
 
 sim_params = parse_sim_params(args, cfg, None)
 env_config = AttrDict(

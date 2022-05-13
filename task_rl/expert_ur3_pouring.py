@@ -45,6 +45,7 @@ class DemoUR3Pouring(BaseTask):
         self.dt = 1/30.
 
         self.use_ik = False
+        self.action_noise = self.cfg["env"]["action_noise"]
 
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
@@ -56,11 +57,10 @@ class DemoUR3Pouring(BaseTask):
 
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
-            num_states = 24
-            # num_obs = (24,)
+            num_states = 31
             # num_states = 0
         else:
-            num_obs = (24, )
+            num_obs = (31, )
             num_states = 0
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
@@ -653,7 +653,7 @@ class DemoUR3Pouring(BaseTask):
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
 
         if self.img_obs:
-            self.states_buf = torch.cat((dof_pos,
+            self.states_buf = torch.cat((dof_pos_vel,
                                         self.bottle_pos, self.bottle_rot,
                                         self.cup_pos, self.cup_rot,
                                         self.liq_pos), dim=-1)
@@ -671,7 +671,7 @@ class DemoUR3Pouring(BaseTask):
                     if k == 27:     # ESC
                         exit()
         else:
-            self.obs_buf = torch.cat((dof_pos,
+            self.obs_buf = torch.cat((dof_pos_vel,
                                       self.bottle_pos, self.bottle_rot,
                                       self.cup_pos, self.cup_rot,
                                       self.liq_pos), dim=-1)
@@ -692,7 +692,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 0.2 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 0.15 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
@@ -720,10 +720,16 @@ class DemoUR3Pouring(BaseTask):
         pick = self.default_bottle_states[env_ids]
         # print("default bottle: ".format(pick[env_ids]))
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.15, 0.45, 0.0,            # position
+        xy_scale = to_torch([0.12, 0.4, 0.0,            # position
                              0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
-        rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
+
+        # both side randomization
+        # rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
+
+        # only right-side (robot_view) randomization
+        rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 1.0) * xy_scale
+
         self.bottle_states[env_ids] = pick + rand_bottle_pos
 
         for e_id in env_ids:
@@ -734,8 +740,8 @@ class DemoUR3Pouring(BaseTask):
         place = self.default_cup_states[env_ids]
         place += (torch.rand_like(place, device=self.device, dtype=torch.float) - 0.5) * xy_scale
         place[:, 1] = torch.where(self.bottle_states[env_ids, 1] >= 0,
-                                  self.bottle_states[env_ids, 1] - 0.2,
-                                  self.bottle_states[env_ids, 1] + 0.2)
+                                  self.bottle_states[env_ids, 1] - 0.25 + (torch.rand(1, device=self.device) - 0.5) * 0.2,
+                                  self.bottle_states[env_ids, 1] + 0.25 + (torch.rand(1, device=self.device) - 0.5) * 0.2)
         place[:, 3:7] = quat
         self.cup_states[env_ids] = place
 
@@ -934,7 +940,8 @@ class DemoUR3Pouring(BaseTask):
             if len(actions.shape) < 2:
                 actions = actions.unsqueeze(0)
             _actions = actions[:, :7].clone().to(self.device)
-            # _actions += (torch.rand_like(_actions) - 0.5) * 0.2   # add joint action noise
+            if self.action_noise:
+                _actions += (torch.rand_like(_actions) - 0.5) * 0.2   # add joint action noise
             grip_act = _actions[:, -1].unsqueeze(-1).repeat(1, 5) * torch.tensor([-1., 1., 1., -1., 1.], device=self.device)
             self.actions = torch.cat((_actions, grip_act), dim=-1)
 
