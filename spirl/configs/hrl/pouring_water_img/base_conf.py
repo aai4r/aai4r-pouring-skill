@@ -13,7 +13,6 @@ from spirl.rl.components.replay_buffer import UniformReplayBuffer
 from spirl.rl.policies.prior_policies import ACLearnedPriorAugmentedPIPolicy
 from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 from spirl.rl.agents.ac_agent import SACAgent
-from spirl.rl.agents.skill_space_agent import SkillSpaceAgent
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
 
@@ -34,13 +33,15 @@ configuration = {
     'num_epochs': 50,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 100000,
-    'n_warmup_steps': 5e3,  # 5e3
+    'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)
 
 
 # Replay Buffer
 replay_params = AttrDict(
+    capacity=1e5,
+    dump_replay=False,
 )
 
 # Observation Normalization
@@ -65,19 +66,16 @@ base_agent_params = AttrDict(
 ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    kl_div_weight=1e-4,
+    kl_div_weight=5e-4,
     n_input_frames=2,
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=128,
-    nz_mid=128,
-    n_processing_layers=6,
+    nz_enc=256,
+    nz_mid=256,
+    n_processing_layers=5,
     # encoder_ngf=12,
 )
-# nz_enc=128,
-# nz_mid=128,
-# n_processing_layers=5,
 
 # LL Agent
 ll_agent_config = copy.deepcopy(base_agent_params)
@@ -106,6 +104,7 @@ hl_critic_params = AttrDict(
     n_layers=5,  # number of policy network layer
     nz_mid=256,
     action_input=True,
+    unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
 )
 
 # HL Agent
@@ -161,6 +160,7 @@ args.sim_device = 'cuda:0'
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
+cfg["env"]["action_noise"] = False
 
 sim_params = parse_sim_params(args, cfg, None)
 env_config = AttrDict(

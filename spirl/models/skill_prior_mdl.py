@@ -67,7 +67,7 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
             'nz_vae': 12,               # number of dimensions in vae-latent space
             'nz_mid': 32,               # number of dimensions for internal feature spaces
             'nz_mid_lstm': 256,         # size of middle LSTM layers
-            'n_lstm_layers': 3,         # number of LSTM layers
+            'n_lstm_layers': 1,         # number of LSTM layers
             'n_processing_layers': 4,   # number of layers in MLPs
         })
 

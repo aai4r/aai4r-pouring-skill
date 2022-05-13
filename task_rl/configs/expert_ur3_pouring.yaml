@@ -1,7 +1,7 @@
 # if given, will override the device setting in gym.
 env:
   numEnvs: 1
-  envSpacing: 1.
+  envSpacing: 1
   episodeLength: 500 # 350
   enableDebugVis: True
 
@@ -16,6 +16,8 @@ env:
   rotRewardScale: 0.02
   openRewardScale: 4.0
   actionPenaltyScale: 0.01
+
+  action_noise: True
 
   cam_width: 128
   cam_height: 128

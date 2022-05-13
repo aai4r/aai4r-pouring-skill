@@ -1,6 +1,9 @@
 import random
 
 import cv2
+import os
+
+import torch
 
 from utils.torch_jit_utils import *
 from utils.utils import *
@@ -8,6 +11,10 @@ from torch.nn.functional import normalize
 from tasks.base.base_task import BaseTask
 from isaacgym import gymtorch
 from isaacgym import gymapi
+
+
+def _uniform(low, high, size=1):
+    return np.random.uniform(low=low, high=high, size=size)
 
 
 class DemoUR3Pouring(BaseTask):
@@ -38,6 +45,7 @@ class DemoUR3Pouring(BaseTask):
         self.dt = 1/30.
 
         self.use_ik = False
+        self.action_noise = self.cfg["env"]["action_noise"]
 
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
@@ -49,9 +57,10 @@ class DemoUR3Pouring(BaseTask):
 
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
-            num_states = 24
+            num_states = 31
+            # num_states = 0
         else:
-            num_obs = (24, )
+            num_obs = (31, )
             num_states = 0
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
@@ -86,6 +95,9 @@ class DemoUR3Pouring(BaseTask):
 
         # create some wrapper tensors for different slices
         print("device:: ", self.device)
+
+        # object order.
+        # [0: robot, 1: bottle, 2: water drop, 3: cup, 4: ]
         self.ur3_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(-90.0), deg2rad(85.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
                                              deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
@@ -101,7 +113,7 @@ class DemoUR3Pouring(BaseTask):
         self.root_state_tensor = gymtorch.wrap_tensor(actor_root_state_tensor).view(self.num_envs, -1, 13)
         self.bottle_states = self.root_state_tensor[:, 1]
         self.liquid_states = self.root_state_tensor[:, 2:2 + self.num_water_drops]
-        self.cup_states = self.root_state_tensor[:, -1]
+        self.cup_states = self.root_state_tensor[:, 3]
 
         self.contact_net_force = gymtorch.wrap_tensor(contact_net_force_tensor)
 
@@ -145,6 +157,17 @@ class DemoUR3Pouring(BaseTask):
         plane_params = gymapi.PlaneParams()
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
         self.gym.add_ground(self.sim, plane_params)
+
+    def _create_background_plane(self):
+        asset_options = gymapi.AssetOptions()
+        asset_options.disable_gravity = True
+        asset_options.fix_base_link = True
+        # asset_options.use_mesh_materials = True
+
+        # asset_file_path = "urdf/objects/background_plane.urdf"
+        # bg_asset = self.gym.load_asset(self.sim, self.asset_root, asset_file_path, asset_options)
+        bg_asset = self.gym.create_box(self.sim, 0.001, 3.2, 1.0, asset_options)
+        return bg_asset
 
     def _create_asset_bottle(self):
         self.bottle_height = 0.195
@@ -215,6 +238,10 @@ class DemoUR3Pouring(BaseTask):
             self.asset_root = self.cfg["env"]["asset"].get("assetRoot", self.asset_root)
 
         self._create_ground_plane()
+        bg_asset = self._create_background_plane()
+        texture_file_path = os.path.join(self.asset_root, "textures", "PerlinNoiseTexture.png")
+        texture_handle = self.gym.create_texture_from_file(self.sim, texture_file_path)
+
         ur3_asset = self._create_asset_ur3()
         bottle_asset = self._create_asset_bottle()
         cup_asset = self._create_asset_cup()
@@ -253,6 +280,14 @@ class DemoUR3Pouring(BaseTask):
         # self.ur3_dof_upper_limits = torch.index_select(self.ur3_dof_upper_limits, 0, self.indices)
         self.ur3_dof_speed_scales = torch.ones_like(self.ur3_dof_lower_limits)
 
+        l_bg_pose = gymapi.Transform()
+        l_bg_pose.p = gymapi.Vec3(-0.8, 0.0, 0.5)
+        l_bg_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
+        r_bg_pose = gymapi.Transform()
+        r_bg_pose.p = gymapi.Vec3(-0.8, -0.6, 0.6)
+        r_bg_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
         ur3_start_pose = gymapi.Transform()
         ur3_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
         ur3_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
@@ -272,7 +307,12 @@ class DemoUR3Pouring(BaseTask):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
+        self.default_cam_pos = [0.75, 0.0, 0.5]
+        self.default_cam_stare = [0.0, 0.0, 0.0]
+
         # compute aggregate size
+        num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
+        num_bg_shapes = self.gym.get_asset_rigid_shape_count(bg_asset)
         num_ur3_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
         num_ur3_shapes = self.gym.get_asset_rigid_shape_count(ur3_asset)
         num_bottle_bodies = self.gym.get_asset_rigid_body_count(bottle_asset)
@@ -281,9 +321,14 @@ class DemoUR3Pouring(BaseTask):
         num_cup_shapes = self.gym.get_asset_rigid_shape_count(cup_asset)
         num_liq_bodies = self.gym.get_asset_rigid_body_count(liq_asset)
         num_liq_shapes = self.gym.get_asset_rigid_shape_count(liq_asset)
-        self.max_agg_bodies = num_ur3_bodies + num_bottle_bodies + num_cup_bodies + self.num_water_drops * num_liq_bodies
-        self.max_agg_shapes = num_ur3_shapes + num_bottle_shapes + num_cup_shapes + self.num_water_drops * num_liq_shapes
 
+        self.max_agg_bodies = num_bg_bodies + num_ur3_bodies + num_bottle_bodies + num_cup_bodies + \
+                              self.num_water_drops * num_liq_bodies
+        self.max_agg_shapes = num_bg_shapes + num_ur3_shapes + num_bottle_shapes + num_cup_shapes + \
+                              self.num_water_drops * num_liq_shapes
+
+        self.l_bgs = []
+        self.r_bgs = []
         self.ur3_robots = []
         self.bottles = []
         self.cups = []
@@ -316,6 +361,7 @@ class DemoUR3Pouring(BaseTask):
             self.default_bottle_states.append([bottle_start_pose.p.x, bottle_start_pose.p.y, bottle_start_pose.p.z,
                                                bottle_start_pose.r.x, bottle_start_pose.r.y, bottle_start_pose.r.z, bottle_start_pose.r.w,
                                                0, 0, 0, 0, 0, 0])
+            self.gym.set_rigid_body_texture(env_ptr, bottle_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, texture_handle)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
@@ -333,6 +379,21 @@ class DemoUR3Pouring(BaseTask):
             self.default_cup_states.append([cup_start_pose.p.x, cup_start_pose.p.y, cup_start_pose.p.z,
                                             cup_start_pose.r.x, cup_start_pose.r.y, cup_start_pose.r.z, cup_start_pose.r.w,
                                             0, 0, 0, 0, 0, 0])
+            self.gym.set_rigid_body_texture(env_ptr, cup_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, texture_handle)
+
+            # (5) Create Left Background
+            l_bg_actor = self.gym.create_actor(env_ptr, bg_asset, l_bg_pose, "background_left", i, 0)
+            # self.gym.reset_actor_materials(env_ptr, bg_actor, gymapi.MESH_VISUAL_AND_COLLISION)
+            self.gym.set_rigid_body_texture(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, texture_handle)
+            self.gym.set_rigid_body_color(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                          gymapi.Vec3(_uniform(0.2, 1), _uniform(0.2, 1), _uniform(0.2, 1)))
+
+            # # (6) Create Left Background
+            # r_bg_actor = self.gym.create_actor(env_ptr, bg_asset, r_bg_pose, "background_right", i, 0)
+            # # self.gym.reset_actor_materials(env_ptr, bg_actor, gymapi.MESH_VISUAL_AND_COLLISION)
+            # self.gym.set_rigid_body_texture(env_ptr, r_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, texture_handle)
+            # self.gym.set_rigid_body_color(env_ptr, r_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
+            #                               gymapi.Vec3(_uniform(0.2, 1), _uniform(0.2, 1), _uniform(0.2, 1)))
 
             if self.aggregate_mode > 0:
                 self.gym.end_aggregate(env_ptr)
@@ -352,13 +413,17 @@ class DemoUR3Pouring(BaseTask):
 
             # (3) or (4) Create Camera sensors
             camera_handle = self.gym.create_camera_sensor(env_ptr, self.camera_props)
-            self.gym.set_camera_location(camera_handle, env_ptr, gymapi.Vec3(0.75, 0.0, 0.3), gymapi.Vec3(0.0, 0.0, 0.0))
+            cx, cy, cz = self.default_cam_pos
+            sx, sy, sz = self.default_cam_stare
+            self.gym.set_camera_location(camera_handle, env_ptr, gymapi.Vec3(cx, cy, cz), gymapi.Vec3(sx, sy, sz))
 
             self.camera_handles.append(camera_handle)
             self.envs.append(env_ptr)
             self.ur3_robots.append(ur3_actor)
             self.bottles.append(bottle_actor)
             self.cups.append(cup_actor)
+            self.l_bgs.append(l_bg_actor)
+            # self.r_bgs.append(r_bg_actor)
 
         self.robot_base_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "base_link")
         self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "tool0")
@@ -588,7 +653,7 @@ class DemoUR3Pouring(BaseTask):
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
 
         if self.img_obs:
-            self.states_buf = torch.cat((dof_pos,
+            self.states_buf = torch.cat((dof_pos_vel,
                                         self.bottle_pos, self.bottle_rot,
                                         self.cup_pos, self.cup_rot,
                                         self.liq_pos), dim=-1)
@@ -606,7 +671,7 @@ class DemoUR3Pouring(BaseTask):
                     if k == 27:     # ESC
                         exit()
         else:
-            self.obs_buf = torch.cat((dof_pos,
+            self.obs_buf = torch.cat((dof_pos_vel,
                                       self.bottle_pos, self.bottle_rot,
                                       self.cup_pos, self.cup_rot,
                                       self.liq_pos), dim=-1)
@@ -627,7 +692,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 0.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 0.15 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
@@ -645,7 +710,6 @@ class DemoUR3Pouring(BaseTask):
         # self.ur3_dof_state[:, 0] = torch.ones_like(self.ur3_dof_state[:, 0], dtype=torch.float, device=self.device)
 
         # reset bottle
-
         rand_z_angle = torch.rand(len(env_ids)).uniform_(deg2rad(-90.0), deg2rad(90.0))
         quat = []   # z-axis cube orientation randomization
         for gamma in rand_z_angle:
@@ -656,26 +720,34 @@ class DemoUR3Pouring(BaseTask):
         pick = self.default_bottle_states[env_ids]
         # print("default bottle: ".format(pick[env_ids]))
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.15, 0.45, 0.0,            # position
+        xy_scale = to_torch([0.12, 0.4, 0.0,            # position
                              0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
-        rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
+
+        # both side randomization
+        # rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
+
+        # only right-side (robot_view) randomization
+        rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 1.0) * xy_scale
+
         self.bottle_states[env_ids] = pick + rand_bottle_pos
 
         for e_id in env_ids:
             self.gym.set_rigid_body_color(self.envs[e_id], self.bottles[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
-                                          gymapi.Vec3(np.random.uniform(0, 1),
-                                                      np.random.uniform(0, 1),
-                                                      np.random.uniform(0, 1)))
+                                          gymapi.Vec3(_uniform(1, 1), _uniform(0.0, 0.5), _uniform(0.0, 0.5)))
 
         # reset cup
         place = self.default_cup_states[env_ids]
         place += (torch.rand_like(place, device=self.device, dtype=torch.float) - 0.5) * xy_scale
         place[:, 1] = torch.where(self.bottle_states[env_ids, 1] >= 0,
-                                  self.bottle_states[env_ids, 1] - 0.2,
-                                  self.bottle_states[env_ids, 1] + 0.2)
+                                  self.bottle_states[env_ids, 1] - 0.25 + (torch.rand(1, device=self.device) - 0.5) * 0.2,
+                                  self.bottle_states[env_ids, 1] + 0.25 + (torch.rand(1, device=self.device) - 0.5) * 0.2)
         place[:, 3:7] = quat
         self.cup_states[env_ids] = place
+
+        for e_id in env_ids:
+            self.gym.set_rigid_body_color(self.envs[e_id], self.cups[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                          gymapi.Vec3(_uniform(0.0, 0.5), _uniform(1, 1), _uniform(0.0, 0.5)))
 
         # reset liquid
         init_liq_pose = pick + rand_bottle_pos
@@ -684,6 +756,13 @@ class DemoUR3Pouring(BaseTask):
         for i in range(self.liquid_states.shape[1]):
             self.liquid_states[env_ids, i] = init_liq_pose
             init_liq_pose[:, 2] = init_liq_pose[:, 2] + offset_z
+
+        # background color
+        for e_id in env_ids:
+            self.gym.set_rigid_body_color(self.envs[e_id], self.l_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                          gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
+            # self.gym.set_rigid_body_color(self.envs[e_id], self.r_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+            #                               gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
 
         # # fluid particle init.
         # for i in range(self.num_envs):
@@ -702,26 +781,36 @@ class DemoUR3Pouring(BaseTask):
         #     #     liq_count += 1
         #     #     z_offset += 1 if liq_count % len(self.expr) == 0 else 0
 
+        for i in range(len(self.envs)):
+            if i in env_ids:
+                _cp = self.default_cam_pos
+                _cs = self.default_cam_stare
+                rand_pos = gymapi.Vec3(_cp[0] + _uniform(low=-0.08, high=0.08, size=1),
+                                       _cp[1] + _uniform(low=-0.1, high=0.1, size=1),
+                                       _cp[2] + _uniform(low=-0.05, high=0.05, size=1))
+                rand_stare = gymapi.Vec3(_cs[0] + _uniform(low=-0.05, high=0.05, size=1),
+                                         _cs[1] + _uniform(low=-0.05, high=0.05, size=1),
+                                         _cs[2] + _uniform(low=-0.05, high=0.05, size=1))
+                self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
+
         if self.img_obs:
             # reset camera sensor pose
-            default_cam_pos = [0.75, 0.0, 0.4]
-            default_cam_stare = [0.0, 0.0, 0.0]
             for i in range(len(self.envs)):
                 if i in env_ids:
-                    _cp = default_cam_pos
-                    _cs = default_cam_stare
-                    rand_pos = gymapi.Vec3(_cp[0] + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                           _cp[1] + np.random.uniform(low=-0.08, high=0.08, size=1),
-                                           _cp[2] + np.random.uniform(low=-0.05, high=0.05, size=1))
-                    rand_stare = gymapi.Vec3(_cs[0] + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                             _cs[1] + np.random.uniform(low=-0.02, high=0.02, size=1),
-                                             _cs[2] + np.random.uniform(low=-0.02, high=0.02, size=1))
+                    _cp = self.default_cam_pos
+                    _cs = self.default_cam_stare
+                    rand_pos = gymapi.Vec3(_cp[0] + _uniform(low=-0.08, high=0.08, size=1),
+                                           _cp[1] + _uniform(low=-0.1, high=0.1, size=1),
+                                           _cp[2] + _uniform(low=-0.05, high=0.05, size=1))
+                    rand_stare = gymapi.Vec3(_cs[0] + _uniform(low=-0.05, high=0.05, size=1),
+                                             _cs[1] + _uniform(low=-0.05, high=0.05, size=1),
+                                             _cs[2] + _uniform(low=-0.05, high=0.05, size=1))
                     self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
 
-        # light params
+        # light params, affecting all envs
         l_color = gymapi.Vec3(random.uniform(1, 1), random.uniform(1, 1), random.uniform(1, 1))
-        l_ambient = gymapi.Vec3(random.uniform(0.7, 0.7), random.uniform(0.7, 0.7), random.uniform(0.7, 0.7))
-        l_direction = gymapi.Vec3(random.uniform(0, 0), random.uniform(0, 0), random.uniform(1, 1))
+        l_ambient = gymapi.Vec3(random.uniform(0.7, 1.0), random.uniform(0.7, 1.0), random.uniform(0.7, 1.0))
+        l_direction = gymapi.Vec3(random.uniform(0., 1), random.uniform(0., 1), random.uniform(0., 1))
         self.gym.set_light_parameters(self.sim, 0, l_color, l_ambient, l_direction)
         self.gym.set_light_parameters(self.sim, 1, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
         self.gym.set_light_parameters(self.sim, 2, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
@@ -851,6 +940,8 @@ class DemoUR3Pouring(BaseTask):
             if len(actions.shape) < 2:
                 actions = actions.unsqueeze(0)
             _actions = actions[:, :7].clone().to(self.device)
+            if self.action_noise:
+                _actions += (torch.rand_like(_actions) - 0.5) * 0.2   # add joint action noise
             grip_act = _actions[:, -1].unsqueeze(-1).repeat(1, 5) * torch.tensor([-1., 1., 1., -1., 1.], device=self.device)
             self.actions = torch.cat((_actions, grip_act), dim=-1)
 
@@ -1034,7 +1125,7 @@ class DemoUR3Pouring(BaseTask):
         """ 
             1)-1 initial pos variation 
         """
-        init_ur3_hand_pos = self.tpl.gen_pos_variation(pivot_pos=[0.5, 0.0, 0.32], pos_var_meter=0.02)
+        init_ur3_hand_pos = self.tpl.gen_pos_variation(pivot_pos=[0.5, 0.0, 0.35], pos_var_meter=0.02)
         # init_ur3_hand_pos = to_torch([0.5, 0.0, 0.32], device=self.device).repeat((self.num_envs, 1))
         # pos_var_meter = 0.02
         # pos_var = (torch.rand_like(init_ur3_hand_pos) - 0.5) * 2.0
@@ -1334,7 +1425,7 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
-    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.07) & (dot3 < 0.6)
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.03) & (dot3 < 0.6)
     # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
     # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 

@@ -13,7 +13,7 @@ configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
-    'epoch_cycles_train': 100,
+    'epoch_cycles_train': 50,
     'num_epochs': 200,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
@@ -25,13 +25,13 @@ model_config = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
     n_rollout_steps=10,
-    kl_div_weight=1e-4,
+    kl_div_weight=5e-4,
     prior_input_res=data_spec_img.res,
     n_input_frames=2,
-    nz_enc=128,
-    nz_mid=128,
-    n_processing_layers=6,
-    # encoder_ngf=12,      # number of feature maps in shallowest level of encoder
+    nz_vae=12,
+    nz_enc=256,
+    nz_mid=256,
+    n_processing_layers=5,
     cond_decode=True,
 )
 
