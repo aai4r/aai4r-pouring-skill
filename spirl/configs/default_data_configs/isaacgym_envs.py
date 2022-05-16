@@ -23,4 +23,4 @@ data_spec_img = AttrDict(
     res=128,
     crop_rand_subseq=True,
 )
-data_spec_img.max_seq_len = 400
+data_spec_img.max_seq_len = 500

@@ -30,9 +30,9 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 500,
+    'num_epochs': 300,
     'max_rollout_len': 500,
-    'n_steps_per_epoch': 10000,
+    'n_steps_per_epoch': 50000,
     'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)

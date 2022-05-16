@@ -240,7 +240,7 @@ class DemoUR3Pouring(BaseTask):
         self._create_ground_plane()
         bg_asset = self._create_background_plane()
         texture_file_path = os.path.join(self.asset_root, "textures", "PerlinNoiseTexture.png")
-        texture_handle = self.gym.create_texture_from_file(self.sim, texture_file_path)
+        self.perlin_texture_handle = self.gym.create_texture_from_file(self.sim, texture_file_path)
 
         ur3_asset = self._create_asset_ur3()
         bottle_asset = self._create_asset_bottle()
@@ -361,7 +361,7 @@ class DemoUR3Pouring(BaseTask):
             self.default_bottle_states.append([bottle_start_pose.p.x, bottle_start_pose.p.y, bottle_start_pose.p.z,
                                                bottle_start_pose.r.x, bottle_start_pose.r.y, bottle_start_pose.r.z, bottle_start_pose.r.w,
                                                0, 0, 0, 0, 0, 0])
-            self.gym.set_rigid_body_texture(env_ptr, bottle_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, texture_handle)
+            self.gym.set_rigid_body_texture(env_ptr, bottle_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
@@ -379,12 +379,12 @@ class DemoUR3Pouring(BaseTask):
             self.default_cup_states.append([cup_start_pose.p.x, cup_start_pose.p.y, cup_start_pose.p.z,
                                             cup_start_pose.r.x, cup_start_pose.r.y, cup_start_pose.r.z, cup_start_pose.r.w,
                                             0, 0, 0, 0, 0, 0])
-            self.gym.set_rigid_body_texture(env_ptr, cup_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, texture_handle)
+            self.gym.set_rigid_body_texture(env_ptr, cup_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
 
             # (5) Create Left Background
             l_bg_actor = self.gym.create_actor(env_ptr, bg_asset, l_bg_pose, "background_left", i, 0)
             # self.gym.reset_actor_materials(env_ptr, bg_actor, gymapi.MESH_VISUAL_AND_COLLISION)
-            self.gym.set_rigid_body_texture(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, texture_handle)
+            self.gym.set_rigid_body_texture(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
             self.gym.set_rigid_body_color(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
                                           gymapi.Vec3(_uniform(0.2, 1), _uniform(0.2, 1), _uniform(0.2, 1)))
 
@@ -724,11 +724,10 @@ class DemoUR3Pouring(BaseTask):
                              0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
 
-        # both side randomization
-        # rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 0.5) * xy_scale
-
-        # only right-side (robot_view) randomization
-        rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - 1.0) * xy_scale
+        # both side randomization: 0.5, right_side only: 1.0
+        both_size_rand = True
+        const = 0.5 if both_size_rand else 1.0
+        rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - const) * xy_scale
 
         self.bottle_states[env_ids] = pick + rand_bottle_pos
 
@@ -1404,7 +1403,7 @@ def compute_ur3_reward(
 
     dist_reward = torch.exp(-5.0 * d1)  # between bottle and ur3 grasp
     bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
-    rewards = 0.5 * dist_reward + 0.5 * bottle_lean_rew
+    rewards = bottle_lean_rew
 
     poured_reward = torch.zeros_like(rewards)
     poured_reward_scale = 5.0
