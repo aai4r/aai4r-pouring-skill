@@ -71,7 +71,7 @@ class RLTrainer:
         self.global_step, self.n_update_steps, start_epoch = 0, 0, 0
         if args.resume or self.conf.ckpt_path is not None:
             start_epoch = self.resume(args.resume, self.conf.ckpt_path)
-            self._hp.n_warmup_steps = 1000     # (default: 0) no warmup if we reload from checkpoint!
+            self._hp.n_warmup_steps = 2000     # (default: 0) no warmup if we reload from checkpoint!
 
         # start training/evaluation
         if args.mode == 'train':

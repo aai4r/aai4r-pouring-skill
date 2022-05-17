@@ -32,7 +32,7 @@ configuration = {
     'data_dir': '.',
     'num_epochs': 300,
     'max_rollout_len': 500,
-    'n_steps_per_epoch': 50000,
+    'n_steps_per_epoch': 10000,
     'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)
@@ -94,6 +94,7 @@ hl_policy_params = AttrDict(
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     n_layers=5,
+    policy_lr=1e-4,
 )
 
 # HL Critic
@@ -105,6 +106,8 @@ hl_critic_params = AttrDict(
     nz_mid=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
+    critic_lr=1e-4,
+    alpha_lr=2e-4,
 )
 
 # HL Agent

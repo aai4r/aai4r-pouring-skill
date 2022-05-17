@@ -1151,7 +1151,7 @@ class DemoUR3Pouring(BaseTask):
         # init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))     # meter
         # grip_var = (torch.rand_like(init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
         # init_ur3_grip = torch.min(init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
-        self.tpl.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
+        # self.tpl.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
 
         """
             2) approach above the bottle
@@ -1195,7 +1195,7 @@ class DemoUR3Pouring(BaseTask):
         grasp_ready_rot = appr_bottle_rot.clone().detach()
         grasp_ready_grip = appr_bottle_grip.clone().detach()
         self.tpl.append_pose(pos=grasp_ready_pos, rot=grasp_ready_rot, grip=grasp_ready_grip,
-                                        err=ViaPointProperty(pos=3.e-2, rot=3.e-2, grip=3.e-3))
+                             err=ViaPointProperty(pos=3.e-2, rot=3.e-2, grip=3.e-3))
 
         """
             4) grasp
@@ -1204,7 +1204,7 @@ class DemoUR3Pouring(BaseTask):
         grasp_rot = grasp_ready_rot.clone().detach()
         grasp_grip = to_torch([self.bottle_diameter - 0.002], device=self.device).repeat((self.num_envs, 1))
         self.tpl.append_pose(pos=grasp_pos, rot=grasp_rot, grip=grasp_grip,
-                                        err=ViaPointProperty(pos=3.e-2, rot=3.e-2, grip=1.e-3))
+                             err=ViaPointProperty(pos=3.e-2, rot=3.e-2, grip=1.e-3))
 
         """
             5) lift
@@ -1214,7 +1214,7 @@ class DemoUR3Pouring(BaseTask):
         lift_rot = grasp_rot.clone().detach()
         lift_grip = grasp_grip.clone().detach()
         self.tpl.append_pose(pos=lift_pos, rot=lift_rot, grip=lift_grip,
-                                        err=ViaPointProperty(pos=1.e-1, rot=1.e-1, grip=1.e-3))
+                             err=ViaPointProperty(pos=1.e-1, rot=1.e-1, grip=1.e-3))
 
         """
             6) approach cup
@@ -1229,7 +1229,8 @@ class DemoUR3Pouring(BaseTask):
         appr_cup_pos[:, 2] = self.cup_height + 0.068
         appr_cup_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         appr_cup_grip = lift_grip.clone().detach()
-        self.tpl.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip)
+        self.tpl.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip,
+                             err=ViaPointProperty(pos=5.e-2, rot=5.e-2, grip=1.e-3))
 
         """
             7) pouring
