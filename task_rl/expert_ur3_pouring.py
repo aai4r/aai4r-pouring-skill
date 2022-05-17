@@ -1230,7 +1230,7 @@ class DemoUR3Pouring(BaseTask):
         appr_cup_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         appr_cup_grip = lift_grip.clone().detach()
         self.tpl.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip,
-                             err=ViaPointProperty(pos=5.e-2, rot=5.e-2, grip=1.e-3))
+                             err=ViaPointProperty(pos=8.e-2, rot=8.e-2, grip=1.e-3))
 
         """
             7) pouring

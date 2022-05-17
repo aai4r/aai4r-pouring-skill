@@ -94,7 +94,7 @@ hl_policy_params = AttrDict(
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     n_layers=5,
-    policy_lr=1e-4,
+    policy_lr=1.5e-4,
 )
 
 # HL Critic
@@ -106,7 +106,7 @@ hl_critic_params = AttrDict(
     nz_mid=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
-    critic_lr=1e-4,
+    critic_lr=1.5e-4,
     alpha_lr=2e-4,
 )
 
