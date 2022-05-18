@@ -57,10 +57,10 @@ class DemoUR3Pouring(BaseTask):
 
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
-            num_states = 31
+            num_states = 43
             # num_states = 0
         else:
-            num_obs = (31, )
+            num_obs = (43, )
             num_states = 0
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
@@ -633,7 +633,7 @@ class DemoUR3Pouring(BaseTask):
         dof_pos = self.ur3_dof_pos
         dof_pos = torch.index_select(dof_pos, 1, self.indices)
         dof_vel = torch.index_select(self.ur3_dof_vel, 1, self.indices)
-        dof_pos_vel = torch.cat((dof_pos, dof_vel), dim=-1)
+        dof_pos_vel = torch.cat((dof_pos, dof_vel[:, :-1]), dim=-1)     # except for gripper joint speed
 
         to_target_pos = self.bottle_grasp_pos - self.ur3_grasp_pos
         to_target_rot = quat_mul(quat_conjugate(self.bottle_grasp_rot), self.ur3_grasp_rot)
@@ -653,10 +653,13 @@ class DemoUR3Pouring(BaseTask):
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
 
         if self.img_obs:
-            self.states_buf = torch.cat((dof_pos_vel,
-                                        self.bottle_pos, self.bottle_rot,
-                                        self.cup_pos, self.cup_rot,
-                                        self.liq_pos), dim=-1)
+            self.states_buf = torch.cat((dof_pos_vel,                               # 13
+                                        self.ur3_grasp_pos, self.ur3_grasp_rot,     # 7
+                                        self.bottle_tip_pos,                        # 3
+                                        self.bottle_pos, self.bottle_rot,           # 7
+                                        self.cup_tip_pos,                           # 3
+                                        self.cup_pos, self.cup_rot,                 # 7
+                                        self.liq_pos), dim=-1)                      # 3
 
             """ Camera Sensor Visualization """
             for i in range(len(self.envs)):
@@ -672,7 +675,10 @@ class DemoUR3Pouring(BaseTask):
                         exit()
         else:
             self.obs_buf = torch.cat((dof_pos_vel,
+                                      self.ur3_grasp_pos, self.ur3_grasp_rot,
+                                      self.bottle_tip_pos,
                                       self.bottle_pos, self.bottle_rot,
+                                      self.cup_tip_pos,
                                       self.cup_pos, self.cup_rot,
                                       self.liq_pos), dim=-1)
 
@@ -1011,15 +1017,15 @@ class DemoUR3Pouring(BaseTask):
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # # bottle tip pose
-                # px = (self.bottle_tip_pos[i] + quat_apply(self.bottle_tip_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.bottle_tip_pos[i] + quat_apply(self.bottle_tip_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.bottle_tip_pos[i] + quat_apply(self.bottle_tip_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.bottle_tip_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # bottle tip pose
+                px = (self.bottle_tip_pos[i] + quat_apply(self.bottle_tip_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.bottle_tip_pos[i] + quat_apply(self.bottle_tip_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.bottle_tip_pos[i] + quat_apply(self.bottle_tip_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.bottle_tip_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # # bottle floor pose
                 # px = (self.bottle_floor_pos[i] + quat_apply(self.bottle_floor_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
@@ -1041,15 +1047,15 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # # cup tip pose
-                # px = (self.cup_tip_pos[i] + quat_apply(self.cup_tip_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.cup_tip_pos[i] + quat_apply(self.cup_tip_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.cup_tip_pos[i] + quat_apply(self.cup_tip_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.cup_tip_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # cup tip pose
+                px = (self.cup_tip_pos[i] + quat_apply(self.cup_tip_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.cup_tip_pos[i] + quat_apply(self.cup_tip_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.cup_tip_pos[i] + quat_apply(self.cup_tip_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.cup_tip_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # ur3 grasp pose
                 px = (self.ur3_grasp_pos[i] + quat_apply(self.ur3_grasp_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
@@ -1186,7 +1192,8 @@ class DemoUR3Pouring(BaseTask):
             self.appr_bottle_pos, self.appr_bottle_rot = appr_bottle_pos, appr_bottle_rot
         self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
         appr_bottle_grip = to_torch([0.085], device=self.device).repeat((self.num_envs, 1))  # full open
-        self.tpl.append_pose(pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip)
+        self.tpl.append_pose(pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip,
+                             err=ViaPointProperty(pos=1.e-1, rot=1.e-1, grip=1.e-3))
 
         """
             3) grasp ready
