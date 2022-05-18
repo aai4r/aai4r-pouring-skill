@@ -14,7 +14,7 @@ configuration = {
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
     'epoch_cycles_train': 50,
-    'num_epochs': 200,
+    'num_epochs': 100,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -28,10 +28,10 @@ model_config = AttrDict(
     kl_div_weight=5e-4,
     prior_input_res=data_spec_img.res,
     n_input_frames=2,
-    nz_vae=12,
-    nz_enc=256,
-    nz_mid=256,
-    n_processing_layers=5,
+    nz_vae=12,                  # skill embedding dim.
+    nz_enc=128,                 # encoder output dim. (img -> nz_enc)
+    n_processing_layers=3,      # num_layers of skill decoder
+    num_prior_net_layers=3,     # prior_net Predictor
     cond_decode=True,
 )
 

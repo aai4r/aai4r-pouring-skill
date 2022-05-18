@@ -71,10 +71,9 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=256,
-    nz_mid=256,
-    n_processing_layers=5,
-    # encoder_ngf=12,
+    nz_enc=128,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
 )
 
 # LL Agent
@@ -102,7 +101,7 @@ hl_critic_params = AttrDict(
     action_dim=hl_policy_params.action_dim,
     input_dim=hl_policy_params.input_dim,
     output_dim=1,
-    n_layers=5,  # number of policy network layer
+    n_layers=3,  # number of policy network layer
     nz_mid=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
