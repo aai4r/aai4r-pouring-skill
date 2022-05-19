@@ -45,6 +45,8 @@ class BaseTask:
 
         self.control_freq_inv = cfg["env"].get("controlFrequencyInv", 1)
 
+        self.interaction_mode = cfg["env"]["interaction_mode"]
+
         # optimization flags for pytorch JIT
         torch._C._jit_set_profiling_mode(False)
         torch._C._jit_set_profiling_executor(False)
@@ -93,6 +95,9 @@ class BaseTask:
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_V, "toggle_viewer_sync")
 
+            if self.interaction_mode:
+                self.gym.subscribe_viewer_mouse_event(self.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_left")
+
             # set the camera position based on up axis
             sim_params = self.gym.get_sim_params(self.sim)
             if sim_params.up_axis == gymapi.UP_AXIS_Z:
@@ -139,11 +144,17 @@ class BaseTask:
         if self.device == 'cpu':
             self.gym.fetch_results(self.sim, True)
 
+        if self.interaction_mode:
+            self.interaction()
+
         # compute observations, rewards, resets, ...
         self.post_physics_step()
 
         if self.dr_randomizations.get('observations', None):
             self.obs_buf = self.dr_randomizations['observations']['noise_lambda'](self.obs_buf)
+
+    def interaction(self):
+        raise NotImplementedError
 
     def get_states(self):
         return self.states_buf

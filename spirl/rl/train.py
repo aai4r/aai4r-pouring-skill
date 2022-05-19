@@ -78,6 +78,8 @@ class RLTrainer:
             self.train(start_epoch)
         elif args.mode == 'val':
             self.val()
+        elif args.mode == 'demo':
+            self.demo()
         else:
             self.generate_rollouts()
 
@@ -180,6 +182,18 @@ class RLTrainer:
                                        self.logger, log_images=True, step=self.global_step)
             print("Evaluation Avg_Reward: {}".format(rollout_stats.avg_reward))
         del val_rollout_storage
+
+    def demo(self):
+        """Run task demonstration"""
+        print("Task demonstration: {}".format(self.conf.notes))
+        rewards = 0
+        n_total = 0
+        with self.agent.val_mode():
+            with torch.no_grad():
+                while True:  # keep producing rollouts until we get a valid one
+                    episode = self.sampler.sample_episode(is_train=False, render=True)
+                    n_total += 1
+        # print("Rewards: {:d} / {:d} = {:.3f}%".format(n_success, n_total, float(n_success) / n_total * 100))
 
     def generate_rollouts(self):
         """Generate rollouts and save to hdf5 files."""
@@ -353,5 +367,5 @@ if __name__ == '__main__':
     args.seed = 0
     args.prefix = "--prefix={}".format("SPIRL_" + task_name + "_seed0")
     # args.resume = "latest"
-    # args.mode = "val"     # "train" / "val"
+    args.mode = "demo"     # "train" / "val" / "demo" / else: rollout_save
     RLTrainer(args=args)

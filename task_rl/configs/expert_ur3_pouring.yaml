@@ -22,6 +22,8 @@ env:
   cam_width: 128
   cam_height: 128
 
+  interaction_mode: True
+
   asset:
     assetRoot: "../assets"
     assetFileNameUR3: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"

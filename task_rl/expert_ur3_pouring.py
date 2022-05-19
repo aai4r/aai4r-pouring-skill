@@ -965,7 +965,48 @@ class DemoUR3Pouring(BaseTask):
         env_ids_int32 = torch.arange(self.num_envs, dtype=torch.int32, device=self.device)
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.ur3_dof_targets))
 
+    def interaction(self):
+        if self.viewer:
+            # print("Interaction Mode is Running...")
+            if self.gym.query_viewer_has_closed(self.viewer):
+                exit()
+
+            # check mouse event
+            for evt in self.gym.query_viewer_action_events(self.viewer):
+                if evt.action == "mouse_left":
+                    pos = self.gym.get_viewer_mouse_position(self.viewer)
+                    window_size = self.gym.get_viewer_size(self.viewer)
+                    u = (pos.x * window_size.x - window_size.x / 2) / window_size.x
+                    v = (pos.y * window_size.y - window_size.y / 2) / window_size.x
+                    # xcoord = pos.x - 0.5
+                    # ycoord = pos.y - 0.5
+                    print("Left mouse was clicked at x: {:.3f},  y: {:.3f}".format(pos.x, pos.y))
+                    print(f"Mouse coords: {u}, {v}")
+
+                    # camera pose
+                    _cam_pose = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
+                    _cam_look = _cam_pose.r.rotate(gymapi.Vec3(0, 0, 1))
+
+                    cam_pos = np.array([_cam_pose.p.x, _cam_pose.p.y, _cam_pose.p.z])
+                    cam_look = np.array([_cam_look.x, _cam_look.y, _cam_look.z])
+                    print("cam pos: {},  cam_fwd: {}".format(cam_pos, cam_look))
+
+                    projection_matrix = self.gym.get_camera_proj_matrix(self.sim, self.envs[0], self.camera_handles[0])
+                    view_matrix = np.matrix(self.gym.get_camera_view_matrix(self.sim, self.envs[0], self.camera_handles[0]))
+                    print("proj_matrix: \n{}, \nview_matrix: \n{}".format(projection_matrix, view_matrix))
+
+                    fu = 2 / projection_matrix[0, 0]
+                    fv = 2 / projection_matrix[1, 1]
+                    d = 1.0
+                    p = np.array([fu * u, fv * v, d, 1.0])
+                    print("inv proj: {}".format(p * np.linalg.inv(view_matrix)))
+                    print("cup pos: {}".format(self.cup_pos[0, :]))
+                    print("======================================")
+
     def post_physics_step(self):
+        # interaction mode with interface devices (keyboard, mouse, etc.)
+        self.interaction()
+
         self.progress_buf += 1
 
         env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
