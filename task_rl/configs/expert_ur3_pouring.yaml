@@ -2,7 +2,7 @@
 env:
   numEnvs: 1
   envSpacing: 1
-  episodeLength: 500 # 350
+  episodeLength: 600 # 350
   enableDebugVis: True
 
   startPositionNoise: 0.1
@@ -17,7 +17,7 @@ env:
   openRewardScale: 4.0
   actionPenaltyScale: 0.01
 
-  action_noise: True
+  action_noise: False
 
   cam_width: 128
   cam_height: 128
