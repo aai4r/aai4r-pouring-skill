@@ -98,7 +98,7 @@ class DemoUR3Pouring(BaseTask):
 
         # object order.
         # [0: robot, 1: bottle, 2: water drop, 3: cup, 4: ]
-        self.ur3_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(-90.0), deg2rad(85.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
+        self.ur3_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
                                              deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.ur3_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, :self.num_ur3_dofs]
@@ -294,7 +294,7 @@ class DemoUR3Pouring(BaseTask):
 
         bottle_start_pose = gymapi.Transform()
         bottle_start_pose.p = gymapi.Vec3(*get_axis_params(0.0, self.up_axis_idx))
-        bottle_start_pose.p.x = 0.5
+        bottle_start_pose.p.x = 0.55
         bottle_start_pose.p.y = 0.0
         bottle_start_pose.p.z = self.bottle_height * 0.05
 
@@ -698,7 +698,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 0.15 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 0.3 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
@@ -726,7 +726,7 @@ class DemoUR3Pouring(BaseTask):
         pick = self.default_bottle_states[env_ids]
         # print("default bottle: ".format(pick[env_ids]))
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.12, 0.4, 0.0,            # position
+        xy_scale = to_torch([0.13, 0.4, 0.0,            # position
                              0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
 
@@ -1193,7 +1193,7 @@ class DemoUR3Pouring(BaseTask):
         self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
         appr_bottle_grip = to_torch([0.085], device=self.device).repeat((self.num_envs, 1))  # full open
         self.tpl.append_pose(pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip,
-                             err=ViaPointProperty(pos=1.e-1, rot=1.e-1, grip=1.e-3))
+                             err=ViaPointProperty(pos=2.e-1, rot=1.e-1, grip=1.e-3))
 
         """
             3) grasp ready
@@ -1409,9 +1409,11 @@ def compute_ur3_reward(
               pouring_reward_scale * pouring_reward \
               - action_penalty_scale * action_penalty \
 
-    dist_reward = torch.exp(-5.0 * d1)  # between bottle and ur3 grasp
+    # dist_reward = torch.exp(-5.0 * d1)  # between bottle and ur3 grasp
+    approach_reward = torch.where(d1 < 0.02, 1.0, 0.0)
+    lift_reward = torch.where((bottle_floor_pos[:, 2] > 0.05), 2.0, 0.0)
     bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
-    rewards = bottle_lean_rew
+    rewards = approach_reward + lift_reward - action_penalty_scale * action_penalty
 
     poured_reward = torch.zeros_like(rewards)
     poured_reward_scale = 5.0
@@ -1437,9 +1439,9 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
-    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.03) & (dot3 < 0.6)
-    # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
-    # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.04) & (dot3 < 0.6)
+    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
+    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
     reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)   # bottle fallen
