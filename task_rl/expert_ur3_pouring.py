@@ -12,6 +12,9 @@ from tasks.base.base_task import BaseTask
 from isaacgym import gymtorch
 from isaacgym import gymapi
 
+# vr interface
+from vr import triad_openvr
+
 
 def _uniform(low, high, size=1):
     return np.random.uniform(low=low, high=high, size=size)
@@ -46,6 +49,10 @@ class DemoUR3Pouring(BaseTask):
 
         self.use_ik = False
         self.action_noise = self.cfg["env"]["action_noise"]
+
+        """ VR interface setting """
+        self.vr = triad_openvr.triad_openvr()
+        self.vr.print_discovered_objects()
 
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
@@ -141,8 +148,8 @@ class DemoUR3Pouring(BaseTask):
         self.ur3_dof_upper_limits[11] = blim
 
         """ Camera Viewer setting """
-        cam_pos = gymapi.Vec3(0.9263, 0.4617, 0.5420)
-        cam_target = gymapi.Vec3(0.0, -0.3, 0.0)
+        cam_pos = gymapi.Vec3(0.9263, 0., 0.5420)   # gymapi.Vec3(0.9263, 0.4617, 0.5420)
+        cam_target = gymapi.Vec3(0.0, 0.0, 0.0)        # gymapi.Vec3(0.0, -0.3, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
     def create_sim(self):
@@ -198,6 +205,9 @@ class DemoUR3Pouring(BaseTask):
         # asset_options.vhacd_params.max_convex_hulls = 128
         # asset_options.vhacd_params.max_num_vertices_per_ch = 64
         asset_options.use_mesh_materials = True
+
+        asset_options.fix_base_link = True
+        asset_options.disable_gravity = True
 
         cup_asset_file = "urdf/objects/paper_cup.urdf"
         cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)
@@ -612,6 +622,18 @@ class DemoUR3Pouring(BaseTask):
         self.cup_pos = self.cup_states[:, 0:3]
         self.cup_rot = self.cup_states[:, 3:7]
 
+        # TODO
+        # 1.(self: isaacgym._bindings.linux - x86_64.gym_37.Gym, arg0: isaacgym._bindings.linux - x86_64.gym_37.Env, arg1: int, arg2: int) ->
+        # numpy.ndarray[isaacgym._bindings.linux - x86_64.gym_37.RigidBodyState]
+        # [Error][carb.gym.plugin] Function GymGetActorRigidBodyStates cannot be used with the GPU pipeline after simulation starts.
+        # Please use the tensor API if possible.See docs / programming / tensors.html for more info.
+
+        # state = self.gym.get_actor_rigid_body_states(self.envs[0], self.cups[0], gymapi.STATE_NONE)
+        # print("state: ", state)
+        # temp = gymtorch.unwrap_tensor(self.cup_states)
+        # self.gym.set_actor_rigid_body_states(self.envs[0], self.cups[0],
+        #                                      gymtorch.unwrap_tensor(self.cup_states), gymapi.STATE_ALL)
+
         # liquid info., TODO
         self.liq_pos = self.liquid_states[:, 0, 0:3].reshape(self.num_envs, -1)
         self.liq_rot = self.liquid_states[:, 0, 3:7].reshape(self.num_envs, -1)
@@ -971,41 +993,63 @@ class DemoUR3Pouring(BaseTask):
             if self.gym.query_viewer_has_closed(self.viewer):
                 exit()
 
-            # check mouse event
-            for evt in self.gym.query_viewer_action_events(self.viewer):
-                if evt.action == "mouse_left":
-                    pos = self.gym.get_viewer_mouse_position(self.viewer)
-                    window_size = self.gym.get_viewer_size(self.viewer)
-                    u = (pos.x * window_size.x - window_size.x / 2) / window_size.x
-                    v = (pos.y * window_size.y - window_size.y / 2) / window_size.x
-                    # xcoord = pos.x - 0.5
-                    # ycoord = pos.y - 0.5
-                    print("Left mouse was clicked at x: {:.3f},  y: {:.3f}".format(pos.x, pos.y))
-                    print(f"Mouse coords: {u}, {v}")
+            # vr controller
+            pose = self.vr.devices["controller_1"].get_pose_euler()
+            vel = self.vr.devices["controller_1"].get_velocity()
+            d = self.vr.devices["controller_1"].get_controller_inputs()
 
-                    # camera pose
-                    _cam_pose = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
-                    _cam_look = _cam_pose.r.rotate(gymapi.Vec3(0, 0, 1))
+            env_ids = (self.reset_buf == 0).nonzero(as_tuple=False).squeeze(-1)
+            if len(env_ids) > 0:
+                self.cup_pos = self.cup_states[:, 0:3]
+                self.cup_rot = self.cup_states[:, 3:7]
 
-                    cam_pos = np.array([_cam_pose.p.x, _cam_pose.p.y, _cam_pose.p.z])
-                    cam_look = np.array([_cam_look.x, _cam_look.y, _cam_look.z])
-                    print("cam pos: {},  cam_fwd: {}".format(cam_pos, cam_look))
+                if d["trigger"]:
+                    if vel:
+                        scale = 0.01
+                        self.cup_pos[0, 0] = torch.clamp(self.cup_pos[0, 0] + scale * vel[2], min=0.01, max=0.6)
+                        self.cup_pos[0, 1] = torch.clamp(self.cup_pos[0, 1] + scale * vel[0], min=-0.3, max=0.3)
+                        self.cup_pos[0, 2] = torch.clamp(self.cup_pos[0, 2] + scale * vel[1], min=0.04, max=0.06)
 
-                    projection_matrix = self.gym.get_camera_proj_matrix(self.sim, self.envs[0], self.camera_handles[0])
-                    view_matrix = np.matrix(self.gym.get_camera_view_matrix(self.sim, self.envs[0], self.camera_handles[0]))
-                    print("proj_matrix: \n{}, \nview_matrix: \n{}".format(projection_matrix, view_matrix))
+                _indices = self.global_indices[env_ids, 3].flatten()
+                self.gym.set_actor_root_state_tensor_indexed(self.sim,
+                                                             gymtorch.unwrap_tensor(self.root_state_tensor),
+                                                             gymtorch.unwrap_tensor(_indices),
+                                                             len(_indices))
 
-                    fu = 2 / projection_matrix[0, 0]
-                    fv = 2 / projection_matrix[1, 1]
-                    d = 1.0
-                    p = np.array([fu * u, fv * v, d, 1.0])
-                    print("inv proj: {}".format(p * np.linalg.inv(view_matrix)))
-                    print("cup pos: {}".format(self.cup_pos[0, :]))
-                    print("======================================")
+            # # check mouse event
+            # for evt in self.gym.query_viewer_action_events(self.viewer):
+            #     if evt.action == "mouse_left":
+            #         pos = self.gym.get_viewer_mouse_position(self.viewer)
+            #         window_size = self.gym.get_viewer_size(self.viewer)
+            #         u = (pos.x * window_size.x - window_size.x / 2) / window_size.x
+            #         v = (pos.y * window_size.y - window_size.y / 2) / window_size.x
+            #         # xcoord = pos.x - 0.5
+            #         # ycoord = pos.y - 0.5
+            #         print("Left mouse was clicked at x: {:.3f},  y: {:.3f}".format(pos.x, pos.y))
+            #         print(f"Mouse coords: {u}, {v}")
+            #
+            #         # camera pose
+            #         _cam_pose = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
+            #         _cam_look = _cam_pose.r.rotate(gymapi.Vec3(0, 0, 1))
+            #
+            #         cam_pos = np.array([_cam_pose.p.x, _cam_pose.p.y, _cam_pose.p.z])
+            #         cam_look = np.array([_cam_look.x, _cam_look.y, _cam_look.z])
+            #         print("cam pos: {},  cam_fwd: {}".format(cam_pos, cam_look))
+            #
+            #         projection_matrix = self.gym.get_camera_proj_matrix(self.sim, self.envs[0], self.camera_handles[0])
+            #         view_matrix = np.matrix(self.gym.get_camera_view_matrix(self.sim, self.envs[0], self.camera_handles[0]))
+            #         print("proj_matrix: \n{}, \nview_matrix: \n{}".format(projection_matrix, view_matrix))
+            #
+            #         fu = 2 / projection_matrix[0, 0]
+            #         fv = 2 / projection_matrix[1, 1]
+            #         d = 1.0
+            #         p = np.array([fu * u, fv * v, d, 1.0])
+            #         print("inv proj: {}".format(p * np.linalg.inv(view_matrix)))
+            #         print("cup pos: {}".format(self.cup_pos[0, :]))
+            #         print("======================================")
 
     def post_physics_step(self):
         # interaction mode with interface devices (keyboard, mouse, etc.)
-        self.interaction()
 
         self.progress_buf += 1
 
@@ -1015,6 +1059,8 @@ class DemoUR3Pouring(BaseTask):
 
         self.compute_observations()
         self.compute_reward(self.actions)
+
+        self.interaction()
 
         # compute task update status
         # self.compute_task()
