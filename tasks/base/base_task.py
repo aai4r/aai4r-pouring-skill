@@ -144,9 +144,6 @@ class BaseTask:
         if self.device == 'cpu':
             self.gym.fetch_results(self.sim, True)
 
-        if self.interaction_mode:
-            self.interaction()
-
         # compute observations, rewards, resets, ...
         self.post_physics_step()
 
