@@ -22,7 +22,7 @@ env:
   cam_width: 128
   cam_height: 128
 
-  interaction_mode: False
+  interaction_mode: True
 
   asset:
     assetRoot: "../assets"

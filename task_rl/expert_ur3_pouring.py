@@ -51,8 +51,8 @@ class DemoUR3Pouring(BaseTask):
         self.action_noise = self.cfg["env"]["action_noise"]
 
         """ VR interface setting """
-        # self.vr = triad_openvr.triad_openvr()
-        # self.vr.print_discovered_objects()
+        self.vr = triad_openvr.triad_openvr()
+        self.vr.print_discovered_objects()
 
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
@@ -755,7 +755,7 @@ class DemoUR3Pouring(BaseTask):
         # both side randomization: 0.5, right_side only: 1.0
         both_size_rand = True
         const = 0.5 if both_size_rand else 1.0
-        rand_bottle_pos = (torch.rand_like(pick, device=self.device, dtype=torch.float) - const) * xy_scale
+        rand_bottle_pos = (torch.rand_like(pick) - const) * xy_scale
 
         self.bottle_states[env_ids] = pick + rand_bottle_pos
 
@@ -1000,12 +1000,16 @@ class DemoUR3Pouring(BaseTask):
 
             env_ids = (self.reset_buf == 0).nonzero(as_tuple=False).squeeze(-1)
             if len(env_ids) > 0:
+                if d["trackpad_pressed"]:
+                    # self.progress_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long) + self.max_episode_length
+                    self.reset_buf = torch.ones_like(self.reset_buf)
+
                 self.cup_pos = self.cup_states[:, 0:3]
                 self.cup_rot = self.cup_states[:, 3:7]
 
                 if d["trigger"]:
                     if vel:
-                        scale = 0.01
+                        scale = 0.025
                         self.cup_pos[0, 0] = torch.clamp(self.cup_pos[0, 0] + scale * vel[2], min=0.01, max=0.6)
                         self.cup_pos[0, 1] = torch.clamp(self.cup_pos[0, 1] + scale * vel[0], min=-0.3, max=0.3)
                         self.cup_pos[0, 2] = torch.clamp(self.cup_pos[0, 2] + scale * vel[1], min=0.04, max=0.06)
