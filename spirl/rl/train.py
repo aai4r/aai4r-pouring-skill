@@ -365,7 +365,7 @@ if __name__ == '__main__':
     args = get_args()
     args.path = "../configs/hrl/{}/{}".format(task_name, mode)
     args.seed = 0
-    args.prefix = "--prefix={}".format("SPIRL_" + task_name + "_seed0")
-    args.resume = "50"
-    args.mode = "demo"     # "train" / "val" / "demo" / else: rollout_save
+    args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
+    args.resume = "latest"
+    # args.mode = "demo"     # "train" / "val" / "demo" / else: rollout_save
     RLTrainer(args=args)

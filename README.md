@@ -2,6 +2,15 @@
 On-going project for learning pouring skill.
 
 
+## Installation
+* steam: https://store.steampowered.com/about/
+* VR libs: https://github.com/ankurhanda/HTC-Vive-Setup-Ubuntu
+* steam
+* steamVR
+* openvr
+* triad_openvr (openvr wrapper)
+* sudo apt install libsdl2-dev
+
 ## SPiRL on isaacgym environment
 * Main train code
   - train.py

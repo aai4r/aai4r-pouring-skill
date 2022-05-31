@@ -51,8 +51,8 @@ class DemoUR3Pouring(BaseTask):
         self.action_noise = self.cfg["env"]["action_noise"]
 
         """ VR interface setting """
-        self.vr = triad_openvr.triad_openvr()
-        self.vr.print_discovered_objects()
+        # self.vr = triad_openvr.triad_openvr()
+        # self.vr.print_discovered_objects()
 
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
@@ -1060,7 +1060,8 @@ class DemoUR3Pouring(BaseTask):
         self.compute_observations()
         self.compute_reward(self.actions)
 
-        self.interaction()
+        if self.interaction_mode:
+            self.interaction()
 
         # compute task update status
         # self.compute_task()
@@ -1526,7 +1527,7 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
-    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.04) & (dot3 < 0.6)
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.04) & (dot3 < 0.5)
     rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
     rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
