@@ -170,11 +170,22 @@ class DemoUR3Pouring(BaseTask):
         asset_options.disable_gravity = True
         asset_options.fix_base_link = True
         # asset_options.use_mesh_materials = True
+        asset_options.vhacd_enabled = True
+        asset_options.vhacd_params.resolution = 15000
+        asset_options.vhacd_params.max_convex_hulls = 128
+        asset_options.vhacd_params.max_num_vertices_per_ch = 64
 
         # asset_file_path = "urdf/objects/background_plane.urdf"
         # bg_asset = self.gym.load_asset(self.sim, self.asset_root, asset_file_path, asset_options)
         bg_asset = self.gym.create_box(self.sim, 0.001, 3.2, 1.0, asset_options)
         return bg_asset
+
+    def _create_floor_plane(self):
+        asset_options = gymapi.AssetOptions()
+        asset_options.disable_gravity = True
+        asset_options.fix_base_link = True
+        floor_asset = self.gym.create_box(self.sim, 3.2, 3.2, 0.001, asset_options)
+        return floor_asset
 
     def _create_asset_bottle(self):
         self.bottle_height = 0.195
@@ -249,8 +260,12 @@ class DemoUR3Pouring(BaseTask):
 
         self._create_ground_plane()
         bg_asset = self._create_background_plane()
+        floor_asset = self._create_floor_plane()
         texture_file_path = os.path.join(self.asset_root, "textures", "PerlinNoiseTexture.png")
         self.perlin_texture_handle = self.gym.create_texture_from_file(self.sim, texture_file_path)
+        texture = np.random.randint(low=0, high=255, size=(128, 128, 4), dtype=np.uint8)
+        texture[:, :, -1] = 255
+        self.random_texture_handle = self.gym.create_texture_from_buffer(self.sim, 128, 128, texture)
 
         ur3_asset = self._create_asset_ur3()
         bottle_asset = self._create_asset_bottle()
@@ -298,6 +313,10 @@ class DemoUR3Pouring(BaseTask):
         r_bg_pose.p = gymapi.Vec3(-0.8, -0.6, 0.6)
         r_bg_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
+        floor_bg_pose = gymapi.Transform()
+        floor_bg_pose.p = gymapi.Vec3(-0.0, 0.0, 0.0)
+        floor_bg_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
         ur3_start_pose = gymapi.Transform()
         ur3_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
         ur3_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
@@ -323,6 +342,9 @@ class DemoUR3Pouring(BaseTask):
         # compute aggregate size
         num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
         num_bg_shapes = self.gym.get_asset_rigid_shape_count(bg_asset)
+        num_floor_bodies = self.gym.get_asset_rigid_body_count(floor_asset)
+        num_floor_shapes = self.gym.get_asset_rigid_shape_count(floor_asset)
+
         num_ur3_bodies = self.gym.get_asset_rigid_body_count(ur3_asset)
         num_ur3_shapes = self.gym.get_asset_rigid_shape_count(ur3_asset)
         num_bottle_bodies = self.gym.get_asset_rigid_body_count(bottle_asset)
@@ -332,13 +354,14 @@ class DemoUR3Pouring(BaseTask):
         num_liq_bodies = self.gym.get_asset_rigid_body_count(liq_asset)
         num_liq_shapes = self.gym.get_asset_rigid_shape_count(liq_asset)
 
-        self.max_agg_bodies = num_bg_bodies + num_ur3_bodies + num_bottle_bodies + num_cup_bodies + \
+        self.max_agg_bodies = num_bg_bodies + num_floor_bodies + num_ur3_bodies + num_bottle_bodies + num_cup_bodies + \
                               self.num_water_drops * num_liq_bodies
-        self.max_agg_shapes = num_bg_shapes + num_ur3_shapes + num_bottle_shapes + num_cup_shapes + \
+        self.max_agg_shapes = num_bg_shapes + num_floor_shapes + num_ur3_shapes + num_bottle_shapes + num_cup_shapes + \
                               self.num_water_drops * num_liq_shapes
 
         self.l_bgs = []
         self.r_bgs = []
+        self.floor_bgs = []
         self.ur3_robots = []
         self.bottles = []
         self.cups = []
@@ -394,8 +417,16 @@ class DemoUR3Pouring(BaseTask):
             # (5) Create Left Background
             l_bg_actor = self.gym.create_actor(env_ptr, bg_asset, l_bg_pose, "background_left", i, 0)
             # self.gym.reset_actor_materials(env_ptr, bg_actor, gymapi.MESH_VISUAL_AND_COLLISION)
-            self.gym.set_rigid_body_texture(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
+            self.gym.set_rigid_body_texture(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.random_texture_handle)
             self.gym.set_rigid_body_color(env_ptr, l_bg_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                          gymapi.Vec3(_uniform(0.2, 1), _uniform(0.2, 1), _uniform(0.2, 1)))
+
+            # (6) Create Floor Background
+            floor_actor = self.gym.create_actor(env_ptr, floor_asset, floor_bg_pose, "floor_background", i, 0)
+            # self.gym.reset_actor_materials(env_ptr, floor_actor, gymapi.MESH_VISUAL_AND_COLLISION)
+            self.gym.set_rigid_body_texture(env_ptr, floor_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                            self.random_texture_handle)
+            self.gym.set_rigid_body_color(env_ptr, floor_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
                                           gymapi.Vec3(_uniform(0.2, 1), _uniform(0.2, 1), _uniform(0.2, 1)))
 
             # # (6) Create Left Background
@@ -434,6 +465,7 @@ class DemoUR3Pouring(BaseTask):
             self.cups.append(cup_actor)
             self.l_bgs.append(l_bg_actor)
             # self.r_bgs.append(r_bg_actor)
+            self.floor_bgs.append(floor_actor)
 
         self.robot_base_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "base_link")
         self.hand_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "tool0")
@@ -790,6 +822,8 @@ class DemoUR3Pouring(BaseTask):
                                           gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
             # self.gym.set_rigid_body_color(self.envs[e_id], self.r_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
             #                               gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
+            self.gym.set_rigid_body_color(self.envs[e_id], self.floor_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                          gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
 
         # # fluid particle init.
         # for i in range(self.num_envs):
