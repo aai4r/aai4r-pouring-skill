@@ -3,7 +3,7 @@ env:
   numEnvs: 1
   envSpacing: 1
   episodeLength: 600 # 350
-  enableDebugVis: True
+  enableDebugVis: False
 
   startPositionNoise: 0.1
   startRotationNoise: 0.0
