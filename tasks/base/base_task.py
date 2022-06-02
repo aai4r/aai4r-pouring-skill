@@ -46,6 +46,8 @@ class BaseTask:
         self.control_freq_inv = cfg["env"].get("controlFrequencyInv", 1)
 
         self.interaction_mode = cfg["env"]["interaction_mode"]
+        self.pause = False
+        self.btn_pause_que = []
 
         # optimization flags for pytorch JIT
         torch._C._jit_set_profiling_mode(False)

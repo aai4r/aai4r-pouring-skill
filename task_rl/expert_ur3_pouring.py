@@ -748,7 +748,7 @@ class DemoUR3Pouring(BaseTask):
         pick = self.default_bottle_states[env_ids]
         # print("default bottle: ".format(pick[env_ids]))
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.13, 0.4, 0.0,            # position
+        xy_scale = to_torch([0.1, 0.4, 0.0,            # position, 0.13, 0.4, 0.0,
                              0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
 
@@ -812,12 +812,12 @@ class DemoUR3Pouring(BaseTask):
             if i in env_ids:
                 _cp = self.default_cam_pos
                 _cs = self.default_cam_stare
-                rand_pos = gymapi.Vec3(_cp[0] + _uniform(low=-0.08, high=0.08, size=1),
-                                       _cp[1] + _uniform(low=-0.1, high=0.1, size=1),
-                                       _cp[2] + _uniform(low=-0.05, high=0.05, size=1))
-                rand_stare = gymapi.Vec3(_cs[0] + _uniform(low=-0.05, high=0.05, size=1),
-                                         _cs[1] + _uniform(low=-0.05, high=0.05, size=1),
-                                         _cs[2] + _uniform(low=-0.05, high=0.05, size=1))
+                rand_pos = gymapi.Vec3(_cp[0] + _uniform(low=-0.05, high=0.05, size=1),     # [-0.08, 0.08]
+                                       _cp[1] + _uniform(low=-0.05, high=0.05, size=1),       # [-0.1, 0.1]
+                                       _cp[2] + _uniform(low=-0.05, high=0.05, size=1))     # [-0.05, 0.05]
+                rand_stare = gymapi.Vec3(_cs[0] + _uniform(low=-0.05, high=0.05, size=1),   # [-0.05, 0.05]
+                                         _cs[1] + _uniform(low=-0.05, high=0.05, size=1),   # [-0.05, 0.05]
+                                         _cs[2] + _uniform(low=-0.05, high=0.05, size=1))   # [-0.05, 0.05]
                 self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
 
         if self.img_obs:
@@ -826,8 +826,8 @@ class DemoUR3Pouring(BaseTask):
                 if i in env_ids:
                     _cp = self.default_cam_pos
                     _cs = self.default_cam_stare
-                    rand_pos = gymapi.Vec3(_cp[0] + _uniform(low=-0.08, high=0.08, size=1),
-                                           _cp[1] + _uniform(low=-0.1, high=0.1, size=1),
+                    rand_pos = gymapi.Vec3(_cp[0] + _uniform(low=-0.05, high=0.05, size=1),
+                                           _cp[1] + _uniform(low=-0.05, high=0.05, size=1),
                                            _cp[2] + _uniform(low=-0.05, high=0.05, size=1))
                     rand_stare = gymapi.Vec3(_cs[0] + _uniform(low=-0.05, high=0.05, size=1),
                                              _cs[1] + _uniform(low=-0.05, high=0.05, size=1),
@@ -972,6 +972,38 @@ class DemoUR3Pouring(BaseTask):
             grip_act = _actions[:, -1].unsqueeze(-1).repeat(1, 5) * torch.tensor([-1., 1., 1., -1., 1.], device=self.device)
             self.actions = torch.cat((_actions, grip_act), dim=-1)
 
+        # pause
+        def get_img_with_text(text=''):
+            img = np.zeros((256, 1024, 3), np.uint8)
+
+            # Write some Text
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            bottomLeftCornerOfText = (512-5, 128-5)
+            fontScale = 1
+            fontColor = (255, 255, 255)
+            thickness = 1
+            lineType = 2
+
+            cv2.putText(img, text,
+                        bottomLeftCornerOfText,
+                        font,
+                        fontScale,
+                        fontColor,
+                        thickness,
+                        lineType)
+            return img
+
+        if self.pause:
+            img = get_img_with_text('Pause')
+            cv2.imshow('pause', img)
+            cv2.waitKey(1)
+            self.actions = torch.zeros(self.num_envs, 12, dtype=torch.float, device=self.device)
+            self.progress_buf -= 1
+        else:
+            img = get_img_with_text('Resume')
+            cv2.imshow('pause', img)
+            cv2.waitKey(1)
+
         targets = self.ur3_dof_pos + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
 
@@ -1000,6 +1032,19 @@ class DemoUR3Pouring(BaseTask):
 
             env_ids = (self.reset_buf == 0).nonzero(as_tuple=False).squeeze(-1)
             if len(env_ids) > 0:
+                # to remove the button pressed noise
+                btn_menu = d["menu_button"]
+                self.btn_pause_que.append(btn_menu)
+                in_seq = 4
+                if len(self.btn_pause_que) > in_seq:
+                    self.btn_pause_que.pop(0)
+
+                if len(self.btn_pause_que) >= in_seq:
+                    if self.btn_pause_que.count(True) >= len(self.btn_pause_que):
+                        self.pause = False if self.pause else True
+                        print("btn pressed...", self.btn_pause_que, self.pause)
+                        self.btn_pause_que = [False for _ in range(len(self.btn_pause_que))]
+
                 if d["trackpad_pressed"]:
                     # self.progress_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long) + self.max_episode_length
                     self.reset_buf = torch.ones_like(self.reset_buf)
