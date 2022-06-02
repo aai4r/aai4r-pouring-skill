@@ -164,7 +164,6 @@ args.sim_device = 'cuda:0'
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
 cfg["env"]["action_noise"] = False
-cfg["env"]["enableDebugVis"] = False
 
 sim_params = parse_sim_params(args, cfg, None)
 env_config = AttrDict(

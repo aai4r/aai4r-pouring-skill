@@ -1582,7 +1582,8 @@ def compute_ur3_reward(
     approach_reward = torch.where(d1 < 0.02, 1.0, 0.0)
     lift_reward = torch.where((bottle_floor_pos[:, 2] > 0.05), 2.0, 0.0)
     bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
-    rewards = approach_reward + lift_reward - action_penalty_scale * action_penalty
+    up_rot_reward = 2.5 * torch.exp(-10.0 * (1.0 - dot1))
+    rewards = approach_reward + lift_reward + up_rot_reward - action_penalty_scale * action_penalty
 
     poured_reward = torch.zeros_like(rewards)
     poured_reward_scale = 5.0
@@ -1608,9 +1609,9 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
-    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.04) & (dot3 < 0.5)
-    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
-    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.9)
+    # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
+    # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
     reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)   # bottle fallen
