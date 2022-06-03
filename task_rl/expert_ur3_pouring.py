@@ -337,7 +337,7 @@ class DemoUR3Pouring(BaseTask):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
-        self.default_cam_pos = [0.75, 0.0, 0.5]
+        self.default_cam_pos = [0.78, 0.0, 0.5]
         self.default_cam_stare = [0.0, 0.0, 0.0]
 
         # compute aggregate size
@@ -1092,7 +1092,7 @@ class DemoUR3Pouring(BaseTask):
                         scale = 0.025
                         self.cup_states[0, 0] = torch.clamp(self.cup_states[0, 0] + scale * vel[2], min=0.4, max=0.6)
                         self.cup_states[0, 1] = torch.clamp(self.cup_states[0, 1] + scale * vel[0], min=-0.3, max=0.3)
-                        self.cup_states[0, 2] = torch.clamp(self.cup_states[0, 2] + scale * vel[1], min=0.04, max=0.06)
+                        self.cup_states[0, 2] = torch.clamp(self.cup_states[0, 2] + scale * vel[1], min=0.04, max=0.05)
 
                         _indices = self.global_indices[env_ids, 3].flatten()
                         self.gym.set_actor_root_state_tensor_indexed(self.sim,
