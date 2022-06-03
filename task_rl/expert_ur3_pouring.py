@@ -50,10 +50,6 @@ class DemoUR3Pouring(BaseTask):
         self.use_ik = False
         self.action_noise = self.cfg["env"]["action_noise"]
 
-        """ VR interface setting """
-        self.vr = triad_openvr.triad_openvr()
-        self.vr.print_discovered_objects()
-
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
         self.camera_props.width = self.cfg["env"]["cam_width"]
@@ -83,6 +79,11 @@ class DemoUR3Pouring(BaseTask):
         self.indices = torch.tensor([0, 1, 2, 3, 4, 5, 8], device=device_id)  # 0~5: ur3 joint, 8: robotiq drive joint
 
         super().__init__(cfg=self.cfg)
+
+        if self.interaction_mode:
+            """ VR interface setting """
+            self.vr = triad_openvr.triad_openvr()
+            self.vr.print_discovered_objects()
 
         # set gripper params
         self.grasp_z_offset = 0.135      # (meter)
@@ -649,10 +650,10 @@ class DemoUR3Pouring(BaseTask):
         self.bottle_rot = self.rigid_body_states[:, self.bottle_handle][:, 3:7]
 
         # cup info.
-        # self.cup_pos = self.rigid_body_states[:, self.cup_handle][:, 0:3]
-        # self.cup_rot = self.rigid_body_states[:, self.cup_handle][:, 3:7]
-        self.cup_pos = self.cup_states[:, 0:3]
-        self.cup_rot = self.cup_states[:, 3:7]
+        self.cup_pos = self.rigid_body_states[:, self.cup_handle][:, 0:3]
+        self.cup_rot = self.rigid_body_states[:, self.cup_handle][:, 3:7]
+        # self.cup_pos = self.cup_states[:, 0:3]
+        # self.cup_rot = self.cup_states[:, 3:7]
 
         # TODO
         # 1.(self: isaacgym._bindings.linux - x86_64.gym_37.Gym, arg0: isaacgym._bindings.linux - x86_64.gym_37.Env, arg1: int, arg2: int) ->
@@ -797,7 +798,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset cup
         place = self.default_cup_states[env_ids]
-        place += (torch.rand_like(place, device=self.device, dtype=torch.float) - 0.5) * xy_scale
+        place += (torch.rand_like(place) - 0.5) * xy_scale
         place[:, 1] = torch.where(self.bottle_states[env_ids, 1] >= 0,
                                   self.bottle_states[env_ids, 1] - 0.25 + (torch.rand(1, device=self.device) - 0.5) * 0.2,
                                   self.bottle_states[env_ids, 1] + 0.25 + (torch.rand(1, device=self.device) - 0.5) * 0.2)
@@ -1008,11 +1009,11 @@ class DemoUR3Pouring(BaseTask):
 
         # pause
         def get_img_with_text(text=''):
-            img = np.zeros((256, 1024, 3), np.uint8)
+            img = np.zeros((128, 512, 3), np.uint8)
 
             # Write some Text
             font = cv2.FONT_HERSHEY_SIMPLEX
-            bottomLeftCornerOfText = (512-5, 128-5)
+            bottomLeftCornerOfText = (256-64, 64-8)
             fontScale = 1
             fontColor = (255, 255, 255)
             thickness = 1
@@ -1032,6 +1033,7 @@ class DemoUR3Pouring(BaseTask):
             cv2.imshow('pause', img)
             cv2.waitKey(1)
             self.actions = torch.zeros(self.num_envs, 12, dtype=torch.float, device=self.device)
+            self.ur3_dof_vel = torch.zeros_like(self.ur3_dof_vel)
             self.progress_buf -= 1
         else:
             img = get_img_with_text('Resume')
@@ -1052,6 +1054,9 @@ class DemoUR3Pouring(BaseTask):
 
         env_ids_int32 = torch.arange(self.num_envs, dtype=torch.int32, device=self.device)
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.ur3_dof_targets))
+
+        if self.interaction_mode:
+            self.interaction()
 
     def interaction(self):
         if self.viewer:
@@ -1080,24 +1085,20 @@ class DemoUR3Pouring(BaseTask):
                         self.btn_pause_que = [False for _ in range(len(self.btn_pause_que))]
 
                 if d["trackpad_pressed"]:
-                    # self.progress_buf = torch.zeros(self.num_envs, device=self.device, dtype=torch.long) + self.max_episode_length
                     self.reset_buf = torch.ones_like(self.reset_buf)
-
-                self.cup_pos = self.cup_states[:, 0:3]
-                self.cup_rot = self.cup_states[:, 3:7]
 
                 if d["trigger"]:
                     if vel:
                         scale = 0.025
-                        self.cup_pos[0, 0] = torch.clamp(self.cup_pos[0, 0] + scale * vel[2], min=0.01, max=0.6)
-                        self.cup_pos[0, 1] = torch.clamp(self.cup_pos[0, 1] + scale * vel[0], min=-0.3, max=0.3)
-                        self.cup_pos[0, 2] = torch.clamp(self.cup_pos[0, 2] + scale * vel[1], min=0.04, max=0.06)
+                        self.cup_states[0, 0] = torch.clamp(self.cup_states[0, 0] + scale * vel[2], min=0.4, max=0.6)
+                        self.cup_states[0, 1] = torch.clamp(self.cup_states[0, 1] + scale * vel[0], min=-0.3, max=0.3)
+                        self.cup_states[0, 2] = torch.clamp(self.cup_states[0, 2] + scale * vel[1], min=0.04, max=0.06)
 
-                _indices = self.global_indices[env_ids, 3].flatten()
-                self.gym.set_actor_root_state_tensor_indexed(self.sim,
-                                                             gymtorch.unwrap_tensor(self.root_state_tensor),
-                                                             gymtorch.unwrap_tensor(_indices),
-                                                             len(_indices))
+                        _indices = self.global_indices[env_ids, 3].flatten()
+                        self.gym.set_actor_root_state_tensor_indexed(self.sim,
+                                                                     gymtorch.unwrap_tensor(self.root_state_tensor),
+                                                                     gymtorch.unwrap_tensor(_indices),
+                                                                     len(_indices))
 
             # # check mouse event
             # for evt in self.gym.query_viewer_action_events(self.viewer):
@@ -1132,8 +1133,6 @@ class DemoUR3Pouring(BaseTask):
             #         print("======================================")
 
     def post_physics_step(self):
-        # interaction mode with interface devices (keyboard, mouse, etc.)
-
         self.progress_buf += 1
 
         env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
@@ -1142,9 +1141,6 @@ class DemoUR3Pouring(BaseTask):
 
         self.compute_observations()
         self.compute_reward(self.actions)
-
-        if self.interaction_mode:
-            self.interaction()
 
         # compute task update status
         # self.compute_task()
