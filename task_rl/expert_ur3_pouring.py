@@ -60,10 +60,10 @@ class DemoUR3Pouring(BaseTask):
 
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
-            num_states = 43
+            num_states = 34
             # num_states = 0
         else:
-            num_obs = (43, )
+            num_obs = (34, )
             num_states = 0
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
@@ -708,11 +708,10 @@ class DemoUR3Pouring(BaseTask):
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
 
         if self.img_obs:
-            self.states_buf = torch.cat((dof_pos_vel,                               # 13
+            self.states_buf = torch.cat((dof_pos,                                   # 7
                                         self.ur3_grasp_pos, self.ur3_grasp_rot,     # 7
-                                        self.bottle_tip_pos,                        # 3
+                                        self.cup_tip_pos - self.bottle_tip_pos,     # 3
                                         self.bottle_pos, self.bottle_rot,           # 7
-                                        self.cup_tip_pos,                           # 3
                                         self.cup_pos, self.cup_rot,                 # 7
                                         self.liq_pos), dim=-1)                      # 3
 
@@ -729,13 +728,12 @@ class DemoUR3Pouring(BaseTask):
                     if k == 27:     # ESC
                         exit()
         else:
-            self.obs_buf = torch.cat((dof_pos_vel,
-                                      self.ur3_grasp_pos, self.ur3_grasp_rot,
-                                      self.bottle_tip_pos,
-                                      self.bottle_pos, self.bottle_rot,
-                                      self.cup_tip_pos,
-                                      self.cup_pos, self.cup_rot,
-                                      self.liq_pos), dim=-1)
+            self.states_buf = torch.cat((dof_pos,  # 7
+                                         self.ur3_grasp_pos, self.ur3_grasp_rot,    # 7
+                                         self.cup_tip_pos - self.bottle_tip_pos,    # 3
+                                         self.bottle_pos, self.bottle_rot,          # 7
+                                         self.cup_pos, self.cup_rot,                # 7
+                                         self.liq_pos), dim=-1)                     # 3
 
         # TODO, cam transform
         # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
@@ -1028,17 +1026,18 @@ class DemoUR3Pouring(BaseTask):
                         lineType)
             return img
 
-        if self.pause:
-            img = get_img_with_text('Pause')
-            cv2.imshow('pause', img)
-            cv2.waitKey(1)
-            self.actions = torch.zeros(self.num_envs, 12, dtype=torch.float, device=self.device)
-            self.ur3_dof_vel = torch.zeros_like(self.ur3_dof_vel)
-            self.progress_buf -= 1
-        else:
-            img = get_img_with_text('Resume')
-            cv2.imshow('pause', img)
-            cv2.waitKey(1)
+        if self.interaction_mode:
+            if self.pause:
+                img = get_img_with_text('Pause')
+                cv2.imshow('pause', img)
+                cv2.waitKey(1)
+                self.actions = torch.zeros(self.num_envs, 12, dtype=torch.float, device=self.device)
+                self.ur3_dof_vel = torch.zeros_like(self.ur3_dof_vel)
+                self.progress_buf -= 1
+            else:
+                img = get_img_with_text('Resume')
+                cv2.imshow('pause', img)
+                cv2.waitKey(1)
 
         targets = self.ur3_dof_pos + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         # targets1 = self.ur3_dof_pos[:, :6] + self.ur3_dof_speed_scales * (1/32) * self.actions[:, :6] * self.action_scale

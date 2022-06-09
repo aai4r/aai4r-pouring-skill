@@ -16,7 +16,7 @@ class ClSPiRLMdl(SkillPriorMdl):
         assert self._hp.cond_decode    # need to decode based on state for closed-loop low-level
         self.q = self._build_inference_net()
         self.decoder = Predictor(self._hp,
-                                 input_size=self.enc_size + self._hp.nz_vae,
+                                 input_size=self.enc_size + self._hp.nz_vae + self._hp.robot_state,
                                  output_size=self._hp.action_dim,
                                  mid_size=self._hp.nz_mid_prior)
         self.p = self._build_prior_ensemble()
@@ -25,7 +25,9 @@ class ClSPiRLMdl(SkillPriorMdl):
     def decode(self, z, cond_inputs, steps, inputs=None):
         assert inputs is not None       # need additional state sequence input for full decode
         seq_enc = self._get_seq_enc(inputs)
-        decode_inputs = torch.cat((seq_enc[:, :steps], z[:, None].repeat(1, steps, 1)), dim=-1)
+        robot_state = inputs.states[:, :steps, :self._hp.robot_state]
+        decode_inputs = torch.cat((seq_enc[:, :steps], z[:, None].repeat(1, steps, 1),
+                                   robot_state), dim=-1)
         return batch_apply(decode_inputs, self.decoder)
 
     def _build_inference_net(self):

@@ -47,11 +47,11 @@ class ClModelPolicy(Policy):
             if self.steps_since_hl > self.horizon - 1:
                 self.last_z = split_obs.z
                 self.steps_since_hl = 0
-            act = self.net.decoder(torch.cat((split_obs.cond_input, self.last_z), dim=-1))
+            act = self.net.decoder(torch.cat((split_obs.cond_input, self.last_z, split_obs.robot_state), dim=-1))
             self.steps_since_hl += 1
         else:
             # during update (ie with batch size > 1) recompute LL action from z
-            act = self.net.decoder(torch.cat((split_obs.cond_input, split_obs.z), dim=-1))
+            act = self.net.decoder(torch.cat((split_obs.cond_input, split_obs.z, split_obs.robot_state), dim=-1))
         return MultivariateGaussian(mu=act, log_sigma=self._log_sigma[None].repeat(act.shape[0], 1))
 
     def sample_rand(self, obs):
@@ -88,4 +88,5 @@ class ACClModelPolicy(ClModelPolicy):
         return AttrDict(
             cond_input=self.net.enc_obs(unflattened_obs.prior_obs),
             z=obs[:, -self.net.latent_dim:],
+            robot_state=obs[:, :self._hp.robot_state]
         )

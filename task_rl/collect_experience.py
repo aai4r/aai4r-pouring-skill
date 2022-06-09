@@ -15,7 +15,7 @@ from task_rl.expert_ur3_pouring import DemoUR3Pouring
 
 # Task name format: $ROBOT_TASK: $CONFIG
 task_list = {"UR3_POURING": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"},
-             "Another_Task": {"task": None, "config": None}
+             "UR3_POURING_IMG": {"task": "DemoUR3Pouring", "config": "expert_ur3_pouring.yaml"},
              }
 
 
