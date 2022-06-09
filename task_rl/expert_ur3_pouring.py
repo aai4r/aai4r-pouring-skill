@@ -45,7 +45,7 @@ class DemoUR3Pouring(BaseTask):
 
         self.up_axis = "x"      # z
         self.up_axis_idx = 0    # 2
-        self.dt = 1/30.
+        self.dt = 1/29.
 
         self.use_ik = False
         self.action_noise = self.cfg["env"]["action_noise"]
@@ -753,7 +753,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 0.3 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 0.01 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
@@ -781,7 +781,7 @@ class DemoUR3Pouring(BaseTask):
         pick = self.default_bottle_states[env_ids]
         # print("default bottle: ".format(pick[env_ids]))
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.1, 0.4, 0.0,            # position, 0.13, 0.4, 0.0,
+        xy_scale = to_torch([0.05, 0.4, 0.0,            # position, 0.13, 0.4, 0.0,
                              0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
 
@@ -1041,6 +1041,9 @@ class DemoUR3Pouring(BaseTask):
             cv2.waitKey(1)
 
         targets = self.ur3_dof_pos + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
+        # targets1 = self.ur3_dof_pos[:, :6] + self.ur3_dof_speed_scales * (1/32) * self.actions[:, :6] * self.action_scale
+        # targets2 = self.ur3_dof_pos[:, 6:] + self.ur3_dof_speed_scales * (1/28) * self.actions[:, 6:] * self.action_scale
+        # targets = torch.cat(targets1, targets2, dim=-1)
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
 
         # gripper on/off
@@ -1090,8 +1093,8 @@ class DemoUR3Pouring(BaseTask):
                 if d["trigger"]:
                     if vel:
                         scale = 0.025
-                        self.cup_states[0, 0] = torch.clamp(self.cup_states[0, 0] + scale * vel[2], min=0.4, max=0.6)
-                        self.cup_states[0, 1] = torch.clamp(self.cup_states[0, 1] + scale * vel[0], min=-0.3, max=0.3)
+                        self.cup_states[0, 0] = torch.clamp(self.cup_states[0, 0] + scale * -vel[2], min=0.45, max=0.6)
+                        self.cup_states[0, 1] = torch.clamp(self.cup_states[0, 1] + scale * -vel[0], min=-0.28, max=0.28)
                         self.cup_states[0, 2] = torch.clamp(self.cup_states[0, 2] + scale * vel[1], min=0.04, max=0.05)
 
                         _indices = self.global_indices[env_ids, 3].flatten()
