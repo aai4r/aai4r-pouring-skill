@@ -45,7 +45,7 @@ class DemoUR3Pouring(BaseTask):
 
         self.up_axis = "x"      # z
         self.up_axis_idx = 0    # 2
-        self.dt = 1/29.
+        self.dt = 1/30.
 
         self.use_ik = False
         self.action_noise = self.cfg["env"]["action_noise"]

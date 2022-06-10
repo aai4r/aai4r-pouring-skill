@@ -66,15 +66,15 @@ base_agent_params = AttrDict(
 ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    robot_state=7,
+    # robot_state=7,
     kl_div_weight=5e-4,
     n_input_frames=2,
     prior_input_res=data_spec_img.res,
     nz_vae=32,
     n_rollout_steps=10,
     nz_enc=256,
-    n_processing_layers=3,
-    num_prior_net_layers=3,
+    n_processing_layers=5,
+    num_prior_net_layers=5,
 )
 
 # LL Agent

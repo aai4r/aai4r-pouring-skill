@@ -47,6 +47,7 @@ class ClModelPolicy(Policy):
             if self.steps_since_hl > self.horizon - 1:
                 self.last_z = split_obs.z
                 self.steps_since_hl = 0
+
             act = self.net.decoder(torch.cat((split_obs.cond_input, self.last_z, split_obs.robot_state), dim=-1))
             self.steps_since_hl += 1
         else:
@@ -85,8 +86,9 @@ class ACClModelPolicy(ClModelPolicy):
     """Handles image observations in ClModelPolicy."""
     def _split_obs(self, obs):
         unflattened_obs = self.net.unflatten_obs(obs[:, :-self.net.latent_dim])
+        robot_state = obs[:, :self._hp.robot_state] if "robot_state" in self._hp else torch.tensor([], device=self.device)
         return AttrDict(
             cond_input=self.net.enc_obs(unflattened_obs.prior_obs),
             z=obs[:, -self.net.latent_dim:],
-            robot_state=obs[:, :self._hp.robot_state]
+            robot_state=robot_state
         )
