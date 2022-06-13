@@ -1,7 +1,7 @@
 """
 Collection of experience in isaacgym environment
 """
-
+import numpy as np
 from isaacgym import gymutil
 from task_rl.config import load_cfg
 from task_rl.expert_manager import ExpertManager
@@ -9,6 +9,7 @@ from utils.config import parse_sim_params
 from tasks.base.vec_task import VecTaskPython
 
 import torch
+import subprocess as sp
 import os
 
 from task_rl.expert_ur3_pouring import DemoUR3Pouring
@@ -41,6 +42,13 @@ def parse_task_py(args, cfg, sim_params):
     return task, env
 
 
+def get_gpu_free_memory():
+    command = "nvidia-smi --query-gpu=memory.free --format=csv"
+    memory_free_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
+    memory_free_values = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+    return memory_free_values
+
+
 def task_demonstration(task):
     print("Target Task: {}".format(task))
     args = gymutil.parse_arguments(description="IsaacGym Task " + task)
@@ -50,7 +58,7 @@ def task_demonstration(task):
     # param customization
     cfg['env']['numEnvs'] = 32
     cfg['env']['enableDebugVis'] = False
-    cfg['expert']['num_total_frames'] = 300000
+    cfg['expert']['num_total_frames'] = 4000000
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB
     cfg['expert']['save_data'] = True
     cfg['expert']['save_resume'] = True
@@ -72,8 +80,22 @@ def task_demonstration(task):
 
     # params
     cfg['device'] = 'cpu' if cfg['device_type'] == 'cpu' else cfg['device_type'] + ':' + str(cfg['device_id'])
+
+    # memory size check
     num_total_frames = cfg['expert']['num_total_frames']
-    num_transitions_per_env = round(num_total_frames / env.num_envs + 0.51)
+    num_iter = 1
+    if cfg['expert']['img_obs']:
+        gpu_mems_mb = get_gpu_free_memory()
+        target_gpu_free_mem_mb = gpu_mems_mb[args.device_id]
+
+        h, w = cfg['env']['cam_height'], cfg['env']['cam_width']
+        req_dominant_data_size_mb = (num_total_frames * (h * w * 3 * np.dtype(np.uint8).itemsize)) / (1000 * 1000)
+        num_iter = int(np.ceil(req_dominant_data_size_mb / target_gpu_free_mem_mb))
+        print("Required dominant dataset size (MB): ", req_dominant_data_size_mb)
+        print("Target gpu free memory size (MB): ", target_gpu_free_mem_mb)
+        print("Number of iterations: ", num_iter)
+
+    num_transitions_per_env = round(num_total_frames / env.num_envs / num_iter + 0.51)
     print("===== Frame Info. =====")
     print("num_total_frames / num_envs: {} / {}".format(num_total_frames, env.num_envs))
     print("  ==> num_transition_per_env: {}".format(num_transitions_per_env))
@@ -83,7 +105,9 @@ def task_demonstration(task):
     print("sim_params: ", sim_params)
 
     expert = ExpertManager(vec_env=env, num_transition_per_env=num_transitions_per_env, cfg=cfg)
-    expert.run(num_transitions_per_env=num_transitions_per_env)
+    for i in range(num_iter):
+        print("iter {}".format(i))
+        expert.run(num_transitions_per_env=num_transitions_per_env)
     # task_rl.load()
 
 

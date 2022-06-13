@@ -32,13 +32,14 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.dtypes = AttrDict(observations=obs_dtype, states=torch.float32, actions=torch.float32,
                                rewards=torch.float32, dones=torch.float32)
 
-        self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape,
-                                        device=self.device, dtype=self.dtypes.observations)
-        self.states = torch.zeros(num_transitions_per_env, num_envs, *states_shape, device=self.device)
-        self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
-        self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
-        self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
-        self.step = 0
+        # self.observations = torch.zeros(num_transitions_per_env, num_envs, *obs_shape,
+        #                                 device=self.device, dtype=self.dtypes.observations)
+        # self.states = torch.zeros(num_transitions_per_env, num_envs, *states_shape, device=self.device)
+        # self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
+        # self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
+        # self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
+        # self.step = 0
+        self.reset_rollout()
 
         self.rollout = AttrDict(observations=self.observations,
                                 states=self.states,
@@ -137,7 +138,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
         self.save_rollout_to_file(episode)
         self.collect_rollout_statistics(episode)
 
-    def init_rollout(self):
+    def reset_rollout(self):
         self.observations = torch.zeros(self.num_transitions_per_env, self.num_envs, *self.shapes.observations,
                                         device=self.device, dtype=self.dtypes.observations)
         self.states = torch.zeros(self.num_transitions_per_env, self.num_envs, *self.shapes.states, device=self.device)
@@ -150,6 +151,7 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
                                 rewards=self.rewards,
                                 actions=self.actions,
                                 dones=self.dones)
+        self.step = 0
 
     def expected_rollout_size(self, print_info=False):
         expected_size = AttrDict()
