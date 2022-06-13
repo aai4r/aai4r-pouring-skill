@@ -97,7 +97,7 @@ def task_demonstration(task):
 
     num_transitions_per_env = round(num_total_frames / env.num_envs / num_iter + 0.51)
     print("===== Frame Info. =====")
-    print("num_total_frames / num_envs: {} / {}".format(num_total_frames, env.num_envs))
+    print("num_total_frames / num_envs / num_iter: {} / {} / {}".format(num_total_frames, env.num_envs, num_iter))
     print("  ==> num_transition_per_env: {}".format(num_transitions_per_env))
 
     print("args: ", args)
