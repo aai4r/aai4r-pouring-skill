@@ -779,7 +779,7 @@ class DemoUR3Pouring(BaseTask):
         pick = self.default_bottle_states[env_ids]
         # print("default bottle: ".format(pick[env_ids]))
         pick[:, 3:7] = quat
-        xy_scale = to_torch([0.05, 0.4, 0.0,            # position, 0.13, 0.4, 0.0,
+        xy_scale = to_torch([0.13, 0.4, 0.0,            # position, 0.13, 0.4, 0.0,
                              0.0, 0.0, 0.0, 0.0,        # rotation (quat)
                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0], device=self.device).repeat(len(pick), 1)
 
