@@ -751,7 +751,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 1.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 1. * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos

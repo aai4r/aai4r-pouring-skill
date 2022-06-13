@@ -76,3 +76,4 @@ class ExpertManager:
             current_states.copy_(next_states)
         self.save(batch_wise=True)
         self.storage.show_summary(start_time=start)
+        self.storage.reset_rollout()
