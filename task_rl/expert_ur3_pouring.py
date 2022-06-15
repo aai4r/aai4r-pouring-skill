@@ -337,8 +337,8 @@ class DemoUR3Pouring(BaseTask):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
-        self.default_cam_pos = [0.78, 0.0, 0.5]
-        self.default_cam_stare = [0.0, 0.0, 0.0]
+        self.default_cam_pos = [0.6, 0.0, 0.6]     # [0.78, 0.0, 0.5]
+        self.default_cam_stare = [0.28, 0.0, 0.0]
 
         # compute aggregate size
         num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
@@ -751,7 +751,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 0.8 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 0.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
