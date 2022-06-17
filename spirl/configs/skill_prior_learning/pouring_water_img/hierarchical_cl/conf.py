@@ -24,7 +24,6 @@ configuration = AttrDict(configuration)
 model_config = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    # robot_state=7,
     n_rollout_steps=10,
     kl_div_weight=5e-4,
     prior_input_res=data_spec_img.res,
