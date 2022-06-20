@@ -12,7 +12,7 @@ np.set_printoptions(precision=3)
 
 
 class DatasetUtil:
-    def __init__(self, data_path, task_name):
+    def __init__(self, data_path, task_name, plot_state):
         self.data_path = data_path
         self.task_name = task_name
 
@@ -23,7 +23,11 @@ class DatasetUtil:
         self.folder_list = sorted(os.listdir(self.path), key=lambda x: int(x[5:]))
         print("batch folder list: {}".format(self.folder_list))
 
-        # initialize plot
+        self.plot_state = plot_state
+        if plot_state:
+            self.init_plot()
+
+    def init_plot(self):
         self.fig = plt.figure()
         self.ax = self.fig.add_subplot(111, projection='3d')
         self.reset_plot()
@@ -103,7 +107,8 @@ class DatasetUtil:
                         print("        cup_rot: {}".format(st[27:31]))
                         print("        liq_pos: {}".format(st[31:]))
 
-                        self.plot3d(p=st[7:10], label="grasp_pos")
+                        if self.plot_state:
+                            self.plot3d(p=st[7:10], label="grasp_pos")
 
                         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                         cv2.imshow(task_name, img)
@@ -112,7 +117,8 @@ class DatasetUtil:
                             exit_flag = True
                         step += 1
 
-                self.reset_plot()
+                if self.plot_state:
+                    self.reset_plot()
 
     def statistics(self):
         frames = {}
@@ -163,6 +169,6 @@ if __name__ == '__main__':
     data_path = "../data"
     task_name = "pouring_water_img"      # block_stacking, pouring_water_img
 
-    du = DatasetUtil(data_path=data_path, task_name=task_name)
-    du.statistics()
-    # du.rollout_play()
+    du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
+    # du.statistics()
+    du.rollout_play()

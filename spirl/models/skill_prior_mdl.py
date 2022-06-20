@@ -268,7 +268,8 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
             return ConditionedFlowModel(self._hp, input_dim=self.prior_input_size, output_dim=self._hp.nz_vae,
                                         n_flow_layers=self._hp.num_prior_net_layers)
         else:
-            return Predictor(self._hp, input_size=self.prior_input_size, output_size=self._hp.nz_vae * 2,
+            cat_size = 7 if self._hp.state_cond_pred else 0
+            return Predictor(self._hp, input_size=self.prior_input_size + cat_size, output_size=self._hp.nz_vae * 2,
                              num_layers=self._hp.num_prior_net_layers, mid_size=self._hp.nz_mid_prior)
 
     def _run_inference(self, inputs):
