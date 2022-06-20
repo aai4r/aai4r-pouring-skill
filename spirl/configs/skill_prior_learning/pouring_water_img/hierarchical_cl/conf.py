@@ -24,6 +24,7 @@ configuration = AttrDict(configuration)
 model_config = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
+    state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
     n_rollout_steps=10,
     kl_div_weight=5e-4,
     prior_input_res=data_spec_img.res,
