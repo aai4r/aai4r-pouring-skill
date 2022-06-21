@@ -74,7 +74,7 @@ ll_model_params = AttrDict(
     n_rollout_steps=10,
     nz_enc=256,
     n_processing_layers=3,
-    num_prior_net_layers=2,
+    num_prior_net_layers=3,
 )
 
 # LL Agent

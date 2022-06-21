@@ -32,7 +32,7 @@ model_config = AttrDict(
     nz_vae=32,                  # skill embedding dim.
     nz_enc=256,                 # encoder output dim. (img -> nz_enc)
     n_processing_layers=3,      # num_layers of skill decoder
-    num_prior_net_layers=2,     # prior_net Predictor
+    num_prior_net_layers=3,     # prior_net Predictor
     cond_decode=True,
 )
 

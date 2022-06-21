@@ -62,6 +62,7 @@ class DatasetUtil:
 
     def rollout_play(self):
         exit_flag = False
+        batch_skip = False
         for batch_idx, folder in enumerate(self.folder_list):
             if exit_flag: break
             # print("idx: {},  batch folder: {}".format(batch_idx + 1, folder))
@@ -92,8 +93,11 @@ class DatasetUtil:
                     step = 0
                     for img, st, a in zip(data.images, data.states, data.actions):
                         if exit_flag: break
-                        print("    rollout: {} step: {} / {}, img, shape: {}, min/max: {}/{}  type: {}".format(
-                            int(rollout[rollout.find('_')+1:rollout.find('.')]),
+                        print("batch: {} / {}, rollout: {} / {}".format(batch_idx + 1,
+                                                                        len(self.folder_list),
+                                                                        int(rollout[rollout.find('_')+1:rollout.find('.')]),
+                                                                        len(rollout_list)))
+                        print("    step: {} / {}, img, shape: {}, min/max: {}/{}  type: {}".format(
                             step, len(data.images), img.shape, img.min(), img.max(), img.dtype))
                         print("        action: joint={}, grip={}".format(a[:6], a[6:]))
                         print("        dof_pos: {}".format(st[:6]))
@@ -115,10 +119,21 @@ class DatasetUtil:
                         k = cv2.waitKey(0)
                         if k == 27:
                             exit_flag = True
+                        elif k == ord('r'):
+                            print("skip rollout data")
+                            break
+                        elif k == ord('b'):
+                            print("skip batch")
+                            batch_skip = True
+                            break
                         step += 1
 
                 if self.plot_state:
                     self.reset_plot()
+
+                if batch_skip:
+                    batch_skip = False
+                    break
 
     def statistics(self):
         frames = {}
