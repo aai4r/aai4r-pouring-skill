@@ -131,7 +131,7 @@ class ModelTrainer(BaseTrainer):
         data_load_time = AverageMeter()
         self.log_outputs_interval = self.args.log_interval
         self.log_images_interval = int(epoch_len / self.args.per_epoch_img_logs)
-        
+
         print('starting epoch ', epoch)
 
         for self.batch_idx, sample_batched in enumerate(self.train_loader):

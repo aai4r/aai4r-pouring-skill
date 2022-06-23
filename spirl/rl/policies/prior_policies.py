@@ -158,9 +158,11 @@ class ACPriorInitializedPolicy(PriorInitializedPolicy):
 class ACLearnedPriorAugmentedPIPolicy(LearnedPriorAugmentedPIPolicy):
     """LearnedPriorAugmentedPIPolicy for case with separate prior obs --> uses prior observation as input only."""
     def forward(self, obs):
+        inputs = self.net.unflatten_obs(obs)
+        _obs = inputs if self._hp.state_cond else inputs.prior_obs
         if obs.shape[0] == 1:
-            return super().forward(self.net.unflatten_obs(obs).prior_obs)   # use policy_net or batch_size 1 inputs
-        return super().forward(self.prior_net.unflatten_obs(obs).prior_obs)
+            return super().forward(_obs)   # use policy_net or batch_size 1 inputs
+        return super().forward(_obs)
 
 
 class ACLearnedPriorAugmentedPolicy(LearnedPriorAugmentedPolicy):
