@@ -728,12 +728,12 @@ class DemoUR3Pouring(BaseTask):
                     if k == 27:     # ESC
                         exit()
         else:
-            self.states_buf = torch.cat((dof_pos,  # 7
-                                         self.ur3_grasp_pos, self.ur3_grasp_rot,    # 7
-                                         self.cup_tip_pos - self.bottle_tip_pos,    # 3
-                                         self.bottle_pos, self.bottle_rot,          # 7
-                                         self.cup_pos, self.cup_rot,                # 7
-                                         self.liq_pos), dim=-1)                     # 3
+            self.obs_buf = torch.cat((dof_pos,  # 7
+                                      self.ur3_grasp_pos, self.ur3_grasp_rot,    # 7
+                                      self.cup_tip_pos - self.bottle_tip_pos,    # 3
+                                      self.bottle_pos, self.bottle_rot,          # 7
+                                      self.cup_pos, self.cup_rot,                # 7
+                                      self.liq_pos), dim=-1)                     # 3
 
         # TODO, cam transform
         # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])

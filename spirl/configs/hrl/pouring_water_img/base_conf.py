@@ -73,8 +73,11 @@ ll_model_params = AttrDict(
     nz_vae=32,
     n_rollout_steps=10,
     nz_enc=256,
-    n_processing_layers=3,
-    num_prior_net_layers=3,
+    nz_mid_prior=256,
+    n_processing_layers=5,
+    num_prior_net_layers=5,
+    state_cond=True,
+    state_cond_size=7,
 )
 
 # LL Agent
@@ -93,8 +96,11 @@ hl_policy_params = AttrDict(
     input_dim=data_spec_img.state_dim,
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
+    nz_enc=256,
     n_layers=5,
     policy_lr=1.5e-4,
+    state_cond=ll_model_params.state_cond,
+    state_cond_size=ll_model_params.state_cond_size,
 )
 
 # HL Critic
@@ -104,6 +110,7 @@ hl_critic_params = AttrDict(
     output_dim=1,
     n_layers=3,  # number of policy network layer
     nz_mid=256,
+    nz_enc=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
     critic_lr=1.5e-4,

@@ -283,10 +283,16 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
         """Splits batch into separate batches for prior ensemble, optionally runs first or avg prior on whole batch.
            (first_only, avg == True is only used for RL)."""
         if first_only:
-            return self._compute_learned_prior(self.p[0], inputs)
+            _inputs = AttrDict(images=inputs.prior_obs,
+                               states=inputs.obs[:, :self._hp.state_cond_size]) if self._hp.state_cond else inputs
+            return self._compute_learned_prior(self.p[0], _inputs)
 
-        assert inputs.shape[0] % self._hp.n_prior_nets == 0
-        per_prior_inputs = torch.chunk(inputs, self._hp.n_prior_nets)
+        if self._hp.state_cond:
+            assert inputs.states.shape[0] % self._hp.n_prior_nets == 0
+            per_prior_inputs = (inputs, )
+        else:
+            assert inputs.shape[0] % self._hp.n_prior_nets == 0
+            per_prior_inputs = torch.chunk(inputs, self._hp.n_prior_nets)
         prior_results = [self._compute_learned_prior(prior, input_batch)
                          for prior, input_batch in zip(self.p, per_prior_inputs)]
 
@@ -389,12 +395,15 @@ class ImageSkillPriorMdl(SkillPriorMdl):
         ))
 
     def _build_prior_net(self):
-        return nn.Sequential(
-            ResizeSpatial(self._hp.prior_input_res),
-            Encoder(self._updated_encoder_params()),
-            RemoveSpatial(),
-            super()._build_prior_net(),
-        )
+        if self._hp.state_cond:
+            return StateCondImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
+        else:
+            return nn.Sequential(
+                ResizeSpatial(self._hp.prior_input_res),
+                Encoder(self._updated_encoder_params()),
+                RemoveSpatial(),
+                super()._build_prior_net(),
+            )
 
     def _build_inference_net(self):
         # inference gets conditioned on prior input if decoding is also conditioned on prior input
@@ -424,8 +433,16 @@ class ImageSkillPriorMdl(SkillPriorMdl):
         return MultivariateGaussian(self.q(inf_input)[:, -1])
 
     def _learned_prior_input(self, inputs):
-        return inputs.images[:, :self._hp.n_input_frames]\
-            .reshape(inputs.images.shape[0], -1, self.resolution, self.resolution)
+        if self._hp.state_cond:
+            outputs = AttrDict()
+            outputs.images = inputs.images[:, :self._hp.n_input_frames]\
+                .reshape(inputs.images.shape[0], -1, self.resolution, self.resolution)
+            outputs.states = inputs.states[:, 0, :self._hp.state_cond_size]\
+                .reshape(inputs.states.shape[0], -1)
+            return outputs
+        else:
+            return inputs.images[:, :self._hp.n_input_frames]\
+                .reshape(inputs.images.shape[0], -1, self.resolution, self.resolution)
 
     def _regression_targets(self, inputs):
         return inputs.actions[:, (self._hp.n_input_frames-1):]
@@ -501,3 +518,30 @@ class SkillSpaceLogger(Logger):
             [self._draw_gaussian(ax, component.tensor(), color, ten2ar(weight)) for weight, component in prior]
         else:
             self._draw_gaussian(ax, prior.tensor(), color)
+
+
+class StateCondImageSkillPriorNet(nn.Module):
+    def __init__(self, hp, enc_params):
+        super().__init__()
+        self._hp = hp
+        self._enc_params = enc_params
+
+        self.resize = ResizeSpatial(self._hp.prior_input_res)
+        self.enc = Encoder(self._enc_params)
+        self.rm_spatial = RemoveSpatial()
+
+        input_size = self._hp.nz_mid_prior + self._hp.state_cond_size  # * self._hp.n_input_frames
+        self.fc = Predictor(self._hp, input_size=input_size,
+                            output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
+                            mid_size=self._hp.nz_mid_prior)
+
+    def forward(self, inputs):
+        """
+        * state-conditioned Skill Prior Net
+        * inputs should contain: {images, states}
+        """
+        out = self.resize(inputs.images)
+        out = self.enc(out)
+        out = self.rm_spatial(out)
+        z = self.fc(torch.cat((out, inputs.states), dim=-1))
+        return z

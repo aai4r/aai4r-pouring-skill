@@ -131,7 +131,7 @@ class ModelTrainer(BaseTrainer):
         data_load_time = AverageMeter()
         self.log_outputs_interval = self.args.log_interval
         self.log_images_interval = int(epoch_len / self.args.per_epoch_img_logs)
-        
+
         print('starting epoch ', epoch)
 
         for self.batch_idx, sample_batched in enumerate(self.train_loader):
@@ -409,7 +409,7 @@ def set_run_params():
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(200))
-    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
 
 if __name__ == '__main__':
