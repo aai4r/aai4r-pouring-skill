@@ -9,6 +9,7 @@ from utils.config import parse_sim_params
 from tasks.base.vec_task import VecTaskPython
 
 import torch
+from spirl.rl.components.params import get_args
 import subprocess as sp
 import os
 
@@ -58,7 +59,7 @@ def task_demonstration(task):
     # param customization
     cfg['env']['numEnvs'] = 32
     cfg['env']['enableDebugVis'] = False
-    cfg['expert']['num_total_frames'] = 1500000
+    cfg['expert']['num_total_frames'] = 1300000
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB
     cfg['expert']['save_data'] = True
     cfg['expert']['save_resume'] = True
@@ -114,4 +115,5 @@ def task_demonstration(task):
 if __name__ == '__main__':
     print("Task Demonstration Dataset")
     task = "UR3_POURING"
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     task_demonstration(task=task)

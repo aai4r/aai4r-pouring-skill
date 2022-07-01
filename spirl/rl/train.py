@@ -356,7 +356,7 @@ if __name__ == '__main__':
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
     task_name = "pouring_water_img"
@@ -367,5 +367,5 @@ if __name__ == '__main__':
     args.seed = 0
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     # args.resume = "latest"
-    # args.mode = "demo"     # "train" / "val" / "demo" / else: rollout_save
+    args.mode = "train"     # "train" / "val" / "demo" / else: rollout_save
     RLTrainer(args=args)

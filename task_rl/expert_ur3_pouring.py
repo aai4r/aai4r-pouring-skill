@@ -60,10 +60,10 @@ class DemoUR3Pouring(BaseTask):
 
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
-            num_states = 34
+            num_states = 40
             # num_states = 0
         else:
-            num_obs = (34, )
+            num_obs = (40, )
             num_states = 0
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
@@ -337,7 +337,7 @@ class DemoUR3Pouring(BaseTask):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
-        self.default_cam_pos = [0.6, 0.0, 0.6]     # [0.78, 0.0, 0.5]
+        self.default_cam_pos = [0.78, 0.0, 0.5]     # front-top [0.78, 0.0, 0.5], top [0.6, 0.0, 0.6]
         self.default_cam_stare = [0.28, 0.0, 0.0]
 
         # compute aggregate size
@@ -603,12 +603,15 @@ class DemoUR3Pouring(BaseTask):
         )
 
     def refresh_env_tensors(self):
+        self.gym.end_access_image_tensors(self.sim)
+
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.gym.refresh_jacobian_tensors(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.render_all_camera_sensors(self.sim)
+        self.gym.start_access_image_tensors(self.sim)
 
     def render_camera(self, to_numpy=False, color_order='rgb'):
         img = None
@@ -623,7 +626,6 @@ class DemoUR3Pouring(BaseTask):
         return img / 255
 
     def compute_observations(self):
-        self.refresh_env_tensors()
         self.sync_gripper()
 
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
@@ -708,7 +710,7 @@ class DemoUR3Pouring(BaseTask):
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
 
         if self.img_obs:
-            self.states_buf = torch.cat((dof_pos,                                   # 7
+            self.states_buf = torch.cat((dof_pos_vel,                               # 13
                                         self.ur3_grasp_pos, self.ur3_grasp_rot,     # 7
                                         self.cup_tip_pos - self.bottle_tip_pos,     # 3
                                         self.bottle_pos, self.bottle_rot,           # 7
@@ -721,14 +723,14 @@ class DemoUR3Pouring(BaseTask):
                                                                      self.camera_handles[i], gymapi.IMAGE_COLOR)
                 torch_camera_tensor = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
                 self.obs_buf[i, :] = torch_camera_tensor
-                bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
                 if self.debug_cam:
+                    bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
                     cv2.imshow("camera sensor", bgr_cam)
                     k = cv2.waitKey(0)
                     if k == 27:     # ESC
                         exit()
         else:
-            self.obs_buf = torch.cat((dof_pos,  # 7
+            self.obs_buf = torch.cat((dof_pos_vel,                               # 13
                                       self.ur3_grasp_pos, self.ur3_grasp_rot,    # 7
                                       self.cup_tip_pos - self.bottle_tip_pos,    # 3
                                       self.bottle_pos, self.bottle_rot,          # 7
@@ -1141,6 +1143,8 @@ class DemoUR3Pouring(BaseTask):
         if len(env_ids) > 0:
             self.reset(env_ids)
 
+        self.refresh_env_tensors()
+
         self.compute_observations()
         self.compute_reward(self.actions)
 
@@ -1406,7 +1410,7 @@ class DemoUR3Pouring(BaseTask):
         appr_cup_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
         appr_cup_grip = lift_grip.clone().detach()
         self.tpl.append_pose(pos=appr_cup_pos, rot=appr_cup_rot, grip=appr_cup_grip,
-                             err=ViaPointProperty(pos=8.e-2, rot=8.e-2, grip=1.e-3))
+                             err=ViaPointProperty(pos=1.e-1, rot=1.e-1, grip=1.e-3))
 
         """
             7) pouring
@@ -1587,7 +1591,7 @@ def compute_ur3_reward(
 
     poured_reward = torch.zeros_like(rewards)
     poured_reward_scale = 5.0
-    is_poured = (liq_cup_dist_xy < 0.015) & (liq_pos[:, 2] < 0.06)
+    is_poured = (liq_cup_dist_xy < 0.015) & (liq_pos[:, 2] < 0.04)
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
     rewards += poured_reward_scale * poured_reward
 
@@ -1610,12 +1614,14 @@ def compute_ur3_reward(
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
     is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.9)
+    is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
     # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
     # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
-    reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)   # bottle fallen
-    reset_buf = torch.where(is_cup_fallen, torch.ones_like(reset_buf), reset_buf)  # paper cup fallen
+    reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)    # bottle fallen
+    reset_buf = torch.where(is_cup_fallen, torch.ones_like(reset_buf), reset_buf)       # paper cup fallen
+    reset_buf = torch.where(is_pouring_finish, torch.ones_like(reset_buf), reset_buf)   # pouring task anyway
     reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
     # reset_buf = torch.where(is_dropped > 0.0, torch.ones_like(reset_buf), reset_buf)
     reset_buf = torch.where((liq_cup_dist_xy > 0.5) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range

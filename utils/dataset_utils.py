@@ -99,20 +99,22 @@ class DatasetUtil:
                                                                         len(rollout_list)))
                         print("    step: {} / {}, img, shape: {}, min/max: {}/{}  type: {}".format(
                             step, len(data.images), img.shape, img.min(), img.max(), img.dtype))
+                        print("      state, shape: {}".format(st.shape))
                         print("        action: joint={}, grip={}".format(a[:6], a[6:]))
                         print("        dof_pos: {}".format(st[:6]))
                         print("        grip_pos: {}".format(st[6:7]))
-                        print("        grasp_pos: {}".format(st[7:10]))
-                        print("        grasp_rot: {}".format(st[10:14]))
-                        print("        cup-bottle_tip_diff: {}".format(st[14:17]))
-                        print("        bottle_pos: {}".format(st[17:20]))
-                        print("        bottle_rot: {}".format(st[20:24]))
-                        print("        cup_pos: {}".format(st[24:27]))
-                        print("        cup_rot: {}".format(st[27:31]))
-                        print("        liq_pos: {}".format(st[31:]))
+                        offset = 6
+                        print("        grasp_pos: {}".format(st[7+offset:10+offset]))
+                        print("        grasp_rot: {}".format(st[10+offset:14+offset]))
+                        print("        cup-bottle_tip_diff: {}".format(st[14+offset:17+offset]))
+                        print("        bottle_pos: {}".format(st[17+offset:20+offset]))
+                        print("        bottle_rot: {}".format(st[20+offset:24+offset]))
+                        print("        cup_pos: {}".format(st[24+offset:27+offset]))
+                        print("        cup_rot: {}".format(st[27+offset:31+offset]))
+                        print("        liq_pos: {}".format(st[31+offset:]))
 
                         if self.plot_state:
-                            self.plot3d(p=st[7:10], label="grasp_pos")
+                            self.plot3d(p=st[7+offset:10+offset], label="grasp_pos")
 
                         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                         cv2.imshow(task_name, img)
@@ -185,5 +187,5 @@ if __name__ == '__main__':
     task_name = "pouring_water_img"      # block_stacking, pouring_water_img
 
     du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
-    # du.statistics()
-    du.rollout_play()
+    du.statistics()
+    # du.rollout_play()

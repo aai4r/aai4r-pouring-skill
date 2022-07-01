@@ -44,7 +44,7 @@ class Block(nn.Sequential, HasParameters):
     def get_default_params(self):
         params = AttrDict(
             normalize=True,
-            activation=nn.ELU(),    #nn.LeakyReLU(0.2, inplace=True),  # TODO
+            activation=nn.ELU(),  #nn.LeakyReLU(0.2, inplace=True),
             normalization=self.builder.normalization,
             normalization_params=AttrDict()
         )
@@ -120,6 +120,9 @@ class ConvBlockEnc(ConvBlock):
         params.update(AttrDict(
             kernel_size=4,
             stride=2,
+        ))
+        params.update(AttrDict(
+            activation=nn.ReLU(),
         ))
         return params
         

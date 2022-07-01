@@ -33,14 +33,14 @@ configuration = {
     'num_epochs': 300,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 2e3,
+    'n_warmup_steps': 5e3,
 }
 configuration = AttrDict(configuration)
 
 
 # Replay Buffer
 replay_params = AttrDict(
-    capacity=5e4,
+    capacity=1e5,
     dump_replay=False,
 )
 
