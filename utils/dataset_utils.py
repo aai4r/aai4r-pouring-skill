@@ -67,7 +67,11 @@ class DatasetUtil:
             if exit_flag: break
             # print("idx: {},  batch folder: {}".format(batch_idx + 1, folder))
             path = os.path.join(self.data_path, self.task_name, "batch{}".format(batch_idx + 1))
-            rollout_list = sorted(os.listdir(path), key=lambda x: int(x[x.find('_') + 1:x.find('.')]))
+
+            included_extensions = ['h5']
+            file_names = [fn for fn in os.listdir(path)
+                          if any(fn.endswith(ext) for ext in included_extensions)]
+            rollout_list = sorted(file_names, key=lambda x: int(x[x.find('_') + 1:x.find('.')]))
 
             for rollout in rollout_list:
                 if exit_flag: break
@@ -184,8 +188,8 @@ class DatasetUtil:
 
 if __name__ == '__main__':
     data_path = "../data"
-    task_name = "pouring_water_img"      # block_stacking, pouring_water_img
+    task_name = "pouring_water_img"      # block_stacking, pouring_water_img, office_TA
 
     du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
-    du.statistics()
-    # du.rollout_play()
+    # du.statistics()
+    du.rollout_play()

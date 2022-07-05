@@ -74,8 +74,8 @@ ll_model_params = AttrDict(
     n_rollout_steps=10,
     nz_enc=256,
     nz_mid_prior=256,
-    n_processing_layers=5,
-    num_prior_net_layers=5,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
     state_cond=True,
     state_cond_size=7,
 )

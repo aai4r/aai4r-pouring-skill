@@ -4,6 +4,7 @@ import copy
 import torch
 import torch.nn as nn
 import numpy as np
+from torchvision import models
 from collections import deque
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
@@ -396,7 +397,8 @@ class ImageSkillPriorMdl(SkillPriorMdl):
 
     def _build_prior_net(self):
         if self._hp.state_cond:
-            return StateCondImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
+            # return StateCondImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
+            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
         else:
             return nn.Sequential(
                 ResizeSpatial(self._hp.prior_input_res),
@@ -526,6 +528,9 @@ class StateCondImageSkillPriorNet(nn.Module):
         self._hp = hp
         self._enc_params = enc_params
 
+        self.build_network()
+
+    def build_network(self):
         self.resize = ResizeSpatial(self._hp.prior_input_res)
         self.enc = Encoder(self._enc_params)
         self.rm_spatial = RemoveSpatial()
@@ -543,5 +548,30 @@ class StateCondImageSkillPriorNet(nn.Module):
         out = self.resize(inputs.images)
         out = self.enc(out)
         out = self.rm_spatial(out)
+        z = self.fc(torch.cat((out, inputs.states), dim=-1))
+        return z
+
+
+class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
+    def __init__(self, hp, enc_params):
+        super().__init__(hp=hp, enc_params=enc_params)
+
+    def build_network(self):
+        self.resize = ResizeSpatial(self._hp.prior_input_res)
+        self.enc = models.resnet18(pretrained=True)
+        freeze_modules([self.enc])
+        self.rm_spatial = RemoveSpatial()
+
+        resnet_mid = 1000
+        input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
+        self.fc = Predictor(self._hp, input_size=input_size,
+                            output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
+                            mid_size=self._hp.nz_mid_prior)
+
+    def forward(self, inputs):
+        out = self.resize(inputs.images)
+        h, w = out.shape[2], out.shape[3]
+        unroll = out.reshape(out.shape[0], 3, h, w * 2)
+        out = self.enc(unroll)
         z = self.fc(torch.cat((out, inputs.states), dim=-1))
         return z
