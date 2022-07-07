@@ -57,7 +57,7 @@ def task_demonstration(task):
     sim_params = parse_sim_params(args, cfg, None)
 
     # param customization
-    cfg['env']['numEnvs'] = 32
+    cfg['env']['numEnvs'] = 64
     cfg['env']['enableDebugVis'] = False
     cfg['expert']['num_total_frames'] = 1200000
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB

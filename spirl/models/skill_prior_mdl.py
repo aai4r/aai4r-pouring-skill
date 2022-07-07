@@ -13,7 +13,7 @@ from spirl.components.base_model import BaseModel
 from spirl.components.logger import Logger
 from spirl.components.checkpointer import load_by_key, freeze_modules
 from spirl.modules.losses import KLDivLoss, NLL
-from spirl.modules.subnetworks import BaseProcessingLSTM, Predictor, Encoder
+from spirl.modules.subnetworks import BaseProcessingLSTM, Predictor, Encoder, PreTrainEncoder
 from spirl.modules.recurrent_modules import RecurrentPredictor
 from spirl.utils.general_utils import AttrDict, ParamDict, split_along_axis, get_clipped_optimizer
 from spirl.utils.pytorch_utils import map2np, ten2ar, RemoveSpatial, ResizeSpatial, map2torch, find_tensor, \
@@ -402,7 +402,7 @@ class ImageSkillPriorMdl(SkillPriorMdl):
         else:
             return nn.Sequential(
                 ResizeSpatial(self._hp.prior_input_res),
-                Encoder(self._updated_encoder_params()),
+                PreTrainEncoder(self._hp) if self._hp.use_pretrain else Encoder(self._updated_encoder_params()),
                 RemoveSpatial(),
                 super()._build_prior_net(),
             )
@@ -558,11 +558,12 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
 
     def build_network(self):
         self.resize = ResizeSpatial(self._hp.prior_input_res)
-        self.enc = models.resnet18(pretrained=True)
+        pre_trained_model = models.resnet18(pretrained=True)
+        self.enc = nn.Sequential(*list(pre_trained_model.children())[:-1])
         freeze_modules([self.enc])
         self.rm_spatial = RemoveSpatial()
 
-        resnet_mid = 1000
+        resnet_mid = 512   # resnet 18 feature size
         input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
         self.fc = Predictor(self._hp, input_size=input_size,
                             output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
@@ -570,8 +571,10 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
 
     def forward(self, inputs):
         out = self.resize(inputs.images)
-        h, w = out.shape[2], out.shape[3]
-        unroll = out.reshape(out.shape[0], 3, h, w * 2)
-        out = self.enc(unroll)
+        # h, w = out.shape[2], out.shape[3]
+        # unroll = out.reshape(out.shape[0], 3, h, w * 2)
+        # out = self.enc(unroll)
+        out = self.enc(out)
+        out = self.rm_spatial(out)
         z = self.fc(torch.cat((out, inputs.states), dim=-1))
         return z

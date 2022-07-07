@@ -20,7 +20,7 @@ data_spec_img = AttrDict(
     state_dim=40,
     env_name="pouring_water_img",
     split=AttrDict(train=0.95, val=0.05, test=0.0),
-    res=128,
+    res=150,
     crop_rand_subseq=True,
 )
 data_spec_img.max_seq_len = 500

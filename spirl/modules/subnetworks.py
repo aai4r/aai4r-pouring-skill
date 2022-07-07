@@ -19,6 +19,8 @@ from spirl.utils.general_utils import SkipInputSequential, GetIntermediatesSeque
 from spirl.utils.pytorch_utils import like, AttrDictPredictor, batchwise_assign, make_one_hot, mask_out
 from spirl.utils.general_utils import broadcast_final, AttrDict
 from torch import Tensor
+from torchvision import models
+from spirl.components.checkpointer import freeze_modules
 
 
 class ParamLayer(nn.Module):
@@ -55,6 +57,25 @@ class IBPredictor(Predictor):
         mu, log_sigma = super().forward(*inp).chunk(2, -1)
         eps = torch.normal(torch.zeros_like(mu), torch.ones_like(mu))
         return mu + torch.exp(log_sigma) * eps, mu, log_sigma
+
+
+class PreTrainEncoder(nn.Module):
+    def __init__(self, hp, freeze=True):
+        super().__init__()
+        self._hp = hp
+        pre_trained_model = models.resnet18(pretrained=True)
+        self.net = nn.Sequential(*list(pre_trained_model.children())[:-1])  # exclude the last fc layer
+        if freeze:
+            freeze_modules([self.net])
+        self.eval()
+
+    def forward(self, input):
+        # input shape: (batch*n_rollout, 3*n_channel, h, w)
+        # h, w = input.shape[-1], input.shape[-1]
+        # unroll = input.reshape(input.shape[0], 3, h, -1)
+        # out = self.net(unroll)
+        out = self.net(input)
+        return out
 
 
 class Encoder(nn.Module):

@@ -4,7 +4,7 @@ import torch.nn as nn
 from spirl.utils.general_utils import batch_apply, ParamDict
 from spirl.utils.pytorch_utils import get_constant_parameter, ResizeSpatial, RemoveSpatial
 from spirl.models.skill_prior_mdl import SkillPriorMdl, ImageSkillPriorMdl
-from spirl.modules.subnetworks import Predictor, BaseProcessingLSTM, Encoder
+from spirl.modules.subnetworks import Predictor, BaseProcessingLSTM, Encoder, PreTrainEncoder
 from spirl.modules.variational_inference import MultivariateGaussian
 from spirl.components.checkpointer import load_by_key, freeze_modules
 
@@ -78,9 +78,15 @@ class ImageClSPiRLMdl(ClSPiRLMdl, ImageSkillPriorMdl):
         return ImageSkillPriorMdl._build_prior_net(self)
 
     def _build_inference_net(self):
-        self.img_encoder = nn.Sequential(ResizeSpatial(self._hp.prior_input_res),  # encodes image inputs
-                                         Encoder(self._updated_encoder_params()),
-                                         RemoveSpatial(),)
+        if self._hp.use_pretrain:
+            self.img_encoder = nn.Sequential(ResizeSpatial(self._hp.prior_input_res),  # encodes image inputs
+                                             PreTrainEncoder(self._hp),
+                                             RemoveSpatial(), )
+            self._hp.nz_enc = 512      # resnet18 feature dim.
+        else:
+            self.img_encoder = nn.Sequential(ResizeSpatial(self._hp.prior_input_res),  # encodes image inputs
+                                             Encoder(self._updated_encoder_params()),
+                                             RemoveSpatial(), )
         return ClSPiRLMdl._build_inference_net(self)
 
     def _get_seq_enc(self, inputs):

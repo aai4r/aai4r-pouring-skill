@@ -19,8 +19,8 @@ env:
 
   action_noise: False
 
-  cam_width: 128
-  cam_height: 128
+  cam_width: 150
+  cam_height: 150
 
   interaction_mode: False
 

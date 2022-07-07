@@ -170,9 +170,16 @@ def load_expert_demo_data():
 
 def load_weights_and_freeze():
     model = models.resnet18(pretrained=True)
+    model = nn.Sequential(*list(model.children())[:-1],     # exclude the last fc layer
+                          nn.Flatten(),)
     for param in model.parameters():
         param.requires_grad = False
     return model
+
+
+def resnet_test():
+    model = models.resnet18(pretrained=True)
+    print(model)
 
 
 if __name__ == "__main__":
@@ -180,5 +187,6 @@ if __name__ == "__main__":
     os.environ["DATA_DIR"] = "../data"
 
     # pre_trained()
-    load_expert_demo_data()
+    # load_expert_demo_data()
+    # resnet_test()
 
