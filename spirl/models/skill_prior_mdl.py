@@ -67,7 +67,7 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
             'nz_enc': 32,               # number of dimensions in encoder-latent space
             'nz_vae': 12,               # number of dimensions in vae-latent space
             'nz_mid': 32,               # number of dimensions for internal feature spaces
-            'nz_mid_lstm': 256,         # size of middle LSTM layers
+            'nz_mid_lstm': 128,         # size of middle LSTM layers
             'n_lstm_layers': 1,         # number of LSTM layers
             'n_processing_layers': 4,   # number of layers in MLPs
         })
@@ -571,9 +571,9 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
 
     def forward(self, inputs):
         out = self.resize(inputs.images)
-        # h, w = out.shape[2], out.shape[3]
-        # unroll = out.reshape(out.shape[0], 3, h, w * 2)
-        # out = self.enc(unroll)
+        h, w = out.shape[2], out.shape[3]
+        unroll = out.reshape(out.shape[0], 3, h, w * 2)
+        out = self.enc(unroll)
         out = self.enc(out)
         out = self.rm_spatial(out)
         z = self.fc(torch.cat((out, inputs.states), dim=-1))

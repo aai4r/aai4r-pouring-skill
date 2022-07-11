@@ -38,6 +38,6 @@ agent_config.update(AttrDict(
 ))
 
 sampler_config = AttrDict(
-    n_frames=1,
+    n_frames=2,
 )
 

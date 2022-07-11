@@ -22,6 +22,8 @@ from torch import Tensor
 from torchvision import models
 from spirl.components.checkpointer import freeze_modules
 
+import cv2  # for debug
+
 
 class ParamLayer(nn.Module):
     def __init__(self, n_dim, init_value):
@@ -67,14 +69,26 @@ class PreTrainEncoder(nn.Module):
         self.net = nn.Sequential(*list(pre_trained_model.children())[:-1])  # exclude the last fc layer
         if freeze:
             freeze_modules([self.net])
-        self.eval()
 
     def forward(self, input):
         # input shape: (batch*n_rollout, 3*n_channel, h, w)
-        # h, w = input.shape[-1], input.shape[-1]
-        # unroll = input.reshape(input.shape[0], 3, h, -1)
-        # out = self.net(unroll)
-        out = self.net(input)
+        h, w, c = input.shape[-1], input.shape[-1], 3   # height, width, channel
+        unroll = torch.tensor([]).to(self._hp.device)
+        for i in range(self._hp.n_input_frames):
+            start, end = i * c, (i + 1) * c
+            unroll = torch.cat((unroll, input[:, start:end]), dim=-1)
+
+        # # visualize unroll
+        # img1 = unroll[0, :, :, :w].cpu().numpy().transpose(1, 2, 0)
+        # img1 = cv2.cvtColor(img1, cv2.COLOR_RGB2BGR)
+        #
+        # img2 = unroll[0, :, :, w:].cpu().numpy().transpose(1, 2, 0)
+        # img2 = cv2.cvtColor(img2, cv2.COLOR_RGB2BGR)
+        #
+        # cv2.imshow("images", np.concatenate((img1, img2), axis=1))
+        # cv2.waitKey()
+        out = self.net(unroll)
+        # out = self.net(input)
         return out
 
 

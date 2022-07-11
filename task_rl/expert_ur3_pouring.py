@@ -218,8 +218,8 @@ class DemoUR3Pouring(BaseTask):
         # asset_options.vhacd_params.max_num_vertices_per_ch = 64
         asset_options.use_mesh_materials = True
 
-        asset_options.fix_base_link = True
-        asset_options.disable_gravity = True
+        # asset_options.fix_base_link = True
+        # asset_options.disable_gravity = True
 
         cup_asset_file = "urdf/objects/paper_cup.urdf"
         cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)

@@ -143,8 +143,8 @@ def load_expert_demo_data():
         print("np img diff: ", (_img1_np - _img2_np).sum())
 
         np_horizon_stack = np.concatenate((_img1, _img2), axis=1)
-        # cv2.imshow("image", np_horizon_stack)
-        cv2.imshow("unroll", _unroll)
+        cv2.imshow("image", np_horizon_stack)
+        # cv2.imshow("unroll", _unroll)
         cv2.waitKey()
 
         out1 = model(img1)
@@ -179,7 +179,13 @@ def load_weights_and_freeze():
 
 def resnet_test():
     model = models.resnet18(pretrained=True)
-    print(model)
+    res = nn.Sequential(*list(model.children())[:-3])
+    inputs = torch.rand(64, 3, 128, 128)
+    outs = res(inputs)
+    # print(model)
+    for c in model.children():
+        print(c)
+    print("out: ", outs.shape)
 
 
 if __name__ == "__main__":
@@ -187,6 +193,6 @@ if __name__ == "__main__":
     os.environ["DATA_DIR"] = "../data"
 
     # pre_trained()
-    # load_expert_demo_data()
+    load_expert_demo_data()
     # resnet_test()
 

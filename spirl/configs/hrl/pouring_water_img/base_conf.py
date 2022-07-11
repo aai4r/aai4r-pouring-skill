@@ -67,15 +67,15 @@ ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
-    kl_div_weight=5e-4,
-    n_input_frames=1,
+    kl_div_weight=2e-4,
+    n_input_frames=2,
     prior_input_res=data_spec_img.res,
-    nz_vae=32,
+    nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=256,     # will automatically set to 512(resnet18) if use_pretrain=True
+    nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
     nz_mid_prior=256,
-    n_processing_layers=3,
-    num_prior_net_layers=3,
+    n_processing_layers=2,
+    num_prior_net_layers=2,
     state_cond=False,
     state_cond_size=7,
     use_pretrain=True,
