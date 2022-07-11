@@ -78,14 +78,17 @@ class PreTrainEncoder(nn.Module):
             start, end = i * c, (i + 1) * c
             unroll = torch.cat((unroll, input[:, start:end]), dim=-1)
 
-        # # visualize unroll
-        # img1 = unroll[0, :, :, :w].cpu().numpy().transpose(1, 2, 0)
-        # img1 = cv2.cvtColor(img1, cv2.COLOR_RGB2BGR)
+        # # visualize unroll dependent on n_input_frames
+        # idx = 0
+        # img = unroll[idx, :, :, :w].cpu().numpy().transpose(1, 2, 0)
+        # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        # for i in range(1, self._hp.n_input_frames):
+        #     start, end = i * w, (i + 1) * w
+        #     temp = unroll[idx, :, :, start:end].cpu().numpy().transpose(1, 2, 0)
+        #     temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
+        #     img = np.concatenate((img, temp), axis=-2)
         #
-        # img2 = unroll[0, :, :, w:].cpu().numpy().transpose(1, 2, 0)
-        # img2 = cv2.cvtColor(img2, cv2.COLOR_RGB2BGR)
-        #
-        # cv2.imshow("images", np.concatenate((img1, img2), axis=1))
+        # cv2.imshow("images", img)
         # cv2.waitKey()
         out = self.net(unroll)
         # out = self.net(input)
