@@ -685,10 +685,11 @@ class DemoUR3Pouring(BaseTask):
         self.cup_tip_rot[:], self.cup_tip_pos[:] = \
             tf_combine(self.cup_rot, self.cup_pos, self.cup_local_tip_rot, self.cup_local_tip_pos)
 
-        # dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
-        #                   / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
-        dof_pos = self.ur3_dof_pos
-        dof_pos = torch.index_select(dof_pos, 1, self.indices)
+        dof_pos_scaled = (2.0 * (self.ur3_dof_pos - self.ur3_dof_lower_limits)
+                          / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
+        # dof_pos = self.ur3_dof_pos
+        dof_pos = torch.index_select(dof_pos_scaled, 1, self.indices)
+        dof_pos[:, -1] = self.ur3_dof_pos[:, -1]
         dof_vel = torch.index_select(self.ur3_dof_vel, 1, self.indices)
         dof_pos_vel = torch.cat((dof_pos, dof_vel[:, :-1]), dim=-1)     # except for gripper joint speed
 
@@ -1461,7 +1462,23 @@ class DemoUR3Pouring(BaseTask):
     def calc_expert_action(self):
         des_pos, des_rot, des_grip, _ = self.tpm.get_desired_pose()
         actions = self.solve(goal_pos=des_pos, goal_rot=des_rot, goal_grip=des_grip, absolute=True)
-        return actions
+        return torch.clamp(actions, min=-1.0, max=1.0)
+
+    """
+        Dataset normalization implementation on tensors for each line by line
+        # a, b = -1, 1    # range [a, b]
+        # # normalize does not preserve the data shape
+        # numer = torch.sub(actions, actions.min(-1).values.unsqueeze(-1))
+        # denom = actions.max(-1).values.unsqueeze(-1) - actions.min(-1).values.unsqueeze(-1)
+        # actions = (b - a) * (numer / denom) + a
+
+        # normalizing does preserve the data shape
+        # numer = actions - actions.mean(-1).unsqueeze(-1)
+        # sig_in = actions.var(-1).unsqueeze(-1)
+        # sig_out = (b - a) / 2
+        # u_out = (b + a) / 2
+        # actions = (numer / sig_in) #* sig_out + u_out
+    """
 
 
 #####################################################################

@@ -114,57 +114,32 @@ def load_expert_demo_data():
     print("loader", loader)
     for batch_idx, sample_batched in enumerate(loader):
         print("batch idx: ", batch_idx)
+        n_frames = 2
         inputs = sample_batched["images"]   # (batch, rollout, channel, height, width)
         batch_size = inputs.shape[0]
-        height, width = inputs.shape[3], inputs.shape[4]
-        # input = sample_batched["images"][:, 0]
-        inputs_seq = inputs[:, :2].reshape(batch_size, -1, height, width)   # (128, 6, 256, 256)
-        inputs_batch = inputs[:, :2].reshape(-1, 3, height, width)          # (256, 3, 256, 256)
-        print("sample: ", inputs.shape)
+        h, w, c = inputs.shape[-2], inputs.shape[-1], 3     # height, width, channel
+        inputs_seq = inputs[:, :n_frames].reshape(batch_size, -1, h, w)  # (128, 6, 256, 256)
 
-        # input comparison
-        img1 = inputs_seq[:, :3]    # tensor img
-        img2 = inputs_batch[:128]
+        for idx in range(batch_size):
+            unroll = torch.tensor([])
+            for i in range(n_frames):
+                start, end = i * c, (i + 1) * c
+                unroll = torch.cat((unroll, inputs_seq[:, start:end]), dim=-1)
 
-        unroll = inputs_seq.reshape(batch_size, 3, height, -1)
-        print("img1, shape: {}, type: {},  min/max: {} / {}".format(img1.shape, img1.dtype, img1.min(), img1.max()))
-        print("img2, shape: {}, type: {},  min/max: {} / {}".format(img2.shape, img2.dtype, img2.min(), img2.max()))
-        print("img diff: ", (img1 - img2).sum())
+            img = unroll[idx, :, :, :w].cpu().numpy().transpose(1, 2, 0)
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            for i in range(1, n_frames):
+                start, end = i * w, (i + 1) * w
+                temp = unroll[idx, :, :, start:end].cpu().numpy().transpose(1, 2, 0)
+                temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
+                img = np.concatenate((img, temp), axis=-2)
 
-        _img1_np = img1.numpy().transpose(0, 2, 3, 1)
-        _img2_np = img2.numpy().transpose(0, 2, 3, 1)
-        _unroll_np = unroll.numpy().transpose(0, 2, 3, 1)
-        print("unroll shape: ", _unroll_np.shape)
+            cv2.imshow("images", img)
+            print("Frame: {} / {}".format(idx, batch_size))
+            k = cv2.waitKey()
+            if k == 27:
+                break
 
-        _img1 = cv2.cvtColor(_img1_np[1], cv2.COLOR_RGB2BGR)
-        _img2 = cv2.cvtColor(_img2_np[1], cv2.COLOR_RGB2BGR)
-        _unroll = cv2.cvtColor(_unroll_np[1], cv2.COLOR_RGB2BGR)
-        print("unroll shape: ", _unroll.shape)
-        print("np img diff: ", (_img1_np - _img2_np).sum())
-
-        np_horizon_stack = np.concatenate((_img1, _img2), axis=1)
-        cv2.imshow("image", np_horizon_stack)
-        # cv2.imshow("unroll", _unroll)
-        cv2.waitKey()
-
-        out1 = model(img1)
-        out2 = model(img2)
-        print("out diff: ", (out1 - out2).sum())   # should be zero
-
-        out_all = model(inputs_batch)
-        print("comp2: ", (out1 - out_all[0]).sum())
-
-        out_unroll = model(unroll)
-        print("unroll result: ", out_unroll.shape)
-        print("out min/max: {} / {}".format(out_unroll.min(), out_unroll.max()))
-
-        # out_all_1 = out_all[:batch_size].reshape(batch_size, -1)
-        # out_all_2 = out_all[batch_size:].reshape(batch_size, -1)
-        # print("result 1: ", (out1 - out_all_1).sum())
-        # print("result 2: ", (out2 - out_all_2).sum())
-        # print("result 12: ", (out1 - out_all_2).sum())
-        # print("output, shape:{}, min/max: {}/{}".format(out.shape, out.min(), out.max()))
-        break
     print("end...")
 
 

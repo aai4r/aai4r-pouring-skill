@@ -3,6 +3,7 @@ import time
 import datetime
 import numpy as np
 import h5py
+import torch
 
 from gym.spaces import Space
 from task_rl.ExpertRolloutStorage import ExpertRolloutStorage

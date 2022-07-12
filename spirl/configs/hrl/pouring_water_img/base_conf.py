@@ -79,6 +79,7 @@ ll_model_params = AttrDict(
     state_cond=False,
     state_cond_size=7,
     use_pretrain=True,
+    # squash_output_dist=False,
 )
 
 # LL Agent
@@ -102,6 +103,7 @@ hl_policy_params = AttrDict(
     policy_lr=1.5e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
+    # squash_output_dist=False,
 )
 
 # HL Critic

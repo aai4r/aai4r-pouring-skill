@@ -69,29 +69,30 @@ class PreTrainEncoder(nn.Module):
         self.net = nn.Sequential(*list(pre_trained_model.children())[:-1])  # exclude the last fc layer
         if freeze:
             freeze_modules([self.net])
+        self.net.eval()
+
+    def visualize(self, unroll, index):
+        w = self._hp.prior_input_res
+        img = unroll[index, :, :, :w].cpu().numpy().transpose(1, 2, 0)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        for i in range(1, self._hp.n_input_frames):
+            start, end = i * w, (i + 1) * w
+            temp = unroll[index, :, :, start:end].cpu().numpy().transpose(1, 2, 0)
+            temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
+            img = np.concatenate((img, temp), axis=-2)
+
+        cv2.imshow("images", img)
+        cv2.waitKey()
 
     def forward(self, input):
         # input shape: (batch*n_rollout, 3*n_channel, h, w)
-        h, w, c = input.shape[-2], input.shape[-1], 3   # height, width, channel
+        n_channel = 3
         unroll = torch.tensor([]).to(self._hp.device)
         for i in range(self._hp.n_input_frames):
-            start, end = i * c, (i + 1) * c
+            start, end = i * n_channel, (i + 1) * n_channel
             unroll = torch.cat((unroll, input[:, start:end]), dim=-1)
 
-        # # visualize unroll dependent on n_input_frames
-        # idx = 0
-        # img = unroll[idx, :, :, :w].cpu().numpy().transpose(1, 2, 0)
-        # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        # for i in range(1, self._hp.n_input_frames):
-        #     start, end = i * w, (i + 1) * w
-        #     temp = unroll[idx, :, :, start:end].cpu().numpy().transpose(1, 2, 0)
-        #     temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
-        #     img = np.concatenate((img, temp), axis=-2)
-        #
-        # cv2.imshow("images", img)
-        # cv2.waitKey()
         out = self.net(unroll)
-        # out = self.net(input)
         return out
 
 
