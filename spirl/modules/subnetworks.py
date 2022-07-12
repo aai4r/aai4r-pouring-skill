@@ -72,7 +72,7 @@ class PreTrainEncoder(nn.Module):
 
     def forward(self, input):
         # input shape: (batch*n_rollout, 3*n_channel, h, w)
-        h, w, c = input.shape[-1], input.shape[-1], 3   # height, width, channel
+        h, w, c = input.shape[-2], input.shape[-1], 3   # height, width, channel
         unroll = torch.tensor([]).to(self._hp.device)
         for i in range(self._hp.n_input_frames):
             start, end = i * c, (i + 1) * c

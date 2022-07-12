@@ -14,7 +14,7 @@ configuration = {
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
     'epoch_cycles_train': 20,
-    'num_epochs': 100,
+    'num_epochs': 200,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
