@@ -570,12 +570,12 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
                             mid_size=self._hp.nz_mid_prior)
 
     def forward(self, inputs):
-        out = self.resize(inputs.images)
-        h, w, c = inputs.shape[-2], inputs.shape[-1], 3  # height, width, channel
+        _img = self.resize(inputs.images)
+        h, w, c = _img.shape[-2], _img.shape[-1], 3  # height, width, channel
         unroll = torch.tensor([]).to(self._hp.device)
         for i in range(self._hp.n_input_frames):
             start, end = i * c, (i + 1) * c
-            unroll = torch.cat((unroll, inputs[:, start:end]), dim=-1)
+            unroll = torch.cat((unroll, _img[:, start:end]), dim=-1)
 
         out = self.enc(unroll)
         out = self.rm_spatial(out)
