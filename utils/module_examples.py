@@ -1,8 +1,10 @@
 import numpy as np
-from torchvision import models
+import torchvision.transforms
+from torchvision import models, transforms
 import torch
 import torch.nn as nn
 import os
+import time
 import cv2
 import imp
 
@@ -125,6 +127,13 @@ def load_expert_demo_data():
             for i in range(n_frames):
                 start, end = i * c, (i + 1) * c
                 unroll = torch.cat((unroll, inputs_seq[:, start:end]), dim=-1)
+
+            tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                          std=[0.229, 0.224, 0.225])])
+            start = time.time()
+            unroll = tr((unroll + 1.0) / 2.0)
+            print("elapsed tr: ", time.time() - start)
+            print("min/max: {} / {}".format(unroll.min(), unroll.max()))
 
             img = unroll[idx, :, :, :w].cpu().numpy().transpose(1, 2, 0)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)

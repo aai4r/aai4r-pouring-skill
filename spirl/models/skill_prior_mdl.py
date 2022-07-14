@@ -4,7 +4,7 @@ import copy
 import torch
 import torch.nn as nn
 import numpy as np
-from torchvision import models
+from torchvision import models, transforms
 from collections import deque
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
@@ -67,7 +67,7 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
             'nz_enc': 32,               # number of dimensions in encoder-latent space
             'nz_vae': 12,               # number of dimensions in vae-latent space
             'nz_mid': 32,               # number of dimensions for internal feature spaces
-            'nz_mid_lstm': 128,         # size of middle LSTM layers
+            'nz_mid_lstm': 256,         # size of middle LSTM layers
             'n_lstm_layers': 1,         # number of LSTM layers
             'n_processing_layers': 4,   # number of layers in MLPs
         })
@@ -398,11 +398,11 @@ class ImageSkillPriorMdl(SkillPriorMdl):
     def _build_prior_net(self):
         if self._hp.state_cond:
             # return StateCondImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
-            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
+            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params(), freeze=False)
         else:
             return nn.Sequential(
                 ResizeSpatial(self._hp.prior_input_res),
-                PreTrainEncoder(self._hp) if self._hp.use_pretrain else Encoder(self._updated_encoder_params()),
+                PreTrainEncoder(self._hp, freeze=False) if self._hp.use_pretrain else Encoder(self._updated_encoder_params()),
                 RemoveSpatial(),
                 super()._build_prior_net(),
             )
@@ -553,14 +553,16 @@ class StateCondImageSkillPriorNet(nn.Module):
 
 
 class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
-    def __init__(self, hp, enc_params):
+    def __init__(self, hp, enc_params, freeze=True):
         super().__init__(hp=hp, enc_params=enc_params)
+        self.freeze = freeze
 
     def build_network(self):
         self.resize = ResizeSpatial(self._hp.prior_input_res)
         pre_trained_model = models.resnet18(pretrained=True)
         self.enc = nn.Sequential(*list(pre_trained_model.children())[:-1])
-        freeze_modules([self.enc])
+        if self.freeze:
+            freeze_modules([self.enc])
         self.rm_spatial = RemoveSpatial()
 
         resnet_mid = 512   # resnet 18 feature size
@@ -568,6 +570,9 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         self.fc = Predictor(self._hp, input_size=input_size,
                             output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
                             mid_size=self._hp.nz_mid_prior)
+
+        self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                           std=[0.229, 0.224, 0.225])])
 
     def forward(self, inputs):
         _img = self.resize(inputs.images)
@@ -577,6 +582,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
             start, end = i * c, (i + 1) * c
             unroll = torch.cat((unroll, _img[:, start:end]), dim=-1)
 
+        unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later.
         out = self.enc(unroll)
         out = self.rm_spatial(out)
         z = self.fc(torch.cat((out, inputs.states), dim=-1))

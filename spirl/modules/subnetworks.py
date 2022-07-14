@@ -19,10 +19,11 @@ from spirl.utils.general_utils import SkipInputSequential, GetIntermediatesSeque
 from spirl.utils.pytorch_utils import like, AttrDictPredictor, batchwise_assign, make_one_hot, mask_out
 from spirl.utils.general_utils import broadcast_final, AttrDict
 from torch import Tensor
-from torchvision import models
+from torchvision import models, transforms
 from spirl.components.checkpointer import freeze_modules
 
 import cv2  # for debug
+import time
 
 
 class ParamLayer(nn.Module):
@@ -69,9 +70,11 @@ class PreTrainEncoder(nn.Module):
         self.net = nn.Sequential(*list(pre_trained_model.children())[:-1])  # exclude the last fc layer
         if freeze:
             freeze_modules([self.net])
-        self.net.eval()
+        # self.net.eval()
+        self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                           std=[0.229, 0.224, 0.225])])
 
-    def visualize(self, unroll, index):
+    def visualize(self, unroll, index):     # for debugging
         w = self._hp.prior_input_res
         img = unroll[index, :, :, :w].cpu().numpy().transpose(1, 2, 0)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -92,6 +95,8 @@ class PreTrainEncoder(nn.Module):
             start, end = i * n_channel, (i + 1) * n_channel
             unroll = torch.cat((unroll, input[:, start:end]), dim=-1)
 
+        unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later. it takes some time..
+        # self.visualize(unroll, 0)
         out = self.net(unroll)
         return out
 

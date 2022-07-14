@@ -32,8 +32,8 @@ class ClSPiRLMdl(SkillPriorMdl):
         # condition inference on states since decoder is conditioned on states too
         input_size = self._hp.action_dim + self.prior_input_size
         return torch.nn.Sequential(
-            BaseProcessingLSTM(self._hp, in_dim=input_size, out_dim=self._hp.nz_enc),
-            torch.nn.Linear(self._hp.nz_enc, self._hp.nz_vae * 2)
+            BaseProcessingLSTM(self._hp, in_dim=input_size, out_dim=int(self._hp.nz_mid_lstm * 0.5)),   # default: self._hp.nz_enc
+            torch.nn.Linear(int(self._hp.nz_mid_lstm * 0.5), self._hp.nz_vae * 2)                       # default: self._hp.nz_enc
         )
 
     def _run_inference(self, inputs):
@@ -80,7 +80,7 @@ class ImageClSPiRLMdl(ClSPiRLMdl, ImageSkillPriorMdl):
     def _build_inference_net(self):
         if self._hp.use_pretrain:
             self.img_encoder = nn.Sequential(ResizeSpatial(self._hp.prior_input_res),  # encodes image inputs
-                                             PreTrainEncoder(self._hp),
+                                             PreTrainEncoder(self._hp, freeze=False),
                                              RemoveSpatial(), )
             self._hp.nz_enc = 512      # resnet18 feature dim.
         else:
