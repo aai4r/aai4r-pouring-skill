@@ -11,7 +11,7 @@ from matplotlib.patches import Ellipse
 
 from spirl.components.base_model import BaseModel
 from spirl.components.logger import Logger
-from spirl.components.checkpointer import load_by_key, freeze_modules
+from spirl.components.checkpointer import load_by_key, freeze_modules, freeze_model_until
 from spirl.modules.losses import KLDivLoss, NLL
 from spirl.modules.subnetworks import BaseProcessingLSTM, Predictor, Encoder, PreTrainEncoder
 from spirl.modules.recurrent_modules import RecurrentPredictor
@@ -398,11 +398,11 @@ class ImageSkillPriorMdl(SkillPriorMdl):
     def _build_prior_net(self):
         if self._hp.state_cond:
             # return StateCondImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
-            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params(), freeze=False)
+            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params(), freeze=True)
         else:
             return nn.Sequential(
                 ResizeSpatial(self._hp.prior_input_res),
-                PreTrainEncoder(self._hp, freeze=False) if self._hp.use_pretrain else Encoder(self._updated_encoder_params()),
+                PreTrainEncoder(self._hp, freeze=True) if self._hp.use_pretrain else Encoder(self._updated_encoder_params()),
                 RemoveSpatial(),
                 super()._build_prior_net(),
             )
@@ -554,15 +554,16 @@ class StateCondImageSkillPriorNet(nn.Module):
 
 class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
     def __init__(self, hp, enc_params, freeze=True):
-        super().__init__(hp=hp, enc_params=enc_params)
         self.freeze = freeze
+        super().__init__(hp=hp, enc_params=enc_params)
 
     def build_network(self):
         self.resize = ResizeSpatial(self._hp.prior_input_res)
         pre_trained_model = models.resnet18(pretrained=True)
         self.enc = nn.Sequential(*list(pre_trained_model.children())[:-1])
         if self.freeze:
-            freeze_modules([self.enc])
+            # freeze_modules([self.enc])
+            freeze_model_until(self.enc, until=4)   # resnet 18 has 9 layers except for the last fc layer
         self.rm_spatial = RemoveSpatial()
 
         resnet_mid = 512   # resnet 18 feature size

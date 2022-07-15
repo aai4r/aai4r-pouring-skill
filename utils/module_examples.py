@@ -163,7 +163,7 @@ def load_weights_and_freeze():
 
 def resnet_test():
     model = models.resnet18(pretrained=True)
-    res = nn.Sequential(*list(model.children())[:-3])
+    res = nn.Sequential(*list(model.children())[:-1])
     inputs = torch.rand(64, 3, 128, 128)
     outs = res(inputs)
     # print(model)
@@ -177,6 +177,6 @@ if __name__ == "__main__":
     os.environ["DATA_DIR"] = "../data"
 
     # pre_trained()
-    load_expert_demo_data()
-    # resnet_test()
+    # load_expert_demo_data()
+    resnet_test()
 

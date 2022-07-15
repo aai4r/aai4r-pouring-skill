@@ -139,3 +139,14 @@ def freeze_module(module):
 
 def freeze_modules(module_list):
     [freeze_module(module) for module in module_list]
+
+
+def freeze_model_until(model, until):
+    assert (until >= 0) and (until <= len(list(model.children())))
+    count = 0
+    for p in model.parameters():
+        if count > until:
+            break
+        if p.requires_grad:
+            p.requires_grad = False
+        count += 1

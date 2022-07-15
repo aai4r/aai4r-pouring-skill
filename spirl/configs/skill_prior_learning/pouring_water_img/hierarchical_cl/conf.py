@@ -13,8 +13,8 @@ configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
-    'epoch_cycles_train': 10,
-    'num_epochs': 200,
+    'epoch_cycles_train': 5,
+    'num_epochs': 101,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -35,7 +35,7 @@ model_config = AttrDict(
     n_processing_layers=2,      # num_layers of skill decoder
     num_prior_net_layers=2,     # prior_net Predictor
     cond_decode=True,
-    state_cond=False,
+    state_cond=True,
     state_cond_size=7,
     use_pretrain=True,
 )

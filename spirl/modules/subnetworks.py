@@ -20,7 +20,7 @@ from spirl.utils.pytorch_utils import like, AttrDictPredictor, batchwise_assign,
 from spirl.utils.general_utils import broadcast_final, AttrDict
 from torch import Tensor
 from torchvision import models, transforms
-from spirl.components.checkpointer import freeze_modules
+from spirl.components.checkpointer import freeze_modules, freeze_model_until
 
 import cv2  # for debug
 import time
@@ -69,7 +69,9 @@ class PreTrainEncoder(nn.Module):
         pre_trained_model = models.resnet18(pretrained=True)
         self.net = nn.Sequential(*list(pre_trained_model.children())[:-1])  # exclude the last fc layer
         if freeze:
-            freeze_modules([self.net])
+            # freeze_modules([self.net])
+            freeze_model_until(model=self.net, until=4)  # resnet 18 has 9 layers except for the last fc layer
+
         # self.net.eval()
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])

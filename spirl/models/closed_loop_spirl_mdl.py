@@ -80,7 +80,7 @@ class ImageClSPiRLMdl(ClSPiRLMdl, ImageSkillPriorMdl):
     def _build_inference_net(self):
         if self._hp.use_pretrain:
             self.img_encoder = nn.Sequential(ResizeSpatial(self._hp.prior_input_res),  # encodes image inputs
-                                             PreTrainEncoder(self._hp, freeze=False),
+                                             PreTrainEncoder(self._hp, freeze=True),
                                              RemoveSpatial(), )
             self._hp.nz_enc = 512      # resnet18 feature dim.
         else:
