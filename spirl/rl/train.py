@@ -15,7 +15,7 @@ from spirl.rl.utils.mpi import update_with_mpi_config, set_shutdown_hooks, mpi_s
 from spirl.rl.utils.wandb import WandBLogger
 from spirl.rl.utils.rollout_utils import RolloutSaver
 from spirl.rl.components.sampler import Sampler
-from spirl.rl.components.replay_buffer import RolloutStorage
+from spirl.rl.components.replay_buffer import RolloutStorage, PouringSkillRolloutStorage
 
 WANDB_PROJECT_NAME = 'spirl_project'
 WANDB_ENTITY_NAME = 'twkim0812'
@@ -158,12 +158,14 @@ class RLTrainer:
 
     def val(self):
         """Evaluate agent."""
-        val_rollout_storage = RolloutStorage()
+        # val_rollout_storage = RolloutStorage()
+        val_rollout_storage = PouringSkillRolloutStorage(conf=self.conf)
         with self.agent.val_mode():
             with torch.no_grad():
                 with timing("Eval rollout time: "):
-                    for _ in range(WandBLogger.N_LOGGED_SAMPLES):   # for efficiency instead of self.args.n_val_samples
+                    for _ in range(30):  # WandBLogger.N_LOGGED_SAMPLES # for efficiency instead of self.args.n_val_samples
                         val_rollout_storage.append(self.sampler.sample_episode(is_train=False, render=True))
+                        print("val_rollout: ", val_rollout_storage.get()[-1].info[-1])
 
         # import cv2
         # for i in range(len(val_rollout_storage.rollouts)):
@@ -174,6 +176,9 @@ class RLTrainer:
         #         cv2.waitKey()
         #         print("img type / dtype: {} / {}".format(type(img), img.dtype))
         #         print("img shape: {}".format(img.shape))
+
+        if self.args.task_name:
+            val_rollout_storage.task_stats()
 
         rollout_stats = val_rollout_storage.rollout_stats()
         if self.is_chef:
@@ -366,6 +371,7 @@ if __name__ == '__main__':
     args.path = "../configs/hrl/{}/{}".format(task_name, mode)
     args.seed = 0
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
+    args.task_name = task_name
     # args.resume = "latest"
     args.mode = "val"     # "train" / "val" / "demo" / else: rollout_save
     RLTrainer(args=args)

@@ -188,6 +188,30 @@ class RolloutStorage:
         return self.rollouts and key in self.rollouts[0]
 
 
+class PouringSkillRolloutStorage(RolloutStorage):
+    def __init__(self, conf):
+        super().__init__()
+        self.model_param = conf.agent.ll_agent_params.policy_params.weights_dir
+
+    def task_stats(self):
+        assert self.rollouts
+        _sum = dict.fromkeys(self.rollouts[0].info[0][0].keys(), 0)
+        for item in self.rollouts:  # for each episode
+            for k, v in item.info[-1][0].items():
+                _sum[k] += v.sum()
+
+        # print summary
+        print("===========================================")
+        print(self.model_param)
+        print("_sum: ", _sum)
+        avg = dict.fromkeys(_sum.keys(), 0.0)
+        eval_len = len(self.rollouts)
+        for k, v in _sum.items():
+            if k == "grasp_stability":
+                avg[k] = _sum[k] / _sum["grasp_stability"]
+                continue
+            avg[k] = _sum[k] / eval_len
+        print("avg: ", avg)
 
 
 
