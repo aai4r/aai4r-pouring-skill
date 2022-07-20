@@ -1,14 +1,13 @@
+import copy
 import random
-
 import cv2
 import os
-
 import torch
 
 from utils.torch_jit_utils import *
 from utils.utils import *
 from torch.nn.functional import normalize
-from tasks.base.base_task import BaseTask
+from tasks.base.base_task import BaseTask, AttrDict
 from isaacgym import gymtorch
 from isaacgym import gymapi
 
@@ -133,6 +132,16 @@ class DemoUR3Pouring(BaseTask):
 
         self.reset(torch.arange(self.num_envs, device=self.device))
         self.refresh_env_tensors()
+
+        self.task_status = AttrDict(
+            approach_bottle=torch.zeros(self.num_envs, 1, device=self.device),
+            grasping=torch.zeros(self.num_envs, 1, device=self.device),
+            lifting=torch.zeros(self.num_envs, 1, device=self.device),
+            pouring=torch.zeros(self.num_envs, 1, device=self.device),
+            task_success=torch.zeros(self.num_envs, 1, device=self.device),
+            bottle_fallen=torch.zeros(self.num_envs, 1, device=self.device),
+            grasp_stability=torch.zeros(self.num_envs, 1, device=self.device),
+        )
         self.set_task_viapoints(torch.arange(self.num_envs, device=self.device))
 
         # task_rl demo. params.
@@ -591,7 +600,7 @@ class DemoUR3Pouring(BaseTask):
 
     def compute_reward(self, actions):
         self.rew_buf[:], self.reset_buf[:] = compute_ur3_reward(
-            self.reset_buf, self.progress_buf, self.actions,
+            self.reset_buf, self.progress_buf, actions,
             self.bottle_grasp_pos, self.bottle_grasp_rot, self.bottle_pos, self.bottle_rot, self.bottle_tip_pos, self.bottle_floor_pos,
             self.ur3_grasp_pos, self.ur3_grasp_rot, self.cup_pos, self.cup_rot, self.cup_tip_pos, self.liq_pos,
             self.ur3_lfinger_pos, self.ur3_rfinger_pos,
@@ -1166,6 +1175,8 @@ class DemoUR3Pouring(BaseTask):
         if len(_env_ids) > 0:
             self.set_task_viapoints(_env_ids)
 
+        self.task_evaluation()
+
         # debug viz
         if self.viewer and self.debug_viz:
             self.gym.clear_lines(self.viewer)
@@ -1297,7 +1308,83 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0, 0, 1])
                 pass
 
+    def task_evaluation(self):
+        """
+        Target:
+            1) approach bottle (O)
+            2) grasping (O)
+            3) lifting (O)
+            4) approach cup, grasping bottle
+            5) pouring (O)
+            6) task success (O)
+
+        Failure:
+            1) bottle fall (O)
+            2) cup fall
+            3) unstable grasping (O)
+        """
+
+        # Target: 1) approach bottle
+        d1 = torch.norm(self.ur3_grasp_pos - self.bottle_grasp_pos, p=2, dim=-1)
+        self.task_status.approach_bottle = torch.where(d1 < 0.1, 1.0, self.task_status.approach_bottle.double())
+
+        # Target: 2) grasping
+        finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1).unsqueeze(-1)
+        self.task_status.grasping = torch.where((d1 < 0.05) & (finger_dist < self.bottle_diameter + 0.005),
+                                                 1.0, self.task_status.grasping.double())
+
+        # Target: 3) lifting
+        self.task_status.lifting = torch.where((self.task_status.grasping == 1.0) & (self.bottle_floor_pos[:, -1] > 0.08),
+                                                1.0, self.task_status.lifting.double())
+
+        # Target: 5) pouring
+        r = self.bottle_tip_pos[:, -1] - self.bottle_floor_pos[:, -1]
+        self.task_status.pouring = torch.where((self.task_status.lifting == 1.0) & (r < 0.0),
+                                                1.0, self.task_status.pouring.double())
+
+        # Target: 6) task success
+        # is_cup_fallen = dot4 < 0.5
+        # is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.8)
+        # is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
+        liq_cup_dist_xy = torch.norm(self.liq_pos[:, :2] - self.cup_pos[:, :2], p=2, dim=-1)
+        is_poured = (liq_cup_dist_xy < 0.015) & (self.liq_pos[:, 2] < 0.04)
+        self.task_status.task_success = torch.where(is_poured, 1.0, self.task_status.task_success.double())
+
+        # Failure: 1) bottle fallen
+        axis1 = tf_vector(self.bottle_grasp_rot, self.bottle_up_axis)
+        dot1 = torch.bmm(axis1.view(self.num_envs, 1, 3), self.bottle_up_axis.view(self.num_envs, 3, 1)).squeeze(-1).squeeze(-1)
+        is_bottle_fallen = (self.bottle_floor_pos[:, 2] < 0.02) & (dot1 < 0.8)
+        self.task_status.bottle_fallen = torch.where(is_bottle_fallen, 1.0, self.task_status.bottle_fallen.double())
+
+        # Failure: 2) grasping stability
+        ee_up_axis = tf_vector(self.ur3_grasp_rot, self.gripper_up_axis)
+        bottle_up_axis = tf_vector(self.bottle_grasp_rot, self.bottle_up_axis)
+        cos_loss = torch.bmm(ee_up_axis.view(self.num_envs, 1, 3), bottle_up_axis.view(self.num_envs, 3, 1)).squeeze(-1).squeeze(-1)
+        self.task_status.grasp_stability = torch.where(self.task_status.grasping == True,
+                                                       cos_loss, self.task_status.grasp_stability)
+
+        # if not hasattr(self.extras, "pouring_task_eval"):
+        #     self.extras = []
+        # else:
+        _task_status = copy.deepcopy(self.task_status)
+        for k, v, in _task_status.items():
+            _task_status[k] = v.cpu().numpy()
+        self.extras = _task_status
+
+        # print("approach bottle: {}, grasping: {}, lifting: {}, pouring: {}, task success: {}, bottle fallen: {}, grasp cos loss: {}"
+        #       .format(self.task_status.approach_bottle.item(),
+        #               self.task_status.grasping.item(),
+        #               self.task_status.lifting.item(),
+        #               self.task_status.pouring.item(),
+        #               self.task_status.task_success.item(),
+        #               self.task_status.bottle_fallen.item(),
+        #               self.task_status.grasp_stability.item()))
+
     def set_task_viapoints(self, env_ids):
+        # task progress reset, TODO, should be in reset() function?
+        for k, v in self.task_status.items():
+            v[env_ids] = 0.0
+
         if not hasattr(self, "task_pose_list"):
             self.tpl = TaskPoseList(task_name="pouring", num_envs=self.num_envs, device=self.device)
 
@@ -1630,7 +1717,7 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
-    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.9)
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.8)
     is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
     # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
     # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
