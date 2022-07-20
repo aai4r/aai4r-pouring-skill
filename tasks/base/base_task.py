@@ -17,6 +17,8 @@ from isaacgym.gymutil import get_property_setter_map, get_property_getter_map, g
 import numpy as np
 import torch
 
+from spirl.utils.general_utils import AttrDict
+
 
 # Base class for RL tasks
 class BaseTask:
@@ -66,7 +68,7 @@ class BaseTask:
             self.num_envs, device=self.device, dtype=torch.long)
         self.randomize_buf = torch.zeros(
             self.num_envs, device=self.device, dtype=torch.long)
-        self.extras = {}
+        self.extras = AttrDict()
 
         self.original_props = {}
         self.dr_randomizations = {}

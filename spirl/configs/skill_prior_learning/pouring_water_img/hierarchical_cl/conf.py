@@ -35,9 +35,9 @@ model_config = AttrDict(
     n_processing_layers=2,      # num_layers of skill decoder
     num_prior_net_layers=2,     # prior_net Predictor
     cond_decode=True,
-    state_cond=True,
+    state_cond=False,
     state_cond_size=7,
-    use_pretrain=True,
+    use_pretrain=False,
 )
 
 # Dataset

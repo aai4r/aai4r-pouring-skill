@@ -76,10 +76,13 @@ ll_model_params = AttrDict(
     nz_mid_prior=256,
     n_processing_layers=2,
     num_prior_net_layers=2,
-    state_cond=True,
+    state_cond=False,
     state_cond_size=7,
     use_pretrain=True,
+    weights_dir="weights",
 )
+ll_model_params.weights_dir += "_pre" if ll_model_params.use_pretrain else ""
+ll_model_params.weights_dir += "_st_cond" if ll_model_params.state_cond else ""
 
 # LL Agent
 ll_agent_config = copy.deepcopy(base_agent_params)
@@ -102,7 +105,7 @@ hl_policy_params = AttrDict(
     policy_lr=1.5e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
-    # squash_output_dist=False,
+    weights_dir=ll_model_params.weights_dir,
 )
 
 # HL Critic

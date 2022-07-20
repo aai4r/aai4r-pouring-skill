@@ -41,9 +41,9 @@ class PriorInitializedPolicy(Policy):
             net = self._hp.prior_model(self._hp.prior_model_params, None)
         if self._hp.load_weights:
             if self._hp.policy_model is not None:
-                BaseAgent.load_model_weights(net, self._hp.policy_model_checkpoint, self._hp.prior_model_epoch)
+                BaseAgent.load_model_weights(net, self._hp.policy_model_checkpoint, self._hp.prior_model_epoch, self._hp.weights_dir)
             else:
-                BaseAgent.load_model_weights(net, self._hp.prior_model_checkpoint, self._hp.prior_model_epoch)
+                BaseAgent.load_model_weights(net, self._hp.prior_model_checkpoint, self._hp.prior_model_epoch, self._hp.weights_dir)
         return net
 
     def _compute_action_dist(self, obs):
@@ -94,7 +94,7 @@ class LearnedPriorAugmentedPolicy(PriorAugmentedPolicy):
         if self._hp.prior_batch_size > 0:
             self._hp.prior_model_params.batch_size = self._hp.prior_batch_size
         self.prior_net = self._hp.prior_model(self._hp.prior_model_params, None)
-        BaseAgent.load_model_weights(self.prior_net, self._hp.prior_model_checkpoint, self._hp.prior_model_epoch)
+        BaseAgent.load_model_weights(self.prior_net, self._hp.prior_model_checkpoint, self._hp.prior_model_epoch, self._hp.weights_dir)
 
     def _default_hparams(self):
         default_dict = ParamDict({

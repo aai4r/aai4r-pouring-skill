@@ -153,10 +153,10 @@ class BaseAgent(nn.Module):
         return info
 
     @staticmethod
-    def load_model_weights(model, checkpoint, epoch='latest'):
+    def load_model_weights(model, checkpoint, epoch='latest', weights_dir="weights"):
         """Loads weights for a given model from the given checkpoint directory."""
-        checkpoint_dir = checkpoint if os.path.basename(checkpoint) == 'weights' \
-                            else os.path.join(checkpoint, 'weights')     # checkpts in 'weights' dir
+        checkpoint_dir = checkpoint if os.path.basename(checkpoint) == weights_dir \
+                            else os.path.join(checkpoint, weights_dir)     # checkpts in 'weights' dir
         checkpoint_path = CheckpointHandler.get_resume_ckpt_file(epoch, checkpoint_dir)
         CheckpointHandler.load_weights(checkpoint_path, model=model)
 
