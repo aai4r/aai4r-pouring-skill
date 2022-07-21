@@ -117,7 +117,8 @@ class ModelTrainer(BaseTrainer):
                     'global_step': self.global_step,
                     'state_dict': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
-                },  os.path.join(self._hp.exp_path, 'weights'), CheckpointHandler.get_ckpt_name(epoch))
+                },  os.path.join(self._hp.exp_path, 'weights' if not hasattr(self.conf.model, "weights_dir") else self.conf.model.weights_dir),
+                    CheckpointHandler.get_ckpt_name(epoch))
 
             if epoch % self.args.val_interval == 0:
                 self.val()

@@ -13,7 +13,7 @@ configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
-    'epoch_cycles_train': 5,
+    'epoch_cycles_train': 1,
     'num_epochs': 101,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
@@ -37,8 +37,11 @@ model_config = AttrDict(
     cond_decode=True,
     state_cond=False,
     state_cond_size=7,
-    use_pretrain=False,
+    use_pretrain=True,
+    weights_dir="weights",
 )
+model_config.weights_dir += "_pre" if model_config.use_pretrain else ""
+model_config.weights_dir += "_st_cond" if model_config.state_cond else ""
 
 # Dataset
 data_config = AttrDict()
