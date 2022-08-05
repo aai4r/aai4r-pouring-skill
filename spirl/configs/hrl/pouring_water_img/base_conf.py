@@ -30,10 +30,10 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 300,
+    'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 5e3,
+    'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)
 
@@ -101,7 +101,7 @@ hl_policy_params = AttrDict(
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     nz_enc=256,
-    n_layers=5,
+    n_layers=2,
     policy_lr=1.5e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
@@ -113,7 +113,7 @@ hl_critic_params = AttrDict(
     action_dim=hl_policy_params.action_dim,
     input_dim=hl_policy_params.input_dim,
     output_dim=1,
-    n_layers=3,  # number of policy network layer
+    n_layers=2,  # number of policy network layer
     nz_mid=256,
     nz_enc=256,
     action_input=True,

@@ -163,7 +163,7 @@ class RLTrainer:
         with self.agent.val_mode():
             with torch.no_grad():
                 with timing("Eval rollout time: "):
-                    for _ in range(30):  # WandBLogger.N_LOGGED_SAMPLES # for efficiency instead of self.args.n_val_samples
+                    for _ in range(10):  # WandBLogger.N_LOGGED_SAMPLES # for efficiency instead of self.args.n_val_samples
                         val_rollout_storage.append(self.sampler.sample_episode(is_train=False, render=True))
                         print("val_rollout: ", val_rollout_storage.get()[-1].info[-1])
 
@@ -373,5 +373,5 @@ if __name__ == '__main__':
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
     # args.resume = "latest"
-    args.mode = "val"     # "train" / "val" / "demo" / else: rollout_save
+    args.mode = "train"     # "train" / "val" / "demo" / else: rollout_save
     RLTrainer(args=args)
