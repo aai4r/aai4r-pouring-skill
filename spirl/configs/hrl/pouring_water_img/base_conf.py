@@ -62,10 +62,10 @@ base_agent_params = AttrDict(
 
 # remote server access params
 ftp_params = AttrDict(
-    user="tw-server",
-    pw="",     # TODO, should be hidden..
-    ip_addr="",
-    skill_weight_path="/home/tw_etri_server/project/cloudrobot/aai4r-pouring-skill/experiments/skill_prior_learning",
+    user="your_server_id",
+    pw="your_server_password",
+    ip_addr="your_server_ip_addr",
+    skill_weight_path="your_path_to_save_in_the_server",
     epoch="latest",
 )
 
@@ -86,7 +86,7 @@ ll_model_params = AttrDict(
     num_prior_net_layers=2,
     state_cond=False,
     state_cond_size=7,
-    use_pretrain=False,
+    use_pretrain=True,
     model_download=True,
     ftp_server_info="",
     weights_dir="weights",

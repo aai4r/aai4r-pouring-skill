@@ -312,7 +312,7 @@ class ModelTrainer(BaseTrainer):
         return loader
 
     def resume(self, ckpt, path=None):
-        path = os.path.join(self._hp.exp_path, 'weights') if path is None else os.path.join(path, 'weights')
+        path = os.path.join(self._hp.exp_path, self.conf.model.weights_dir) if path is None else os.path.join(path, "weights")
         assert ckpt is not None  # need to specify resume epoch for loading checkpoint
         weights_file = CheckpointHandler.get_resume_ckpt_file(ckpt, path)
         self.global_step, start_epoch, _ = \
