@@ -60,6 +60,14 @@ base_agent_params = AttrDict(
     clip_q_target=False,
 )
 
+# remote server access params
+ftp_params = AttrDict(
+    user="tw-server",
+    pw="",     # TODO, should be hidden..
+    ip_addr="",
+    skill_weight_path="/home/tw_etri_server/project/cloudrobot/aai4r-pouring-skill/experiments/skill_prior_learning",
+    epoch="latest",
+)
 
 ###### Low-Level ######
 # LL Policy
@@ -78,7 +86,9 @@ ll_model_params = AttrDict(
     num_prior_net_layers=2,
     state_cond=False,
     state_cond_size=7,
-    use_pretrain=True,
+    use_pretrain=False,
+    model_download=True,
+    ftp_server_info="",
     weights_dir="weights",
 )
 ll_model_params.weights_dir += "_pre" if ll_model_params.use_pretrain else ""
