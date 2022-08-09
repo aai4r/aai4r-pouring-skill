@@ -33,14 +33,14 @@ configuration = {
     'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 2e3,
+    'n_warmup_steps': 3e3,
 }
 configuration = AttrDict(configuration)
 
 
 # Replay Buffer
 replay_params = AttrDict(
-    capacity=1e5,
+    capacity=2e5,
     dump_replay=False,
 )
 
@@ -52,7 +52,7 @@ sampler_config = AttrDict(
 )
 
 base_agent_params = AttrDict(
-    batch_size=512,
+    batch_size=64,
     replay=UniformReplayBuffer,
     replay_params=replay_params,
     # obs_normalizer=Normalizer,
@@ -102,7 +102,7 @@ hl_policy_params = AttrDict(
     nz_mid=256,
     nz_enc=256,
     n_layers=2,
-    policy_lr=1.5e-4,
+    policy_lr=2e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
     weights_dir=ll_model_params.weights_dir,
@@ -118,7 +118,7 @@ hl_critic_params = AttrDict(
     nz_enc=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
-    critic_lr=1.5e-4,
+    critic_lr=2e-4,
     alpha_lr=2e-4,
 )
 
