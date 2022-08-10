@@ -1,0 +1,9 @@
+# This yaml file contains sensitive information such as ip address or password
+# Thus it should *NOT* be pushed to the github repository
+
+
+user: "your_server_id"
+pw: "your_server_password"
+ip_addr: "your_server_ip_address"
+skill_weight_path: "weight_path_in_the_server"
+epoch: "target_epoch"

@@ -1,5 +1,6 @@
 import torch
 import copy
+import ftplib
 
 from spirl.modules.variational_inference import MultivariateGaussian, mc_kl_divergence
 from spirl.rl.components.agent import BaseAgent
@@ -39,6 +40,10 @@ class PriorInitializedPolicy(Policy):
             net = self._hp.policy_model(self._hp.policy_model_params, None)
         else:
             net = self._hp.prior_model(self._hp.prior_model_params, None)
+
+        if self._hp.prior_model_params.model_download:
+            self.model_download()
+
         if self._hp.load_weights:
             if self._hp.policy_model is not None:
                 BaseAgent.load_model_weights(net, self._hp.policy_model_checkpoint, self._hp.prior_model_epoch, self._hp.weights_dir)
@@ -55,6 +60,10 @@ class PriorInitializedPolicy(Policy):
             output_dict.action = output_dict.action[0]
             return output_dict
         return self.forward(obs)    # for prior-initialized policy we run policy directly for rand sampling from prior
+
+    def model_download(self):
+
+        pass
 
     @staticmethod
     def update_model_params(params):

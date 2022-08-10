@@ -373,5 +373,5 @@ if __name__ == '__main__':
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
     # args.resume = "latest"
-    args.mode = "val"     # "train" / "val" / "demo" / else: rollout_save
+    args.mode = "train"     # "train" / "val" / "demo" / else: rollout_save
     RLTrainer(args=args)

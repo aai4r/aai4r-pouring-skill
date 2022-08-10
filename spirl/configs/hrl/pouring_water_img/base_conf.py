@@ -1,3 +1,4 @@
+import io
 import os
 import copy
 import isaacgym
@@ -33,7 +34,7 @@ configuration = {
     'num_epochs': 300,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 5e3,
+    'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)
 
@@ -69,6 +70,16 @@ ftp_params = AttrDict(
     epoch="latest",
 )
 
+import yaml
+# assuming starts from spirl/rl/train.py
+path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info.yaml")
+with io.open(path, 'r') as f:
+    ftp_yaml_params = yaml.safe_load(f)
+
+for a, b in zip(ftp_params, ftp_yaml_params):
+    ftp_params[a] = ftp_yaml_params[b]
+
+
 ###### Low-Level ######
 # LL Policy
 ll_model_params = AttrDict(
@@ -88,7 +99,7 @@ ll_model_params = AttrDict(
     state_cond_size=7,
     use_pretrain=True,
     model_download=True,
-    ftp_server_info="",
+    ftp_server_info=ftp_params,
     weights_dir="weights",
 )
 ll_model_params.weights_dir += "_pre" if ll_model_params.use_pretrain else ""
