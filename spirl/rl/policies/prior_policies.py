@@ -1,3 +1,5 @@
+import os
+
 import torch
 import copy
 import ftplib
@@ -62,8 +64,33 @@ class PriorInitializedPolicy(Policy):
         return self.forward(obs)    # for prior-initialized policy we run policy directly for rand sampling from prior
 
     def model_download(self):
+        ftp_params = self._hp.prior_model_params.ftp_server_info
+        print("ftp_params: ", ftp_params)
+        ftp = ftplib.FTP(host=ftp_params.ip_addr)
+        ftp.encoding = "utf-8"
+        ftp.login(user=ftp_params.user, passwd=ftp_params.pw)
+        print("login success!")
 
-        pass
+        _path = ftp_params.skill_weight_path
+        p = self._hp.prior_model_checkpoint
+        task = p.split('/')[-2]
+        method = p.split('/')[-1]
+        weight_type = self._hp.prior_model_params.weights_dir
+        path = os.path.join(_path, task, method, weight_type)
+
+        files = ftp.nlst(path)
+        files = sorted(files, key=lambda x: int(x[x.find('_ep') + 3:x.find('.')]))
+        target = files[-1]  # target epoch number, TODO, 향후 epoch number로 선택할 수 있도록 수정 요망
+        proj_path = os.path.join(os.getcwd(), '../', '../')
+        save_path = os.path.join(proj_path, 'experiments', 'skill_prior_learning', task, method, weight_type)
+        curr_path = os.getcwd()
+
+        os.chdir(save_path)
+        fd = open(target[target.rfind('/') + 1:], "wb")
+        ftp.retrbinary("RETR %s" % target, fd.write)
+        fd.close()
+        os.chdir(curr_path)     # reset current working directory
+        print("model download finish! __ {} __".format(target))
 
     @staticmethod
     def update_model_params(params):
