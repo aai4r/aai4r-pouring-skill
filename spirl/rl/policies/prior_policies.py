@@ -65,7 +65,6 @@ class PriorInitializedPolicy(Policy):
 
     def model_download(self):
         ftp_params = self._hp.prior_model_params.ftp_server_info
-        print("ftp_params: ", ftp_params)
         ftp = ftplib.FTP(host=ftp_params.ip_addr)
         ftp.encoding = "utf-8"
         ftp.login(user=ftp_params.user, passwd=ftp_params.pw)
@@ -89,7 +88,7 @@ class PriorInitializedPolicy(Policy):
         fd = open(target[target.rfind('/') + 1:], "wb")
         ftp.retrbinary("RETR %s" % target, fd.write)
         fd.close()
-        os.chdir(curr_path)     # reset current working directory
+        os.chdir(curr_path)     # return to the current working directory
         print("model download finish! __ {} __".format(target))
 
     @staticmethod

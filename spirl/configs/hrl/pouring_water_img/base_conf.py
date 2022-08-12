@@ -72,7 +72,7 @@ ftp_params = AttrDict(
 
 import yaml
 # assuming starts from spirl/rl/train.py
-path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info.yaml")
+path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
 with io.open(path, 'r') as f:
     ftp_yaml_params = yaml.safe_load(f)
 
