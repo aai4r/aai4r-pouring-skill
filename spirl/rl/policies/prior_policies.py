@@ -79,7 +79,17 @@ class PriorInitializedPolicy(Policy):
 
         files = ftp.nlst(path)
         files = sorted(files, key=lambda x: int(x[x.find('_ep') + 3:x.find('.')]))
-        target = files[-1]  # target epoch number, TODO, 향후 epoch number로 선택할 수 있도록 수정 요망
+        try:
+            _epoch = self._hp.prior_model_params.ftp_server_info.epoch
+            if _epoch == 'latest':
+                target = files[-1]
+            else:
+                matches = [match for match in files if '_ep' + str(_epoch) in match]
+                target = matches[0]
+        except IndexError:
+            print("Empty weight list in remote server!")
+            return
+
         proj_path = os.path.join(os.getcwd(), '../', '../')
         save_path = os.path.join(proj_path, 'experiments', 'skill_prior_learning', task, method, weight_type)
         curr_path = os.getcwd()

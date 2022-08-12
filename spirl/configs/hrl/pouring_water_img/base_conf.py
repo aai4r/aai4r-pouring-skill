@@ -67,7 +67,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="latest",
+    epoch="400",    # target epoch number of weight to download
 )
 
 import yaml
