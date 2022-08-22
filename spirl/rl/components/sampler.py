@@ -86,6 +86,7 @@ class Sampler:
                             render_obs = self._env.render()
                         obs, reward, done, info = self._env.step(agent_output.action)
                         obs = self._postprocess_obs(obs)
+                        # obs = self._postprocess_obs_multi_env(obs)
                         episode.append(AttrDict(
                             observation=self._obs,
                             reward=reward,
@@ -119,6 +120,7 @@ class Sampler:
                                          step=global_step)
         self._episode_step, self._episode_reward = 0, 0.
         self._obs = self._postprocess_obs(self._reset_env())
+        # self._obs = self._postprocess_obs_multi_env(self._reset_env())
         self._agent.reset()
 
     def _reset_env(self):
@@ -131,7 +133,7 @@ class Sampler:
         return obs
 
     def _postprocess_reward(self, reward):
-        reward = reward.squeeze(0) if len(reward.shape) > 0 else reward
+        # reward = reward.squeeze(0) if len(reward.shape) > 0 else reward
         return reward
 
     def _postprocess_agent_output(self, agent_output):
@@ -214,6 +216,75 @@ class HierarchicalSampler(Sampler):
             ll_batch=listdict2dictlist(ll_experience_batch[:-1]),   # last element does not have updated obs_next!
         ), env_steps
 
+    def sample_batch_multi_env(self, batch_size, is_train=True, global_step=None, store_ll=True):
+        """Samples the required number of high-level transitions. Number of LL transitions can be higher."""
+        hl_experience_batch, ll_experience_batch = [], []
+
+        num_envs = self._env.config.cfg["env"]["numEnvs"]
+        env_steps, hl_step = np.zeros(num_envs, ), np.zeros(num_envs, )
+        with self._env.val_mode() if not is_train else contextlib.suppress():
+            with self._agent.val_mode() if not is_train else contextlib.suppress():
+                with self._agent.rollout_mode():
+                    while hl_step.sum() < batch_size or len(ll_experience_batch) <= 1:
+                        # perform one rollout step
+                        agent_output = self.sample_action(self._obs)
+                        agent_output = self._postprocess_agent_output(agent_output)
+                        obs, reward, done, info = self._env.step(agent_output.action)
+                        obs = self._postprocess_obs_multi_env(obs)
+                        reward = self._postprocess_reward(reward)
+
+                        # update last step's 'observation_next' with HL action
+                        if store_ll:
+                            if ll_experience_batch:
+                                ll_experience_batch[-1].observation_next = \
+                                    self._agent.make_ll_obs(ll_experience_batch[-1].observation_next, agent_output.hl_action)
+
+                            # store current step in ll_experience_batch
+                            ll_experience_batch.append(AttrDict(
+                                observation=self._agent.make_ll_obs(self._obs, agent_output.hl_action),
+                                reward=reward,
+                                done=done,
+                                action=agent_output.action,
+                                observation_next=obs,       # this will get updated in the next step
+                            ))
+
+                        # store HL experience batch if this was HL action or episode is done
+                        if agent_output.is_hl_step or (done or self._episode_step >= self._max_episode_len-1):
+                            if self.last_hl_obs is not None and self.last_hl_action is not None:
+                                hl_experience_batch.append(AttrDict(
+                                    observation=self.last_hl_obs,
+                                    reward=self.reward_since_last_hl,
+                                    done=done,
+                                    action=self.last_hl_action,
+                                    observation_next=obs,
+                                ))
+                                hl_step += 1
+                                if done:
+                                    hl_experience_batch[-1].reward += reward  # add terminal reward
+                                if hl_step % 1000 == 0:
+                                    print("Sample step {}".format(hl_step))
+                            self.last_hl_obs = self._obs if self._episode_step == 0 else obs
+                            self.last_hl_action = agent_output.hl_action
+                            self.reward_since_last_hl = 0
+
+                        # update stored observation
+                        self._obs = obs
+                        env_steps += 1; self._episode_step += 1; self._episode_reward += reward
+                        self.reward_since_last_hl += reward
+
+                        # reset if episode ends
+                        if done or self._episode_step >= self._max_episode_len:
+                            if not done:    # force done to be True for timeout
+                                ll_experience_batch[-1].done = True
+                                if hl_experience_batch:   # can potentially be empty
+                                    hl_experience_batch[-1].done = True
+                            self._episode_reset(global_step)
+
+        return AttrDict(
+            hl_batch=listdict2dictlist(hl_experience_batch),
+            ll_batch=listdict2dictlist(ll_experience_batch[:-1]),   # last element does not have updated obs_next!
+        ), env_steps
+
     def _episode_reset(self, global_step=None):
         super()._episode_reset(global_step)
         self.last_hl_obs, self.last_hl_action = None, None
@@ -231,6 +302,7 @@ class MultiImageAugmentedSampler(Sampler):
     """Appends multiple past images to current observation."""
     def _episode_reset(self, global_step=None):
         self._past_frames = deque(maxlen=self._hp.n_frames)     # build ring-buffer of past images
+        self._past_frames_per_env = [deque(maxlen=self._hp.n_frames) for _ in range(self._env.config.cfg["env"]["numEnvs"])]
         super()._episode_reset(global_step)
 
     def _postprocess_obs(self, obs):
@@ -241,12 +313,24 @@ class MultiImageAugmentedSampler(Sampler):
         stacked_img = np.concatenate(list(self._past_frames), axis=0)
         return np.concatenate((obs, stacked_img.flatten()))
 
+    def _postprocess_obs_multi_env(self, obs):
+        imgs = self._env.render(mode='rgb')
+        rtn = np.zeros((len(imgs), np.prod(imgs.shape[1:]) * self._hp.n_frames + obs.shape[-1]))
+        for i in range(len(imgs)):
+            _img = imgs[i].transpose(2, 0, 1) * 2. - 1.0
+            if not self._past_frames_per_env[i]:  # initialize past frames with N copies of current frame
+                [self._past_frames_per_env[i].append(_img) for _ in range(self._hp.n_frames - 1)]
+            self._past_frames_per_env[i].append(_img)
+            stacked_img = np.concatenate(list(self._past_frames_per_env[i]), axis=0)
+            rtn[i] = np.concatenate((obs[i], stacked_img.flatten()))
+        return rtn
+
 
 class ACImageAugmentedSampler(ImageAugmentedSampler):
     """Adds no-op renders to make sure agent-centric camera reaches agent."""
     def _reset_env(self):
         obs = super()._reset_env()
-        for _ in range(100):  # so that camera can "reach" agent
+        for _ in range(10):  # so that camera can "reach" agent
             self._env.render(mode='rgb_array')
         return obs
 

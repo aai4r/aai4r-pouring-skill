@@ -6,7 +6,7 @@ import torch
 from init_conf import project_home_path
 
 from spirl.utils.general_utils import AttrDict
-from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
+from spirl.rl.components.agent import FixedIntervalHierarchicalAgent, MultiEnvFixedIntervalHierarchicalAgent
 from spirl.rl.components.critic import SplitObsMLPCritic
 from spirl.rl.envs.isaacgym_env import PouringWaterEnv
 from spirl.rl.components.sampler import ACMultiImageAugmentedHierarchicalSampler
@@ -67,7 +67,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="400",    # target epoch number of weight to download
+    epoch="14",    # target epoch number of weight to download
 )
 
 import yaml
@@ -93,9 +93,9 @@ ll_model_params = AttrDict(
     n_rollout_steps=10,
     nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
     nz_mid_prior=256,
-    n_processing_layers=2,
-    num_prior_net_layers=2,
-    state_cond=False,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
+    state_cond=True,
     state_cond_size=7,
     use_pretrain=True,
     model_download=True,
@@ -197,6 +197,7 @@ args.sim_device = 'cuda:0'
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
 cfg["env"]["action_noise"] = False
+cfg["env"]["numEnvs"] = 1
 
 sim_params = parse_sim_params(args, cfg, None)
 env_config = AttrDict(

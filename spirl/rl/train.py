@@ -55,7 +55,7 @@ class RLTrainer:
         if 'task_params' in self.conf.env: self.conf.env.task_params.seed=self._hp.seed
         if 'general' in self.conf: self.conf.general.seed=self._hp.seed
         self.env = self._hp.environment(self.conf.env)
-        self.conf.agent.env_params = self.env.agent_params      # (optional) set params from env for agent
+        self.conf.agent.env_params = self.env      # (optional) set params from env for agent
         if self.is_chef:
             pretty_print(self.conf)
 
@@ -163,7 +163,7 @@ class RLTrainer:
         with self.agent.val_mode():
             with torch.no_grad():
                 with timing("Eval rollout time: "):
-                    for _ in range(30):  # WandBLogger.N_LOGGED_SAMPLES # for efficiency instead of self.args.n_val_samples
+                    for _ in range(10):  # WandBLogger.N_LOGGED_SAMPLES # for efficiency instead of self.args.n_val_samples
                         val_rollout_storage.append(self.sampler.sample_episode(is_train=False, render=True))
                         print("val_rollout: ", val_rollout_storage.get()[-1].info[-1])
 

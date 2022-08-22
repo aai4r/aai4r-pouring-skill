@@ -344,3 +344,42 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
     def reset(self):
         super().reset()
         self._steps_since_hl = 0     # start new episode with high-level step
+
+
+class MultiEnvFixedIntervalHierarchicalAgent(FixedIntervalHierarchicalAgent):
+    """Multiple environmental agent in isaacgym"""
+    def __init__(self, config):
+        super().__init__(config)
+        num_envs = config.env_params.config.cfg["env"]["numEnvs"]
+        self._steps_since_hl = np.zeros(num_envs, )  # number of steps since last high-level step for multiple agents
+
+    def _act(self, obs):
+        """Output dict contains is_hl_step in case high-level action was performed during this action."""
+        obs_input = obs[None] if len(obs.shape) == 1 else obs    # need batch input for agents
+        output = AttrDict()
+        if self._perform_hl_step_now.any():
+            # perform step with high-level policy
+            temp_out = self.hl_agent.act(obs_input)
+
+            output.action = np.where(self._perform_hl_step_now[:, np.newaxis], temp_out.action, None)
+            output.log_prob = np.where(self._perform_hl_step_now[:, np.newaxis], temp_out.log_prob, None)
+            # self._last_hl_output = self.hl_agent.act(obs_input)
+            output.is_hl_step = True    # TODO, should be array type
+        else:
+            output.is_hl_step = False
+        output.update(prefix_dict(self._last_hl_output, 'hl_')) # TODO, here, error!
+
+        # perform step with low-level policy
+        assert self._last_hl_output is not None
+        output.update(self.ll_agent.act(self.make_ll_obs(obs_input, self._last_hl_output.action)))
+
+        return self._remove_batch(output) if len(obs.shape) == 1 else output
+
+    def act(self, *args, **kwargs):
+        output = self._act(*args, **kwargs)
+        self._steps_since_hl += 1
+        return output
+
+    def reset(self):
+        HierarchicalAgent.reset(self)
+        self._steps_since_hl = np.zeros_like(self._steps_since_hl)     # start new episode with high-level step

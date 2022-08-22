@@ -634,6 +634,19 @@ class DemoUR3Pouring(BaseTask):
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) if color_order == 'bgr' else img
         return img / 255
 
+    def _render_camera(self, to_numpy=False, color_order='rgb'):    # for multi env
+        img = torch.zeros(self.num_envs, self.camera_props.width, self.camera_props.height, 3, device=self.device)
+        for i in range(len(self.envs)):
+            camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
+                                                                 self.camera_handles[i], gymapi.IMAGE_COLOR)
+            img[i] = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
+
+        if to_numpy:
+            img = img.cpu().numpy()
+            for i in range(len(img)):
+                img[i] = cv2.cvtColor(img[i], cv2.COLOR_RGB2BGR) if color_order == 'bgr' else img[i]
+        return img / 255
+
     def compute_observations(self):
         self.sync_gripper()
 
