@@ -53,6 +53,7 @@ class DemoUR3Pouring(BaseTask):
         self.camera_props = gymapi.CameraProperties()
         self.camera_props.width = self.cfg["env"]["cam_width"]
         self.camera_props.height = self.cfg["env"]["cam_height"]
+        self.camera_props.horizontal_fov = 69   # degree, Default: 90, RealSense D435 FoV = H69 / V42
         self.camera_props.enable_tensors = True
 
         self.img_obs = self.cfg["expert"]["img_obs"]

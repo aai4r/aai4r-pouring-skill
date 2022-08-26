@@ -91,7 +91,7 @@ class ModelTrainer(BaseTrainer):
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
-            'optimizer': 'radam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
+            'optimizer': 'adam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
             'lr': 3e-4,
             'gradient_clip': None,
             'init_grad_clip': 0.001,

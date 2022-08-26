@@ -30,17 +30,17 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 100,
+    'num_epochs': 200,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 3e3,
+    'n_warmup_steps': 2e3,
 }
 configuration = AttrDict(configuration)
 
 
 # Replay Buffer
 replay_params = AttrDict(
-    capacity=2e5,
+    capacity=1e5,
     dump_replay=False,
 )
 
@@ -74,9 +74,9 @@ ll_model_params = AttrDict(
     n_rollout_steps=10,
     nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
     nz_mid_prior=256,
-    n_processing_layers=2,
-    num_prior_net_layers=2,
-    state_cond=False,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
+    state_cond=True,
     state_cond_size=7,
     use_pretrain=True,
     weights_dir="weights",
