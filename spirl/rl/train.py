@@ -55,7 +55,7 @@ class RLTrainer:
         if 'task_params' in self.conf.env: self.conf.env.task_params.seed=self._hp.seed
         if 'general' in self.conf: self.conf.general.seed=self._hp.seed
         self.env = self._hp.environment(self.conf.env)
-        self.conf.agent.env_params = self.env.agent_params      # (optional) set params from env for agent
+        self.conf.agent.env_params = self.env      # (optional) set params from env for agent
         if self.is_chef:
             pretty_print(self.conf)
 
@@ -71,7 +71,7 @@ class RLTrainer:
         self.global_step, self.n_update_steps, start_epoch = 0, 0, 0
         if args.resume or self.conf.ckpt_path is not None:
             start_epoch = self.resume(args.resume, self.conf.ckpt_path)
-            self._hp.n_warmup_steps = 2000     # (default: 0) no warmup if we reload from checkpoint!
+            self._hp.n_warmup_steps = 1000     # (default: 0) no warmup if we reload from checkpoint!
 
         # start training/evaluation
         if args.mode == 'train':
@@ -163,10 +163,10 @@ class RLTrainer:
         with self.agent.val_mode():
             with torch.no_grad():
                 with timing("Eval rollout time: "):
-                    n_eval = 30
+                    n_eval = 10
                     for i in range(n_eval):  # WandBLogger.N_LOGGED_SAMPLES # for efficiency instead of self.args.n_val_samples
                         val_rollout_storage.append(self.sampler.sample_episode(is_train=False, render=True))
-                        print("{} / {}, val_rollout: {}".format(i, n_eval, val_rollout_storage.get()[-1].info[-1]))
+                        print("{} / {} val_rollout: {}".format(i, n_eval, val_rollout_storage.get()[-1].info[-1]))
 
         # import cv2
         # for i in range(len(val_rollout_storage.rollouts)):
@@ -362,7 +362,7 @@ if __name__ == '__main__':
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
 
     # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
     task_name = "pouring_water_img"
@@ -374,5 +374,5 @@ if __name__ == '__main__':
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
     # args.resume = "latest"
-    args.mode = "val"     # "train" / "val" / "demo" / else: rollout_save
+    args.mode = "train"     # "train" / "val" / "demo" / else: rollout_save
     RLTrainer(args=args)

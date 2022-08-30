@@ -224,7 +224,7 @@ def avg_grad_norm(model):
 
 def check_shape(t, target_shape):
     if not list(t.shape) == target_shape:
-        raise ValueError(f"Temsor should have shape {target_shape} but has shape {list(t.shape)}!")
+        raise ValueError(f"Tensor should have shape {target_shape} but has shape {list(t.shape)}!")
 
 
 def mask_out(tensor, start_ind, end_ind, value, dim=1):

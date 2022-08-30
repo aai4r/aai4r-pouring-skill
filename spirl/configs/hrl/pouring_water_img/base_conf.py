@@ -1,3 +1,4 @@
+import io
 import os
 import copy
 import isaacgym
@@ -5,7 +6,7 @@ import torch
 from init_conf import project_home_path
 
 from spirl.utils.general_utils import AttrDict
-from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
+from spirl.rl.components.agent import FixedIntervalHierarchicalAgent, MultiEnvFixedIntervalHierarchicalAgent
 from spirl.rl.components.critic import SplitObsMLPCritic
 from spirl.rl.envs.isaacgym_env import PouringWaterEnv
 from spirl.rl.components.sampler import ACMultiImageAugmentedHierarchicalSampler
@@ -30,10 +31,10 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 200,
+    'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 2e3,
+    'n_warmup_steps': 1e3,
 }
 configuration = AttrDict(configuration)
 
@@ -60,6 +61,24 @@ base_agent_params = AttrDict(
     clip_q_target=False,
 )
 
+# remote server access params
+ftp_params = AttrDict(
+    user="your_server_id",
+    pw="your_server_password",
+    ip_addr="your_server_ip_addr",
+    skill_weight_path="your_path_to_save_in_the_server",
+    epoch="latest",    # target epoch number of weight to download
+)
+
+import yaml
+# assuming starts from spirl/rl/train.py
+path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
+with io.open(path, 'r') as f:
+    ftp_yaml_params = yaml.safe_load(f)
+
+for a, b in zip(ftp_params, ftp_yaml_params):
+    ftp_params[a] = ftp_yaml_params[b]
+
 
 ###### Low-Level ######
 # LL Policy
@@ -67,18 +86,20 @@ ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
-    kl_div_weight=2e-4,
+    kl_div_weight=1e-4,
     n_input_frames=2,
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
     nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
     nz_mid_prior=256,
-    n_processing_layers=3,
-    num_prior_net_layers=3,
+    n_processing_layers=4,
+    num_prior_net_layers=4,
     state_cond=True,
     state_cond_size=7,
     use_pretrain=True,
+    model_download=True,
+    ftp_server_info=ftp_params,
     weights_dir="weights",
 )
 ll_model_params.weights_dir += "_pre" if ll_model_params.use_pretrain else ""
@@ -101,8 +122,8 @@ hl_policy_params = AttrDict(
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     nz_enc=256,
-    n_layers=2,
-    policy_lr=2e-4,
+    n_layers=4,
+    policy_lr=3.0e-5,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
     weights_dir=ll_model_params.weights_dir,
@@ -113,12 +134,12 @@ hl_critic_params = AttrDict(
     action_dim=hl_policy_params.action_dim,
     input_dim=hl_policy_params.input_dim,
     output_dim=1,
-    n_layers=2,  # number of policy network layer
+    n_layers=3,  # number of policy network layer
     nz_mid=256,
     nz_enc=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
-    critic_lr=2e-4,
+    critic_lr=3.0e-4,
     alpha_lr=2e-4,
 )
 
@@ -166,16 +187,17 @@ args.headless = False
 args.test = False
 
 # if torch.cuda.device_count() > 1:
-assert torch.cuda.get_device_name(0)
-args.compute_device_id = 0
-args.device_id = 0
-args.graphics_device_id = 0
-args.rl_device = 'cuda:0'
-args.sim_device = 'cuda:0'
+assert torch.cuda.get_device_name(1)
+args.compute_device_id = 1
+args.device_id = 1
+args.graphics_device_id = 1
+args.rl_device = 'cuda:1'
+args.sim_device = 'cuda:1'
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
 cfg["env"]["action_noise"] = False
+cfg["env"]["numEnvs"] = 1
 
 sim_params = parse_sim_params(args, cfg, None)
 env_config = AttrDict(

@@ -200,16 +200,12 @@ class PouringSkillRolloutStorage(RolloutStorage):
             for k, v in item.info[-1][0].items():
                 _sum[k] += v.sum()
 
-        # print summary
         print("===========================================")
         print(self.model_param)
         print("_sum: ", _sum)
         avg = dict.fromkeys(_sum.keys(), 0.0)
         eval_len = len(self.rollouts)
         for k, v in _sum.items():
-            if k == "grasp_stability":
-                avg[k] = _sum[k] / _sum["grasp_stability"]
-                continue
             avg[k] = _sum[k] / eval_len
         print("avg: ", avg)
 

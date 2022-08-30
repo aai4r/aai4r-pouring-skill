@@ -1,5 +1,8 @@
+import os
+
 import torch
 import copy
+import ftplib
 
 from spirl.modules.variational_inference import MultivariateGaussian, mc_kl_divergence
 from spirl.rl.components.agent import BaseAgent
@@ -39,6 +42,10 @@ class PriorInitializedPolicy(Policy):
             net = self._hp.policy_model(self._hp.policy_model_params, None)
         else:
             net = self._hp.prior_model(self._hp.prior_model_params, None)
+
+        if self._hp.prior_model_params.model_download:
+            self.model_download()
+
         if self._hp.load_weights:
             if self._hp.policy_model is not None:
                 BaseAgent.load_model_weights(net, self._hp.policy_model_checkpoint, self._hp.prior_model_epoch, self._hp.weights_dir)
@@ -55,6 +62,44 @@ class PriorInitializedPolicy(Policy):
             output_dict.action = output_dict.action[0]
             return output_dict
         return self.forward(obs)    # for prior-initialized policy we run policy directly for rand sampling from prior
+
+    def model_download(self):
+        ftp_params = self._hp.prior_model_params.ftp_server_info
+        ftp = ftplib.FTP(host=ftp_params.ip_addr)
+        ftp.encoding = "utf-8"
+        ftp.login(user=ftp_params.user, passwd=ftp_params.pw)
+        print("login success!")
+
+        _path = ftp_params.skill_weight_path
+        p = self._hp.prior_model_checkpoint
+        task = p.split('/')[-2]
+        method = p.split('/')[-1]
+        weight_type = self._hp.prior_model_params.weights_dir
+        path = os.path.join(_path, task, method, weight_type)
+
+        files = ftp.nlst(path)
+        files = sorted(files, key=lambda x: int(x[x.find('_ep') + 3:x.find('.')]))
+        try:
+            _epoch = self._hp.prior_model_params.ftp_server_info.epoch
+            if _epoch == 'latest':
+                target = files[-1]
+            else:
+                matches = [match for match in files if '_ep' + str(_epoch) in match]
+                target = matches[0]
+        except IndexError:
+            print("Empty weight list in remote server!")
+            return
+
+        proj_path = os.path.join(os.getcwd(), '../', '../')
+        save_path = os.path.join(proj_path, 'experiments', 'skill_prior_learning', task, method, weight_type)
+        curr_path = os.getcwd()
+
+        os.chdir(save_path)
+        fd = open(target[target.rfind('/') + 1:], "wb")
+        ftp.retrbinary("RETR %s" % target, fd.write)
+        fd.close()
+        os.chdir(curr_path)     # return to the current working directory
+        print("model download finish! __ {} __".format(target))
 
     @staticmethod
     def update_model_params(params):

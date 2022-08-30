@@ -87,11 +87,11 @@ class ModelTrainer(BaseTrainer):
             'logger_test': None,
             'evaluator': None,
             'data_dir': None,  # directory where dataset is in
-            'batch_size': 32,
+            'batch_size': 64,
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
-            'optimizer': 'adam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
+            'optimizer': 'radam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
             'lr': 3e-4,
             'gradient_clip': None,
             'init_grad_clip': 0.001,
@@ -312,7 +312,7 @@ class ModelTrainer(BaseTrainer):
         return loader
 
     def resume(self, ckpt, path=None):
-        path = os.path.join(self._hp.exp_path, self.conf.model.weights_dir) if path is None else os.path.join(path, 'weights')
+        path = os.path.join(self._hp.exp_path, self.conf.model.weights_dir) if path is None else os.path.join(path, "weights")
         assert ckpt is not None  # need to specify resume epoch for loading checkpoint
         weights_file = CheckpointHandler.get_resume_ckpt_file(ckpt, path)
         self.global_step, start_epoch, _ = \
