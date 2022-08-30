@@ -569,7 +569,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         resnet_mid = 512   # resnet 18 feature size
         # input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
         self.fc = Predictor(self._hp, input_size=resnet_mid,
-                            output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers - 1,
+                            output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers - 2,
                             mid_size=self._hp.nz_mid_prior)
 
         self.fc_last = Predictor(self._hp, input_size=self._hp.nz_mid_prior + self._hp.state_cond_size,
