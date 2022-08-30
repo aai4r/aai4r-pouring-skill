@@ -140,6 +140,13 @@ class TaskPathManager:
         self.prev_time = 0
         self.elapsed = torch.zeros(num_env, device=device)
 
+        self.init_joint_pos = None
+
+    def set_init_joint_pos(self, joint, noise=0.05):
+        assert torch.is_tensor(joint)
+        self.init_joint_pos = joint.repeat((self.num_env, 1)) + \
+                              (torch.rand(self.num_env, joint.numel(), device=self.device) - 0.5) * noise
+
     def reset_task(self, env_ids):
         self._task_pos[env_ids] = torch.zeros_like(self._task_pos[env_ids])
         self._task_rot[env_ids] = torch.zeros_like(self._task_rot[env_ids])
@@ -157,13 +164,16 @@ class TaskPathManager:
         self._task_err[env_ids, self._push_idx[env_ids]] = err_th[env_ids]
         self._push_idx[env_ids] += 1
 
-    def update_step_by_checking_arrive(self, ee_pos, ee_rot, ee_grip, sim_time):
+    def update_step_by_checking_arrive(self, ee_pos, ee_rot, ee_grip, dof_pos, sim_time):
         des_pos, des_rot, des_grip, err_th = self.get_desired_pose()
         err_pos = (des_pos - ee_pos).norm(dim=-1)
         err_rot = orientation_error(des_rot, ee_rot).norm(dim=-1)
         err_grip = (des_grip - ee_grip).norm(dim=-1)
+        err_joint = (self.init_joint_pos - dof_pos).norm(dim=-1)
 
-        reach = (err_pos < err_th[:, 0]) & (err_rot < err_th[:, 1]) & (err_grip < err_th[:, 2])
+        reach_jnt = err_joint < 0.1
+        reach_ee = (err_pos < err_th[:, 0]) & (err_rot < err_th[:, 1]) & (err_grip < err_th[:, 2])
+        reach = torch.where(self._step[:, 0, 0] == 0, reach_jnt, reach_ee)
 
         self.curr_time = sim_time
         dt = self.curr_time - self.prev_time

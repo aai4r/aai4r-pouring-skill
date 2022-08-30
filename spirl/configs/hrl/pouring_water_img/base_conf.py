@@ -31,10 +31,10 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 300,
+    'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 2e3,
+    'n_warmup_steps': 1e3,
 }
 configuration = AttrDict(configuration)
 
@@ -53,7 +53,7 @@ sampler_config = AttrDict(
 )
 
 base_agent_params = AttrDict(
-    batch_size=512,
+    batch_size=64,
     replay=UniformReplayBuffer,
     replay_params=replay_params,
     # obs_normalizer=Normalizer,
@@ -86,15 +86,15 @@ ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
-    kl_div_weight=2e-4,
+    kl_div_weight=1e-4,
     n_input_frames=2,
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
     nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
     nz_mid_prior=256,
-    n_processing_layers=3,
-    num_prior_net_layers=3,
+    n_processing_layers=4,
+    num_prior_net_layers=4,
     state_cond=True,
     state_cond_size=7,
     use_pretrain=True,
@@ -122,8 +122,8 @@ hl_policy_params = AttrDict(
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     nz_enc=256,
-    n_layers=5,
-    policy_lr=1.5e-4,
+    n_layers=4,
+    policy_lr=3.0e-5,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
     weights_dir=ll_model_params.weights_dir,
@@ -139,7 +139,7 @@ hl_critic_params = AttrDict(
     nz_enc=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
-    critic_lr=1.5e-4,
+    critic_lr=3.0e-4,
     alpha_lr=2e-4,
 )
 
@@ -187,12 +187,12 @@ args.headless = False
 args.test = False
 
 # if torch.cuda.device_count() > 1:
-assert torch.cuda.get_device_name(0)
-args.compute_device_id = 0
-args.device_id = 0
-args.graphics_device_id = 0
-args.rl_device = 'cuda:0'
-args.sim_device = 'cuda:0'
+assert torch.cuda.get_device_name(1)
+args.compute_device_id = 1
+args.device_id = 1
+args.graphics_device_id = 1
+args.rl_device = 'cuda:1'
+args.sim_device = 'cuda:1'
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
