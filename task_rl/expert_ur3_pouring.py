@@ -1408,22 +1408,22 @@ class DemoUR3Pouring(BaseTask):
             1)-1 initial pos variation 
         """
         init_ur3_hand_pos = self.tpl.gen_pos_variation(pivot_pos=[0.5, 0.0, 0.35], pos_var_meter=0.02)
-        # init_ur3_hand_pos = to_torch([0.5, 0.0, 0.32], device=self.device).repeat((self.num_envs, 1))
-        # pos_var_meter = 0.02
-        # pos_var = (torch.rand_like(init_ur3_hand_pos) - 0.5) * 2.0
-        # init_ur3_hand_pos += pos_var * pos_var_meter
+        init_ur3_hand_pos = to_torch([0.5, 0.0, 0.32], device=self.device).repeat((self.num_envs, 1))
+        pos_var_meter = 0.02
+        pos_var = (torch.rand_like(init_ur3_hand_pos) - 0.5) * 2.0
+        init_ur3_hand_pos += pos_var * pos_var_meter
 
         """ 
             1)-2 initial rot variation 
         """
         init_ur3_hand_rot = self.tpl.gen_rot_variation(pivot_quat=[0.0, 0.0, 0.0, 1.0], rot_var_deg=15)
-        # init_ur3_hand_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
-        # rot_var_deg = 15    # +-
-        # roll = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
-        # pitch = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
-        # yaw = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
-        # q_var = quat_from_euler_xyz(roll=deg2rad(roll), pitch=deg2rad(pitch), yaw=deg2rad(yaw))
-        # init_ur3_hand_rot = quat_mul(init_ur3_hand_rot, q_var)
+        init_ur3_hand_rot = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device).repeat((self.num_envs, 1))
+        rot_var_deg = 15    # +-
+        roll = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        pitch = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        yaw = (torch.rand(self.num_envs, device=self.device) - 0.5) * 2.0 * rot_var_deg
+        q_var = quat_from_euler_xyz(roll=deg2rad(roll), pitch=deg2rad(pitch), yaw=deg2rad(yaw))
+        init_ur3_hand_rot = quat_mul(init_ur3_hand_rot, q_var)
 
         """
             1)-3 initial grip variation
@@ -1431,10 +1431,10 @@ class DemoUR3Pouring(BaseTask):
             Unit: meter ~ [0.0, 0.085]
         """
         init_ur3_grip = self.tpl.gen_grip_variation(pivot_grip=[0.08], grip_var_meter=0.01)
-        # init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))     # meter
-        # grip_var = (torch.rand_like(init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
-        # init_ur3_grip = torch.min(init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
-        # self.tpl.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
+        init_ur3_grip = to_torch([0.08], device=self.device).repeat((self.num_envs, 1))     # meter
+        grip_var = (torch.rand_like(init_ur3_grip) - 0.5) * 0.01   # grip. variation range: [0.075, 0.085]
+        init_ur3_grip = torch.min(init_ur3_grip + grip_var, torch.tensor(self.gripper_stroke, device=self.device))
+        self.tpl.append_pose(pos=init_ur3_hand_pos, rot=init_ur3_hand_rot, grip=init_ur3_grip)
 
         """
             2) approach above the bottle
@@ -1569,9 +1569,7 @@ class DemoUR3Pouring(BaseTask):
 
         # desired joint action for initial position
         curr_joint = torch.index_select(self.ur3_dof_pos, 1, self.indices)
-        des_joint = torch.tensor([deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0),
-                                  deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
-                                  0.0], device=self.device).repeat((self.num_envs, 1))
+        des_joint = self.tpm.get_init_des_joint()
 
         # follow the joint space trajectory when initial step
         actions[:, :6] = torch.where(self.tpm._step[:, 0].repeat((1, 2))[:, :6] == 0,
