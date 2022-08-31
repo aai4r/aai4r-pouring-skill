@@ -142,10 +142,16 @@ class TaskPathManager:
 
         self.init_joint_pos = None
 
-    def set_init_joint_pos(self, joint, noise=0.05):
+    def set_init_joint_pos(self, joint, noise=0.1):
         assert torch.is_tensor(joint)
         self.init_joint_pos = joint.repeat((self.num_env, 1)) + \
                               (torch.rand(self.num_env, joint.numel(), device=self.device) - 0.5) * noise
+
+    def get_init_des_joint(self):
+        if self.init_joint_pos is None:
+            print("init_joint_pos must be initialized before calling it")
+            raise ValueError
+        return self.init_joint_pos
 
     def reset_task(self, env_ids):
         self._task_pos[env_ids] = torch.zeros_like(self._task_pos[env_ids])
