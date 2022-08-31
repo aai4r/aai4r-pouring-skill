@@ -70,14 +70,14 @@ ftp_params = AttrDict(
     epoch="latest",    # target epoch number of weight to download
 )
 
-import yaml
-# assuming starts from spirl/rl/train.py
-path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
-with io.open(path, 'r') as f:
-    ftp_yaml_params = yaml.safe_load(f)
-
-for a, b in zip(ftp_params, ftp_yaml_params):
-    ftp_params[a] = ftp_yaml_params[b]
+# import yaml
+# # assuming starts from spirl/rl/train.py
+# path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
+# with io.open(path, 'r') as f:
+#     ftp_yaml_params = yaml.safe_load(f)
+#
+# for a, b in zip(ftp_params, ftp_yaml_params):
+#     ftp_params[a] = ftp_yaml_params[b]
 
 
 ###### Low-Level ######
@@ -98,7 +98,7 @@ ll_model_params = AttrDict(
     state_cond=True,
     state_cond_size=7,
     use_pretrain=True,
-    model_download=True,
+    model_download=False,
     ftp_server_info=ftp_params,
     weights_dir="weights",
 )
@@ -187,12 +187,12 @@ args.headless = False
 args.test = False
 
 # if torch.cuda.device_count() > 1:
-assert torch.cuda.get_device_name(1)
-args.compute_device_id = 1
-args.device_id = 1
-args.graphics_device_id = 1
-args.rl_device = 'cuda:1'
-args.sim_device = 'cuda:1'
+assert torch.cuda.get_device_name(0)
+args.compute_device_id = 0
+args.device_id = 0
+args.graphics_device_id = 0
+args.rl_device = 'cuda:0'
+args.sim_device = 'cuda:0'
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")

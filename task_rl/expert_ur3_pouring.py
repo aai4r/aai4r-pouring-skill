@@ -53,7 +53,6 @@ class DemoUR3Pouring(BaseTask):
         self.camera_props = gymapi.CameraProperties()
         self.camera_props.width = self.cfg["env"]["cam_width"]
         self.camera_props.height = self.cfg["env"]["cam_height"]
-        self.camera_props.horizontal_fov = 69  # degree, Default: 90, RealSense D435 FoV = H69 / V42
         self.camera_props.enable_tensors = True
 
         self.img_obs = self.cfg["expert"]["img_obs"]
@@ -347,8 +346,8 @@ class DemoUR3Pouring(BaseTask):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
-        self.default_cam_pos = [0.9, 0.0, 0.6]     # front-top [0.78, 0.0, 0.5], top [0.6, 0.0, 0.6]
-        self.default_cam_stare = [0.28, 0.0, 0.1]
+        self.default_cam_pos = [0.78, 0.0, 0.5]     # front-top [0.78, 0.0, 0.5], top [0.6, 0.0, 0.6]
+        self.default_cam_stare = [0.28, 0.0, 0.0]
 
         # compute aggregate size
         num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
@@ -633,20 +632,7 @@ class DemoUR3Pouring(BaseTask):
         if to_numpy:
             img = img.cpu().numpy()
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR) if color_order == 'bgr' else img
-        return (img / 255.0).astype(np.float32)
-
-    def _render_camera(self, to_numpy=False, color_order='rgb'):    # for multi env
-        img = torch.zeros(self.num_envs, self.camera_props.width, self.camera_props.height, 3, device=self.device)
-        for i in range(len(self.envs)):
-            camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
-                                                                 self.camera_handles[i], gymapi.IMAGE_COLOR)
-            img[i] = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
-
-        if to_numpy:
-            img = img.cpu().numpy()
-            for i in range(len(img)):
-                img[i] = cv2.cvtColor(img[i], cv2.COLOR_RGB2BGR) if color_order == 'bgr' else img[i]
-        return (img / 255.0).astype(np.float32)
+        return img / 255
 
     def compute_observations(self):
         self.sync_gripper()
@@ -777,7 +763,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset ur3
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 3.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 0.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
@@ -1178,9 +1164,7 @@ class DemoUR3Pouring(BaseTask):
         t = self.gym.get_sim_time(self.sim)
         dof_pos_finger = self.angle_to_stroke(self.ur3_dof_pos[:, 8].unsqueeze(-1))
         done_envs = self.tpm.update_step_by_checking_arrive(ee_pos=self.ur3_grasp_pos, ee_rot=self.ur3_grasp_rot,
-                                                            ee_grip=dof_pos_finger,
-                                                            dof_pos=torch.index_select(self.ur3_dof_pos, 1, self.indices),
-                                                            sim_time=t)
+                                                             ee_grip=dof_pos_finger, sim_time=t)
 
         self.reset_buf = torch.where(done_envs > 0, torch.ones_like(self.reset_buf), self.reset_buf)
 
@@ -1553,7 +1537,6 @@ class DemoUR3Pouring(BaseTask):
             num_task_steps = self.tpl.length()
             print("num_task_steps: ", num_task_steps)
             self.tpm = TaskPathManager(num_env=self.num_envs, num_task_steps=num_task_steps, device=self.device)
-            self.tpm.set_init_joint_pos(joint=torch.index_select(self.ur3_default_dof_pos, 0, self.indices).clone())
         self.tpm.reset_task(env_ids=env_ids)
 
         for i in range(self.tpl.length()):
@@ -1566,18 +1549,6 @@ class DemoUR3Pouring(BaseTask):
     def calc_expert_action(self):
         des_pos, des_rot, des_grip, _ = self.tpm.get_desired_pose()
         actions = self.solve(goal_pos=des_pos, goal_rot=des_rot, goal_grip=des_grip, absolute=True)
-
-        # desired joint action for initial position
-        curr_joint = torch.index_select(self.ur3_dof_pos, 1, self.indices)
-        des_joint = torch.tensor([deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0),
-                                  deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
-                                  0.0], device=self.device).repeat((self.num_envs, 1))
-
-        # follow the joint space trajectory when initial step
-        actions[:, :6] = torch.where(self.tpm._step[:, 0].repeat((1, 2))[:, :6] == 0,
-                                     des_joint[:, :6] - curr_joint[:, :6],
-                                     actions[:, :6])
-
         return torch.clamp(actions, min=-1.0, max=1.0)
 
     """
@@ -1716,19 +1687,14 @@ def compute_ur3_reward(
               - action_penalty_scale * action_penalty \
 
     # dist_reward = torch.exp(-5.0 * d1)  # between bottle and ur3 grasp
-    approach_reward = 0.0
-    approach_reward = 1.0 * torch.where(d1 < 0.02, torch.exp(-15.0 * d1), 0.0 * torch.exp(-15.0 * d1))
-    # grasping_reward = torch.where((approach_reward > 0.0) & (), 1.0, 0.0)
-    lift_reward = 2.5 * torch.where((bottle_floor_pos[:, 2] > 0.05), 1.0, 0.0)
-    # bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
-    up_rot_reward = 7.5 * torch.exp(-10.0 * (1.0 - dot1))
-
-
-    # tip_dist_reward =
+    approach_reward = torch.where(d1 < 0.02, 1.0, 0.0)
+    lift_reward = torch.where((bottle_floor_pos[:, 2] > 0.05), 2.0, 0.0)
+    bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
+    up_rot_reward = 2.5 * torch.exp(-10.0 * (1.0 - dot1))
     rewards = approach_reward + lift_reward + up_rot_reward - action_penalty_scale * action_penalty
 
     poured_reward = torch.zeros_like(rewards)
-    poured_reward_scale = 25.0
+    poured_reward_scale = 5.0
     is_poured = (liq_cup_dist_xy < 0.015) & (liq_pos[:, 2] < 0.04)
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
     rewards += poured_reward_scale * poured_reward
@@ -1751,10 +1717,10 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
-    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.025) & (dot3 < 0.8)
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.8)
     is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
     # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
-    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
+    # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
     reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)    # bottle fallen
