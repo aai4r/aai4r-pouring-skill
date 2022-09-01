@@ -177,7 +177,7 @@ class TaskPathManager:
         err_grip = (des_grip - ee_grip).norm(dim=-1)
         err_joint = (self.init_joint_pos - dof_pos).norm(dim=-1)
 
-        reach_jnt = err_joint < 0.1
+        reach_jnt = err_joint < 0.2
         reach_ee = (err_pos < err_th[:, 0]) & (err_rot < err_th[:, 1]) & (err_grip < err_th[:, 2])
         reach = torch.where(self._step[:, 0, 0] == 0, reach_jnt, reach_ee)
 

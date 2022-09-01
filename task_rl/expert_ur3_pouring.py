@@ -231,7 +231,7 @@ class DemoUR3Pouring(BaseTask):
         # asset_options.fix_base_link = True
         # asset_options.disable_gravity = True
 
-        cup_asset_file = "urdf/objects/paper_cup.urdf"
+        cup_asset_file = "urdf/objects/paper_cup_broad.urdf"  # paper_cup.urdf
         cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)
         return cup_asset
 
@@ -483,7 +483,7 @@ class DemoUR3Pouring(BaseTask):
         self.lfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_left_finger_tip_link")
         self.rfinger_handle = self.gym.find_actor_rigid_body_handle(env_ptr, ur3_actor, "robotiq_85_right_finger_tip_link")
         self.bottle_handle = self.gym.find_actor_rigid_body_handle(env_ptr, bottle_actor, "bottle")
-        self.cup_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cup_actor, "paper_cup")
+        self.cup_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cup_actor, "paper_cup_broad")
         self.default_bottle_states = to_torch(self.default_bottle_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
         self.default_cup_states = to_torch(self.default_cup_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
         self.init_data()
@@ -776,8 +776,9 @@ class DemoUR3Pouring(BaseTask):
         self.dof_state[:, 1] = torch.zeros_like(self.dof_state[:, 1], dtype=torch.float, device=self.device)  # vel
 
         # reset ur3
+        rand_init_pos = 3.5
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 3.5 * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + rand_init_pos * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
@@ -1238,15 +1239,15 @@ class DemoUR3Pouring(BaseTask):
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
                 # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
-                # # cup pose
-                # px = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
-                # py = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
-                # pz = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
-                #
-                # p0 = self.cup_pos[i].cpu().numpy()
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
-                # self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+                # cup pose
+                px = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                py = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                pz = (self.cup_pos[i] + quat_apply(self.cup_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
+
+                p0 = self.cup_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
                 # cup tip pose
                 px = (self.cup_tip_pos[i] + quat_apply(self.cup_tip_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
@@ -1727,7 +1728,7 @@ def compute_ur3_reward(
 
     poured_reward = torch.zeros_like(rewards)
     poured_reward_scale = 25.0
-    is_poured = (liq_cup_dist_xy < 0.015) & (liq_pos[:, 2] < 0.04)
+    is_poured = (liq_cup_dist_xy < 0.03) & (liq_pos[:, 2] < 0.04)  # 0.015, 0.04
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
     rewards += poured_reward_scale * poured_reward
 

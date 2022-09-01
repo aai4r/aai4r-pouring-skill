@@ -1,0 +1,29 @@
+<?xml version="1.0" ?>
+<robot name="paper_cup_broad">
+  <link name="paper_cup_broad">
+    <inertial>
+       <mass value="0.014"/>
+<!--       <origin rpy="0 0 0" xyz="0 0 0.032"/>-->
+       <origin rpy="0 0 0" xyz="0 0 0.005"/>
+       <inertia ixx="0.000013717" ixy="0.0" ixz="0.0" iyy="0.000013717" iyz="0.0" izz="0.000010779"/>
+    </inertial>
+    <visual>
+<!--      <origin rpy="0 0 0" xyz="0 0 0.037"/>-->
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://objects/meshes/paper_cup_broad.obj" scale="1 1 1"/>
+      </geometry>
+      <material name="white">
+        <color rgba="1.0 1.0 0.0 0.0"/>
+      </material>
+    </visual>
+    <collision>
+<!--      <origin rpy="0 0 0" xyz="0 0 0.037"/>-->
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://objects/meshes/paper_cup_broad.obj" scale="1 1 1"/>
+      </geometry>
+    </collision>
+  </link>
+
+</robot>
