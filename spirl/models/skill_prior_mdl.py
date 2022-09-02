@@ -447,6 +447,10 @@ class ImageSkillPriorMdl(SkillPriorMdl):
                 .reshape(inputs.images.shape[0], -1, self.resolution, self.resolution)
 
     def _regression_targets(self, inputs):
+        if self._hp.aux_pred_dim > 0:
+            indices = torch.tensor(self._hp.aux_pred_index, device=self.device)
+            _states = torch.index_select(inputs.states[:, (self._hp.n_input_frames-1):-1], -1, indices)  # TODO, check index
+            return torch.cat((inputs.actions[:, (self._hp.n_input_frames-1):], _states), dim=-1)
         return inputs.actions[:, (self._hp.n_input_frames-1):]
 
     def unflatten_obs(self, raw_obs):
