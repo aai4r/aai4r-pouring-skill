@@ -13,7 +13,7 @@ configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
-    'epoch_cycles_train': 1,
+    'epoch_cycles_train': 20,
     'num_epochs': 101,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
@@ -24,6 +24,8 @@ configuration = AttrDict(configuration)
 model_config = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
+    aux_pred_dim=9,     # gripper, bottle, cup position, set zero for only actions
+    aux_pred_index=[13, 14, 15, 23, 24, 25, 30, 31, 32],
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
     n_rollout_steps=10,
     kl_div_weight=2e-4,
@@ -36,7 +38,7 @@ model_config = AttrDict(
     num_prior_net_layers=4,     # prior_net Predictor
     cond_decode=True,
     state_cond=True,
-    state_cond_size=7,
+    state_cond_size=6,          # only joint values
     use_pretrain=True,
     weights_dir="weights",
 )

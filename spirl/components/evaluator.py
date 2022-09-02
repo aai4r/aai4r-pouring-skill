@@ -153,7 +153,8 @@ class TopOfNSequenceEvaluator(TopOfNEvaluator):
         return AttrDict(mse=self._mse,)
 
     def _mse(self, inputs, model_outputs, batch_idx):
-        return mse(model_outputs.reconstruction[batch_idx], inputs.observations[batch_idx, -model_outputs.reconstruction.shape[1]:])
+        return mse(model_outputs.reconstruction[batch_idx, :, :inputs.observations.shape[-1]],  # TODO, recon shape
+                   inputs.observations[batch_idx, -model_outputs.reconstruction.shape[1]:])
 
     def _store_aux_outputs(self, inputs, model_outputs, batch_idx):
         return AttrDict(gt=inputs.observations[batch_idx], estimate=model_outputs.reconstruction[batch_idx])

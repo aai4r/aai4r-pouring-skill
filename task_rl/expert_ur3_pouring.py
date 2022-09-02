@@ -248,7 +248,7 @@ class DemoUR3Pouring(BaseTask):
         r = 0.012
         self.expr = [[0, 0], [0, -r], [-r, 0], [0, r], [r, 0]]
         self.num_water_drops = 1
-        self.water_drop_radius = 0.018
+        self.water_drop_radius = 0.015
 
         asset_options = gymapi.AssetOptions()
         asset_options.density = 997
