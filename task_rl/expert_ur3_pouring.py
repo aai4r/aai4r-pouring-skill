@@ -38,6 +38,7 @@ class DemoUR3Pouring(BaseTask):
         self.rot_reward_scale = self.cfg["env"]["rotRewardScale"]
         self.open_reward_scale = self.cfg["env"]["openRewardScale"]
         self.action_penalty_scale = self.cfg["env"]["actionPenaltyScale"]
+        self.rand_init_pos_scale = self.cfg["env"]["rand_init_pos_scale"]
 
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
         self.debug_cam = self.cfg["expert"]["debug_cam"]
@@ -217,7 +218,6 @@ class DemoUR3Pouring(BaseTask):
         return bottle_asset
 
     def _create_asset_cup(self):
-        self.cup_height = 0.074
         asset_options = gymapi.AssetOptions()
         # asset_options.armature = 0.01
         # asset_options.angular_damping = 0.01
@@ -231,19 +231,29 @@ class DemoUR3Pouring(BaseTask):
         # asset_options.fix_base_link = True
         # asset_options.disable_gravity = True
 
-        cup_asset_file = "urdf/objects/paper_cup_broad.urdf"  # paper_cup.urdf
+        target_cup_asset_name = "paper_cup_broad.urdf"      # paper_cup.urdf, paper_cup_broad.urdf
+        cup_asset_file = "urdf/objects/" + target_cup_asset_name
         cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)
+
+        cup_prop_dict = {
+            "paper_cup.urdf": AttrDict(height=0.073, inner_radius=0.0328),
+            "paper_cup_broad.urdf": AttrDict(height=0.073, inner_radius=0.066)
+        }
+
+        self.cup_height = cup_prop_dict[target_cup_asset_name].height
+        self.cup_inner_radius = cup_prop_dict[target_cup_asset_name].inner_radius
         return cup_asset
 
     def create_asset_water_drops(self):
         r = 0.012
         self.expr = [[0, 0], [0, -r], [-r, 0], [0, r], [r, 0]]
         self.num_water_drops = 1
+        self.water_drop_radius = 0.018
 
         asset_options = gymapi.AssetOptions()
         asset_options.density = 997
         asset_options.armature = 0.01
-        liquid_asset = self.gym.create_sphere(self.sim, 0.01, asset_options)   # radius
+        liquid_asset = self.gym.create_sphere(self.sim, self.water_drop_radius, asset_options)   # radius
         return liquid_asset
 
     def _create_asset_ur3(self):
@@ -282,6 +292,8 @@ class DemoUR3Pouring(BaseTask):
         bottle_asset = self._create_asset_bottle()
         cup_asset = self._create_asset_cup()
         liq_asset = self.create_asset_water_drops()
+        self.water_in_boundary_xy = self.cup_inner_radius - self.water_drop_radius
+        self.water_in_boundary_z = self.cup_height * 0.8 - self.water_drop_radius
 
         lower = gymapi.Vec3(-spacing, -spacing, 0.0)
         upper = gymapi.Vec3(spacing, spacing, spacing)
@@ -608,7 +620,7 @@ class DemoUR3Pouring(BaseTask):
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.lfinger_handle],
             self.contact_net_force.view(self.num_envs, self.max_agg_bodies, -1)[:, self.rfinger_handle],
             self.gripper_forward_axis, self.bottle_up_axis, self.gripper_up_axis, self.cube_left_axis,
-            self.num_envs, self.bottle_diameter, self.dist_reward_scale, self.rot_reward_scale, self.open_reward_scale,
+            self.num_envs, self.water_in_boundary_xy, self.dist_reward_scale, self.rot_reward_scale, self.open_reward_scale,
             self.action_penalty_scale, self.max_episode_length
         )
 
@@ -776,9 +788,8 @@ class DemoUR3Pouring(BaseTask):
         self.dof_state[:, 1] = torch.zeros_like(self.dof_state[:, 1], dtype=torch.float, device=self.device)  # vel
 
         # reset ur3
-        rand_init_pos = 3.5
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + rand_init_pos * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + self.rand_init_pos_scale * (torch.rand((len(env_ids), self.num_ur3_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets[env_ids, :] = pos
         self.ur3_dof_pos[env_ids, :] = pos
@@ -1364,7 +1375,7 @@ class DemoUR3Pouring(BaseTask):
         # is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.8)
         # is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
         liq_cup_dist_xy = torch.norm(self.liq_pos[:, :2] - self.cup_pos[:, :2], p=2, dim=-1)
-        is_poured = (liq_cup_dist_xy < 0.015) & (self.liq_pos[:, 2] < 0.04)
+        is_poured = (liq_cup_dist_xy < self.water_in_boundary_xy) & (self.liq_pos[:, 2] < self.water_in_boundary_z)
         self.task_status.task_success = torch.where(is_poured, 1.0, self.task_status.task_success.double())
 
         # Failure: 1) bottle fallen
@@ -1609,7 +1620,7 @@ def compute_ur3_reward(
     ur3_lfinger_pos, ur3_rfinger_pos,
     lfinger_contact_net_force, rfinger_contact_net_force,
     gripper_forward_axis, bottle_up_axis, gripper_up_axis, cube_left_axis,
-    num_envs, bottle_diameter, dist_reward_scale, rot_reward_scale, open_reward_scale,
+    num_envs, water_in_boundary_xy, dist_reward_scale, rot_reward_scale, open_reward_scale,
     action_penalty_scale, max_episode_length
 ):
     # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, int, float, float, float, float, float, float) -> Tuple[Tensor, Tensor]
@@ -1716,11 +1727,11 @@ def compute_ur3_reward(
 
     # dist_reward = torch.exp(-5.0 * d1)  # between bottle and ur3 grasp
     approach_reward = 0.0
-    approach_reward = 1.0 * torch.where(d1 < 0.02, torch.exp(-15.0 * d1), 0.0 * torch.exp(-15.0 * d1))
+    approach_reward = 1.5 * torch.where(d1 < 0.02, torch.exp(-5.0 * d1), 0.0 * torch.exp(-5.0 * d1))
     # grasping_reward = torch.where((approach_reward > 0.0) & (), 1.0, 0.0)
     lift_reward = 2.5 * torch.where((bottle_floor_pos[:, 2] > 0.05), 1.0, 0.0)
     # bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
-    up_rot_reward = 7.5 * torch.exp(-10.0 * (1.0 - dot1))
+    up_rot_reward = 7.5 * torch.exp(-3.0 * (1.0 - dot1))
 
 
     # tip_dist_reward =
@@ -1728,7 +1739,7 @@ def compute_ur3_reward(
 
     poured_reward = torch.zeros_like(rewards)
     poured_reward_scale = 25.0
-    is_poured = (liq_cup_dist_xy < 0.03) & (liq_pos[:, 2] < 0.04)  # 0.015, 0.04
+    is_poured = (liq_cup_dist_xy < water_in_boundary_xy) & (liq_pos[:, 2] < 0.04)  # 0.015, 0.04
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
     rewards += poured_reward_scale * poured_reward
 
