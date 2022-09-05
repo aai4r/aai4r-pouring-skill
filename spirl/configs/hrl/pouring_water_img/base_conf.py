@@ -67,7 +67,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="175",    # target epoch number of weight to download
+    epoch="100",    # target epoch number of weight to download
 )
 
 import yaml
@@ -85,18 +85,20 @@ for a, b in zip(ftp_params, ftp_yaml_params):
 ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
+    aux_pred_dim=9,
+    aux_pred_index=[13, 14, 15, 23, 24, 25, 30, 31, 32],
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
-    kl_div_weight=1e-4,
+    kl_div_weight=2e-4,
     n_input_frames=2,
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
     nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
-    nz_mid_prior=256,
-    n_processing_layers=4,
-    num_prior_net_layers=4,
+    nz_mid_prior=128,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
     state_cond=True,
-    state_cond_size=7,
+    state_cond_size=6,
     use_pretrain=True,
     model_download=True,
     ftp_server_info=ftp_params,
@@ -123,7 +125,7 @@ hl_policy_params = AttrDict(
     nz_mid=256,
     nz_enc=256,
     n_layers=4,
-    policy_lr=3.0e-5,
+    policy_lr=1.5e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
     weights_dir=ll_model_params.weights_dir,
@@ -139,7 +141,7 @@ hl_critic_params = AttrDict(
     nz_enc=256,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
-    critic_lr=3.0e-4,
+    critic_lr=3.0e-3,
     alpha_lr=2e-4,
 )
 
