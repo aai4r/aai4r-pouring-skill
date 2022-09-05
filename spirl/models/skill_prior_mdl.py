@@ -571,14 +571,18 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         self.rm_spatial = RemoveSpatial()
 
         resnet_mid = 512   # resnet 18 feature size
-        # input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
-        self.fc = Predictor(self._hp, input_size=resnet_mid,
-                            output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers - 2,
+        input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
+        self.fc = Predictor(self._hp, input_size=input_size,
+                            output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
                             mid_size=self._hp.nz_mid_prior)
 
-        self.fc_last = Predictor(self._hp, input_size=self._hp.nz_mid_prior + self._hp.state_cond_size,
-                                 output_size=self._hp.nz_vae * 2, num_layers=1,
-                                 mid_size=self._hp.nz_mid_prior)
+        # self.fc = Predictor(self._hp, input_size=resnet_mid,
+        #                     output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers - 2,
+        #                     mid_size=self._hp.nz_mid_prior)
+        #
+        # self.fc_last = Predictor(self._hp, input_size=self._hp.nz_mid_prior + self._hp.state_cond_size,
+        #                          output_size=self._hp.nz_vae * 2, num_layers=1,
+        #                          mid_size=self._hp.nz_mid_prior)
 
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])
@@ -594,6 +598,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later.
         out = self.enc(unroll)
         out = self.rm_spatial(out)
-        out = self.fc(out)
-        z = self.fc_last(torch.cat((out, inputs.states), dim=-1))
+        z = self.fc(torch.cat((out, inputs.states), dim=-1))
+        # out = self.fc(out)
+        # z = self.fc_last(torch.cat((out, inputs.states), dim=-1))
         return z

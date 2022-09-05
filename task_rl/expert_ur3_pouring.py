@@ -1763,7 +1763,7 @@ def compute_ur3_reward(
     is_cup_fallen = dot4 < 0.5
     is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.025) & (dot3 < 0.8)
     is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
-    # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
+    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
     rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
