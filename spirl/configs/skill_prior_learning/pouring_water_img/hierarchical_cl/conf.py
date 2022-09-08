@@ -14,7 +14,7 @@ configuration = {
     'logger': SkillSpaceLogger,
     'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
     'epoch_cycles_train': 10,
-    'num_epochs': 101,
+    'num_epochs': 201,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -40,6 +40,7 @@ model_config = AttrDict(
     state_cond=True,
     state_cond_size=6,          # only joint values
     use_pretrain=True,
+    layer_freeze=4,             # 4: freeze for skill train, -1: freeze all layers for policy train
     weights_dir="weights",
 )
 model_config.weights_dir += "_pre" if model_config.use_pretrain else ""

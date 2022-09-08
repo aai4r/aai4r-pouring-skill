@@ -34,7 +34,7 @@ configuration = {
     'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 1e3,
+    'n_warmup_steps': 1.5e3,
 }
 configuration = AttrDict(configuration)
 
@@ -67,7 +67,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="100",    # target epoch number of weight to download
+    epoch="200",    # target epoch number of weight to download
 )
 
 import yaml
@@ -100,6 +100,7 @@ ll_model_params = AttrDict(
     state_cond=True,
     state_cond_size=6,
     use_pretrain=True,
+    layer_freeze=-1,    # 4: freeze for skill train, -1: freeze all layers for policy train
     model_download=True,
     ftp_server_info=ftp_params,
     weights_dir="weights",
@@ -124,8 +125,8 @@ hl_policy_params = AttrDict(
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     nz_enc=256,
-    n_layers=4,
-    policy_lr=1.5e-4,
+    n_layers=2,
+    policy_lr=1.0e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
     weights_dir=ll_model_params.weights_dir,
@@ -136,12 +137,12 @@ hl_critic_params = AttrDict(
     action_dim=hl_policy_params.action_dim,
     input_dim=hl_policy_params.input_dim,
     output_dim=1,
-    n_layers=3,  # number of policy network layer
+    n_layers=2,  # number of policy network layer
     nz_mid=256,
-    nz_enc=256,
+    nz_enc=128,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
-    critic_lr=3.0e-3,
+    critic_lr=1.0e-3,
     alpha_lr=2e-4,
 )
 
