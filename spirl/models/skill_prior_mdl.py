@@ -398,7 +398,7 @@ class ImageSkillPriorMdl(SkillPriorMdl):
     def _build_prior_net(self):
         if self._hp.state_cond:
             # return StateCondImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
-            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params(), freeze=True)
+            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
         else:
             return nn.Sequential(
                 ResizeSpatial(self._hp.prior_input_res),
@@ -557,24 +557,30 @@ class StateCondImageSkillPriorNet(nn.Module):
 
 
 class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
-    def __init__(self, hp, enc_params, freeze=True):
-        self.freeze = freeze
+    def __init__(self, hp, enc_params):
         super().__init__(hp=hp, enc_params=enc_params)
+        self.recurrent = True
 
     def build_network(self):
         self.resize = ResizeSpatial(self._hp.prior_input_res)
         pre_trained_model = models.resnet18(pretrained=True)
         self.enc = nn.Sequential(*list(pre_trained_model.children())[:-1])
-        if self.freeze:
-            # freeze_modules([self.enc])
-            freeze_model_until(self.enc, until=4)   # resnet 18 has 9 layers except for the last fc layer
+        # freeze_modules([self.enc])
+        freeze_model_until(self.enc, until=self._hp.layer_freeze)   # resnet 18 has 9 layers except for the last fc layer
         self.rm_spatial = RemoveSpatial()
 
         resnet_mid = 512   # resnet 18 feature size
         input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
-        self.fc = Predictor(self._hp, input_size=input_size,
-                            output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
-                            mid_size=self._hp.nz_mid_prior)
+        if self.recurrent:
+            # Recurrent structure
+            self.nn = torch.nn.Sequential(
+                BaseProcessingLSTM(self._hp, in_dim=input_size, out_dim=int(self._hp.nz_mid_lstm * 0.5)),
+                torch.nn.Linear(int(self._hp.nz_mid_lstm * 0.5), self._hp.nz_vae * 2)
+            )
+        else:
+            self.nn = Predictor(self._hp, input_size=input_size,
+                                output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
+                                mid_size=self._hp.nz_mid_prior)
 
         # self.fc = Predictor(self._hp, input_size=resnet_mid,
         #                     output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers - 2,
@@ -598,7 +604,9 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later.
         out = self.enc(unroll)
         out = self.rm_spatial(out)
-        z = self.fc(torch.cat((out, inputs.states), dim=-1))
+        out = torch.cat((out, inputs.states), dim=-1)
+        out = out.unsqueeze(1) if self.recurrent else out
+        z = self.nn(out)
         # out = self.fc(out)
         # z = self.fc_last(torch.cat((out, inputs.states), dim=-1))
         return z

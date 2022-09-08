@@ -142,6 +142,7 @@ def freeze_modules(module_list):
 
 
 def freeze_model_until(model, until):
+    until = len(list(model.children())) if until == -1 else until
     assert (until >= 0) and (until <= len(list(model.children())))
     count = 0
     for p in model.parameters():
