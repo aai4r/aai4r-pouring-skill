@@ -558,7 +558,7 @@ class StateCondImageSkillPriorNet(nn.Module):
 
 class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
     def __init__(self, hp, enc_params):
-        self.recurrent = True
+        self.recurrent = hp.recurrent_prior
         super().__init__(hp=hp, enc_params=enc_params)
 
     def build_network(self):
