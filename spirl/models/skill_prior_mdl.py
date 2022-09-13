@@ -558,8 +558,8 @@ class StateCondImageSkillPriorNet(nn.Module):
 
 class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
     def __init__(self, hp, enc_params):
-        super().__init__(hp=hp, enc_params=enc_params)
         self.recurrent = True
+        super().__init__(hp=hp, enc_params=enc_params)
 
     def build_network(self):
         self.resize = ResizeSpatial(self._hp.prior_input_res)
@@ -607,6 +607,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
         z = self.nn(out)
+        z = z.squeeze(1) if self.recurrent else z
         # out = self.fc(out)
         # z = self.fc_last(torch.cat((out, inputs.states), dim=-1))
         return z
