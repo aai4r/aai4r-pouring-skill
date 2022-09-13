@@ -16,6 +16,7 @@ from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 from spirl.rl.agents.ac_agent import SACAgent
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
+from spirl.utils.remote_server_utils import WeightNaming
 
 from utils.config import parse_sim_params
 from task_rl.config import load_cfg
@@ -86,7 +87,7 @@ ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
     aux_pred_dim=9,
-    aux_pred_index=[13, 14, 15, 23, 24, 25, 30, 31, 32],
+    aux_pred_index=[13, 14, 15, 23, 24, 25, 30, 31, 32],    # target index of obs. variable
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
     kl_div_weight=2e-4,
     n_input_frames=2,
@@ -101,12 +102,12 @@ ll_model_params = AttrDict(
     state_cond_size=6,
     use_pretrain=True,
     layer_freeze=-1,    # 4: freeze for skill train, -1: freeze all layers for policy train
-    model_download=True,
+    model_download=False,
     ftp_server_info=ftp_params,
     weights_dir="weights",
+    recurrent_prior=True,
 )
-ll_model_params.weights_dir += "_pre" if ll_model_params.use_pretrain else ""
-ll_model_params.weights_dir += "_st_cond" if ll_model_params.state_cond else ""
+WeightNaming.weights_name_convert(ll_model_params)
 
 # LL Agent
 ll_agent_config = copy.deepcopy(base_agent_params)

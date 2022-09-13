@@ -5,6 +5,7 @@ from spirl.models.skill_prior_mdl import SkillSpaceLogger
 from spirl.utils.general_utils import AttrDict
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
 from spirl.components.evaluator import TopOfNSequenceEvaluator
+from spirl.utils.remote_server_utils import WeightNaming
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -41,10 +42,11 @@ model_config = AttrDict(
     state_cond_size=6,          # only joint values
     use_pretrain=True,
     layer_freeze=4,             # 4: freeze for skill train, -1: freeze all layers for policy train
+    recurrent_prior=True,
     weights_dir="weights",
 )
-model_config.weights_dir += "_pre" if model_config.use_pretrain else ""
-model_config.weights_dir += "_st_cond" if model_config.state_cond else ""
+
+WeightNaming.weights_name_convert(model_config)
 
 # Dataset
 data_config = AttrDict()
