@@ -1726,10 +1726,10 @@ def compute_ur3_reward(
               - action_penalty_scale * action_penalty \
 
     # dist_reward = torch.exp(-5.0 * d1)  # between bottle and ur3 grasp
-    approach_reward = 0.0
-    approach_reward = 1.5 * torch.where(d1 < 0.02, torch.exp(-5.0 * d1), 0.0 * torch.exp(-5.0 * d1))
+    approach_done = d1 < 0.02
+    approach_reward = 1.5 * torch.where(approach_done, torch.exp(-5.0 * d1), 0.0 * torch.exp(-5.0 * d1))
     # grasping_reward = torch.where((approach_reward > 0.0) & (), 1.0, 0.0)
-    lift_reward = 2.5 * torch.where((bottle_floor_pos[:, 2] > 0.05), 1.0, 0.0)
+    lift_reward = 2.5 * torch.where((bottle_floor_pos[:, 2] > 0.05) & approach_done, 1.0, 0.0)
     # bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
     up_rot_reward = 7.5 * torch.exp(-3.0 * (1.0 - dot1))
 

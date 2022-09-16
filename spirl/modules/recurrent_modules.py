@@ -17,6 +17,9 @@ class CustomLSTM(nn.Module):
     def __init__(self, cell):
         super(CustomLSTM, self).__init__()
         self.cell = cell
+
+    def reset(self, for_update):
+        self.cell.reset(for_update)
     
     def forward(self, inputs, length, initial_inputs=None, static_inputs=None):
         """
@@ -70,7 +73,7 @@ class CustomLSTM(nn.Module):
 class BaseProcessingLSTM(CustomLSTM):
     def __init__(self, hp, in_dim, out_dim):
         super().__init__(CustomLSTMCell(hp, in_dim, out_dim))
-        
+
     def forward(self, input):
         """
         :param input: tensor of shape batch x time x channels
@@ -160,9 +163,12 @@ class CustomLSTMCell(BaseCell):
                 start, end = n // 4, n // 2
                 bias.data[start:end].fill_(1.)
 
-    def reset(self):
+    def reset(self, for_update=False):
         # TODO make this trainable
-        self.hidden_var = torch.zeros(self._hp.batch_size, self.get_state_size(), device=self._hp.device)
+        if for_update and ("update_batch_size" in self._hp):
+            self.hidden_var = torch.zeros(self._hp.update_batch_size, self.get_state_size(), device=self._hp.device)
+        else:
+            self.hidden_var = torch.zeros(self._hp.batch_size, self.get_state_size(), device=self._hp.device)
         
     def get_state_size(self):
         return self.hidden_size * self.n_layers * 2
