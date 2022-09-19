@@ -32,17 +32,17 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 100,
+    'num_epochs': 300,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 100,  # 1.5e3,
+    'n_warmup_steps': 1.e3,
 }
 configuration = AttrDict(configuration)
 
 
 # Replay Buffer
 replay_params = AttrDict(
-    capacity=1e5,
+    capacity=1e4,
     dump_replay=False,
 )
 
@@ -102,7 +102,7 @@ ll_model_params = AttrDict(
     state_cond=True,
     state_cond_size=6,
     use_pretrain=True,
-    layer_freeze=-1,    # 4: freeze for skill train, -1: freeze all layers for policy train
+    layer_freeze=4,    # 4: freeze for skill train, -1: freeze all layers of pre-trained net
     model_download=True,
     ftp_server_info=ftp_params,
     weights_dir="weights",
@@ -133,7 +133,7 @@ hl_policy_params = AttrDict(
     nz_mid=256,
     nz_enc=256,
     n_layers=3,
-    policy_lr=1.0e-4,
+    policy_lr=1.5e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
     weights_dir=ll_model_params.weights_dir,
@@ -144,7 +144,7 @@ hl_critic_params = AttrDict(
     action_dim=hl_policy_params.action_dim,
     input_dim=hl_policy_params.input_dim,
     output_dim=1,
-    n_layers=2,  # number of policy network layer
+    n_layers=3,  # number of critic network layer
     nz_mid=256,
     nz_enc=128,
     action_input=True,
