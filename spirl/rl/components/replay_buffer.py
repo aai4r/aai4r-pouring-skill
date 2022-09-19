@@ -5,6 +5,7 @@ import os
 import copy
 
 from spirl.utils.general_utils import AttrDict, RecursiveAverageMeter, ParamDict
+from spirl.utils.remote_server_utils import WeightNaming
 
 
 class ReplayBuffer:
@@ -201,7 +202,8 @@ class PouringSkillRolloutStorage(RolloutStorage):
                 _sum[k] += v.sum()
 
         print("===========================================")
-        print(self.model_param)
+        print("Encoded Name: {}, \nDecoded Name: {}".
+              format(self.model_param, WeightNaming.weights_name_dec(self.model_param)))
         print("_sum: ", _sum)
         avg = dict.fromkeys(_sum.keys(), 0.0)
         eval_len = len(self.rollouts)

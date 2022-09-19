@@ -32,17 +32,17 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 100,
+    'num_epochs': 300,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 1.5e3,
+    'n_warmup_steps': 1.e3,
 }
 configuration = AttrDict(configuration)
 
 
 # Replay Buffer
 replay_params = AttrDict(
-    capacity=1e5,
+    capacity=1e4,
     dump_replay=False,
 )
 
@@ -55,6 +55,7 @@ sampler_config = AttrDict(
 
 base_agent_params = AttrDict(
     batch_size=64,
+    update_iterations=1,        # replay buffer
     replay=UniformReplayBuffer,
     replay_params=replay_params,
     # obs_normalizer=Normalizer,
@@ -68,7 +69,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="200",    # target epoch number of weight to download
+    epoch="300",    # target epoch number of weight to download
 )
 
 import yaml
@@ -101,12 +102,16 @@ ll_model_params = AttrDict(
     state_cond=True,
     state_cond_size=6,
     use_pretrain=True,
-    layer_freeze=-1,    # 4: freeze for skill train, -1: freeze all layers for policy train
-    model_download=False,
+    layer_freeze=4,    # 4: freeze for skill train, -1: freeze all layers of pre-trained net
+    model_download=True,
     ftp_server_info=ftp_params,
     weights_dir="weights",
     recurrent_prior=True,
 )
+
+if ll_model_params.recurrent_prior:
+    ll_model_params.update_batch_size = base_agent_params.batch_size
+
 WeightNaming.weights_name_convert(ll_model_params)
 
 # LL Agent
@@ -121,13 +126,14 @@ ll_agent_config.update(AttrDict(
 ###### High-Level ########
 # HL Policy
 hl_policy_params = AttrDict(
+    # prior_batch_size=base_agent_params.batch_size,
     action_dim=ll_model_params.nz_vae,       # z-dimension of the skill VAE
     input_dim=data_spec_img.state_dim,
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     nz_enc=256,
-    n_layers=2,
-    policy_lr=1.0e-4,
+    n_layers=3,
+    policy_lr=1.5e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
     weights_dir=ll_model_params.weights_dir,
@@ -138,7 +144,7 @@ hl_critic_params = AttrDict(
     action_dim=hl_policy_params.action_dim,
     input_dim=hl_policy_params.input_dim,
     output_dim=1,
-    n_layers=2,  # number of policy network layer
+    n_layers=3,  # number of critic network layer
     nz_mid=256,
     nz_enc=128,
     action_input=True,
