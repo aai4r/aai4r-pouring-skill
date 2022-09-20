@@ -35,7 +35,7 @@ configuration = {
     'num_epochs': 300,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 1.e3,
+    'n_warmup_steps': 3.0e3,
 }
 configuration = AttrDict(configuration)
 
@@ -54,7 +54,7 @@ sampler_config = AttrDict(
 )
 
 base_agent_params = AttrDict(
-    batch_size=64,
+    batch_size=128,
     update_iterations=1,        # replay buffer
     replay=UniformReplayBuffer,
     replay_params=replay_params,
@@ -87,7 +87,7 @@ for a, b in zip(ftp_params, ftp_yaml_params):
 ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    aux_pred_dim=9,
+    aux_pred_dim=9,         # C, 0 or 9
     aux_pred_index=[13, 14, 15, 23, 24, 25, 30, 31, 32],    # target index of obs. variable
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
     kl_div_weight=2e-4,
@@ -99,14 +99,14 @@ ll_model_params = AttrDict(
     nz_mid_prior=128,
     n_processing_layers=3,
     num_prior_net_layers=3,
-    state_cond=True,
+    state_cond=True,        # B
     state_cond_size=6,
-    use_pretrain=True,
+    use_pretrain=True,      # A
     layer_freeze=4,    # 4: freeze for skill train, -1: freeze all layers of pre-trained net
     model_download=True,
     ftp_server_info=ftp_params,
     weights_dir="weights",
-    recurrent_prior=True,
+    recurrent_prior=True,   # D
 )
 
 if ll_model_params.recurrent_prior:
@@ -149,7 +149,7 @@ hl_critic_params = AttrDict(
     nz_enc=128,
     action_input=True,
     unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames,
-    critic_lr=1.0e-3,
+    critic_lr=3.0e-4,
     alpha_lr=2e-4,
 )
 
@@ -196,13 +196,14 @@ args.device = args.sim_device_type
 args.headless = False
 args.test = False
 
+dev_num = 1
 # if torch.cuda.device_count() > 1:
-assert torch.cuda.get_device_name(1)
-args.compute_device_id = 1
-args.device_id = 1
-args.graphics_device_id = 1
-args.rl_device = 'cuda:1'
-args.sim_device = 'cuda:1'
+assert torch.cuda.get_device_name(dev_num)
+args.compute_device_id = dev_num
+args.device_id = dev_num
+args.graphics_device_id = dev_num
+args.rl_device = 'cuda:{}'.format(dev_num)
+args.sim_device = 'cuda:{}'.format(dev_num)
 
 cfg = load_cfg(cfg_file_name=task_list[target]['config'], des_path=[project_home_path, "task_rl"])
 cfg["env"]["asset"]["assetRoot"] = os.path.join(project_home_path, "assets")
