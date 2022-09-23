@@ -50,7 +50,7 @@ class MLPCritic(Critic):
         return super()._default_hparams().overwrite(default_dict)
 
     def forward(self, obs, actions=None):
-        input = torch.cat((obs, actions), dim=-1) if self._hp.action_input else obs
+        input = torch.cat((obs, actions[:, :self._hp.action_dim]), dim=-1) if self._hp.action_input else obs
         return AttrDict(q=self._net(input))
 
     def _build_network(self):

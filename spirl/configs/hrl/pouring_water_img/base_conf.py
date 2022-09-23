@@ -35,7 +35,7 @@ configuration = {
     'num_epochs': 300,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 3.0e3,
+    'n_warmup_steps': 1.5e3,
 }
 configuration = AttrDict(configuration)
 
@@ -102,7 +102,7 @@ ll_model_params = AttrDict(
     state_cond=True,        # B
     state_cond_size=6,
     use_pretrain=True,      # A
-    layer_freeze=4,    # 4: freeze for skill train, -1: freeze all layers of pre-trained net
+    layer_freeze=-1,    # 4: freeze for skill train, -1: freeze all layers of pre-trained net
     model_download=True,
     ftp_server_info=ftp_params,
     weights_dir="weights",

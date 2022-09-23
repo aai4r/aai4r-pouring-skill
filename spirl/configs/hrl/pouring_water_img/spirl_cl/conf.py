@@ -15,11 +15,27 @@ ll_policy_params = AttrDict(
 ll_policy_params.update(ll_model_params)
 
 # create LL SAC agent (by default we will only use it for rolling out decoded skills, not finetuning skill decoder)
+# by twkim, we try to finetune the skill decoder
+
+# LL Critic
+ll_critic_params = AttrDict(
+    action_dim=data_spec_img.n_actions,
+    input_dim=hl_policy_params.input_dim,
+    output_dim=1,
+    n_layers=3,  # number of critic network layer
+    nz_mid=256,
+    nz_enc=128,
+    action_input=True,
+    unused_obs_size=ll_model_params.prior_input_res ** 2 * 3 * ll_model_params.n_input_frames + hl_policy_params.action_dim,
+    critic_lr=3.0e-4,
+    alpha_lr=2e-4,
+)
+
 ll_agent_config = AttrDict(
     policy=ACClModelPolicy,
     policy_params=ll_policy_params,
     critic=SplitObsMLPCritic,                   # LL critic is not used since we are not finetuning LL
-    critic_params=hl_critic_params
+    critic_params=ll_critic_params,             # hl_critic_params
 )
 
 # update HL policy model params
