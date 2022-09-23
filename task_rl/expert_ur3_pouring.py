@@ -1738,7 +1738,7 @@ def compute_ur3_reward(
     rewards = approach_reward + lift_reward + up_rot_reward - action_penalty_scale * action_penalty
 
     poured_reward = torch.zeros_like(rewards)
-    poured_reward_scale = 1.0
+    poured_reward_scale = 2.0
     is_poured = (liq_cup_dist_xy < water_in_boundary_xy) & (liq_pos[:, 2] < 0.04)  # 0.015, 0.04
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
     # rewards += poured_reward_scale * poured_reward
