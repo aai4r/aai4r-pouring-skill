@@ -69,7 +69,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="300",    # target epoch number of weight to download
+    epoch="latest",    # target epoch number of weight to download
 )
 
 import yaml
@@ -84,11 +84,12 @@ for a, b in zip(ftp_params, ftp_yaml_params):
 
 ###### Low-Level ######
 # LL Policy
+aux_pred_indices = [13, 14, 15, 23, 24, 25, 30, 31, 32, 40, 41, 42, 43, 44, 45, 46]
 ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    aux_pred_dim=9,         # C, 0 or 9
-    aux_pred_index=[13, 14, 15, 23, 24, 25, 30, 31, 32],    # target index of obs. variable
+    aux_pred_dim=len(aux_pred_indices),         # C, 0 or 9
+    aux_pred_index=aux_pred_indices,    # target index of obs. variable
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
     kl_div_weight=2e-4,
     n_input_frames=2,
@@ -103,7 +104,7 @@ ll_model_params = AttrDict(
     state_cond_size=6,
     use_pretrain=True,      # A
     layer_freeze=-1,    # 4: freeze for skill train, -1: freeze all layers of pre-trained net
-    model_download=True,
+    model_download=False,
     ftp_server_info=ftp_params,
     weights_dir="weights",
     recurrent_prior=True,   # D
@@ -196,7 +197,7 @@ args.device = args.sim_device_type
 args.headless = False
 args.test = False
 
-dev_num = 1
+dev_num = 0
 # if torch.cuda.device_count() > 1:
 assert torch.cuda.get_device_name(dev_num)
 args.compute_device_id = dev_num
