@@ -170,7 +170,7 @@ class DemoUR3Pouring(BaseTask):
         cam_target_first_person = gymapi.Vec3(0.5, 0.0, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos_third_person, cam_target_third_person)
 
-        self.gym.subscribe_viewer_mouse_event(self.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_left")
+        # self.gym.subscribe_viewer_mouse_event(self.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_left")
 
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -1113,11 +1113,11 @@ class DemoUR3Pouring(BaseTask):
         if self.interaction_mode:
             self.interaction()
 
-        for evt in self.gym.query_viewer_action_events(self.viewer):
-            if evt.action == "mouse_left":
-                tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
-                print("p: ", tr.p)
-                print("r: ", tr.r)
+        # for evt in self.gym.query_viewer_action_events(self.viewer):
+        #     if evt.action == "mouse_left":
+        #         tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
+        #         print("p: ", tr.p)
+        #         print("r: ", tr.r)
 
     def interaction(self):
         if self.viewer:
