@@ -49,6 +49,7 @@ class DemoUR3Pouring(BaseTask):
 
         self.use_ik = False
         self.action_noise = self.cfg["env"]["action_noise"]
+        self.action_noise_scale = self.cfg["env"]["action_noise_scale"]
 
         """ Camera Sensor setting """
         self.camera_props = gymapi.CameraProperties()
@@ -61,10 +62,10 @@ class DemoUR3Pouring(BaseTask):
 
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
-            num_states = 40
+            num_states = 47
             # num_states = 0
         else:
-            num_obs = (40, )
+            num_obs = (47, )
             num_states = 0
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
@@ -160,9 +161,16 @@ class DemoUR3Pouring(BaseTask):
         self.ur3_dof_upper_limits[11] = blim
 
         """ Camera Viewer setting """
-        cam_pos = gymapi.Vec3(0.9263, 0., 0.5420)   # gymapi.Vec3(0.9263, 0.4617, 0.5420)
-        cam_target = gymapi.Vec3(0.0, 0.0, 0.0)        # gymapi.Vec3(0.0, -0.3, 0.0)
-        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
+        cam_pos_third_person = gymapi.Vec3(0.9263, 0., 0.5420)   # gymapi.Vec3(0.9263, 0.4617, 0.5420)
+        cam_target_third_person = gymapi.Vec3(0.0, 0.0, 0.0)        # gymapi.Vec3(0.0, -0.3, 0.0)
+
+        # Vec3(-0.114076, 0.199471, 0.953120)
+        # Quat(0.673537, 0.682974, 0.201253, 0.198472)
+        cam_pos_first_person = gymapi.Vec3(-0.114076, 0.0, 0.953120)
+        cam_target_first_person = gymapi.Vec3(0.5, 0.0, 0.0)
+        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos_third_person, cam_target_third_person)
+
+        # self.gym.subscribe_viewer_mouse_event(self.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_left")
 
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -359,8 +367,11 @@ class DemoUR3Pouring(BaseTask):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
-        self.default_cam_pos = [0.9, 0.0, 0.6]     # front-top [0.78, 0.0, 0.5], top [0.6, 0.0, 0.6]
-        self.default_cam_stare = [0.28, 0.0, 0.1]
+        third_person_top_pos_stare = [[0.78, 0.0, 0.5], [0.6, 0.0, 0.6]]
+        third_person_view_pos_stare = [[0.9, 0.0, 0.6], [0.28, 0.0, 0.1]]
+        first_person_view_pos_stare = [[-0.068866, -0.014887, 0.777630], [0.5, 0.0, 0.0]]
+        self.default_cam_pos = first_person_view_pos_stare[0]
+        self.default_cam_stare = first_person_view_pos_stare[1]
 
         # compute aggregate size
         num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
@@ -746,12 +757,14 @@ class DemoUR3Pouring(BaseTask):
         tip_pos_diff = self.cup_tip_pos - self.bottle_tip_pos
 
         if self.img_obs:
-            self.states_buf = torch.cat((dof_pos_vel,                               # 13
-                                        self.ur3_grasp_pos, self.ur3_grasp_rot,     # 7
-                                        self.cup_tip_pos - self.bottle_tip_pos,     # 3
-                                        self.bottle_pos, self.bottle_rot,           # 7
-                                        self.cup_pos, self.cup_rot,                 # 7
-                                        self.liq_pos), dim=-1)                      # 3
+            self.states_buf = torch.cat((dof_pos_vel,                               # 13, [0, 12]
+                                        self.ur3_grasp_pos, self.ur3_grasp_rot,     # 7, [13, 19]
+                                        self.cup_tip_pos - self.bottle_tip_pos,     # 3, [20, 22]
+                                        self.bottle_pos, self.bottle_rot,           # 7, [23, 29]
+                                        self.cup_pos, self.cup_rot,                 # 7, [30, 36]
+                                        self.liq_pos, to_target_pos,                # 6, [37, 42]
+                                        to_target_rot                               # 4, [43, 46]
+                                         ), dim=-1)
 
             """ Camera Sensor Visualization """
             for i in range(len(self.envs)):
@@ -766,12 +779,14 @@ class DemoUR3Pouring(BaseTask):
                     if k == 27:     # ESC
                         exit()
         else:
-            self.obs_buf = torch.cat((dof_pos_vel,                               # 13
-                                      self.ur3_grasp_pos, self.ur3_grasp_rot,    # 7
-                                      self.cup_tip_pos - self.bottle_tip_pos,    # 3
-                                      self.bottle_pos, self.bottle_rot,          # 7
-                                      self.cup_pos, self.cup_rot,                # 7
-                                      self.liq_pos), dim=-1)                     # 3
+            self.obs_buf = torch.cat((dof_pos_vel,                              # 13, [0, 12]
+                                     self.ur3_grasp_pos, self.ur3_grasp_rot,    # 7, [13, 19]
+                                     self.cup_tip_pos - self.bottle_tip_pos,    # 3, [20, 22]
+                                     self.bottle_pos, self.bottle_rot,          # 7, [23, 29]
+                                     self.cup_pos, self.cup_rot,                # 7, [30, 36]
+                                     self.liq_pos, to_target_pos,               # 6, [37, 42]
+                                     to_target_rot                              # 4, [43, 46]
+                                     ), dim=-1)
 
         # TODO, cam transform
         # cam_tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
@@ -1039,7 +1054,7 @@ class DemoUR3Pouring(BaseTask):
                 actions = actions.unsqueeze(0)
             _actions = actions[:, :7].clone().to(self.device)
             if self.action_noise:
-                _actions += (torch.rand_like(_actions) - 0.5) * 0.2   # add joint action noise
+                _actions += (torch.rand_like(_actions) - 0.5) * self.action_noise_scale   # add joint action noise
             grip_act = _actions[:, -1].unsqueeze(-1).repeat(1, 5) * torch.tensor([-1., 1., 1., -1., 1.], device=self.device)
             self.actions = torch.cat((_actions, grip_act), dim=-1)
 
@@ -1097,6 +1112,12 @@ class DemoUR3Pouring(BaseTask):
 
         if self.interaction_mode:
             self.interaction()
+
+        # for evt in self.gym.query_viewer_action_events(self.viewer):
+        #     if evt.action == "mouse_left":
+        #         tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
+        #         print("p: ", tr.p)
+        #         print("r: ", tr.r)
 
     def interaction(self):
         if self.viewer:
@@ -1482,7 +1503,7 @@ class DemoUR3Pouring(BaseTask):
         self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
         appr_bottle_grip = to_torch([0.085], device=self.device).repeat((self.num_envs, 1))  # full open
         self.tpl.append_pose(pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip,
-                             err=ViaPointProperty(pos=2.e-1, rot=1.e-1, grip=1.e-3))
+                             err=ViaPointProperty(pos=3.e-1, rot=1.5e-1, grip=1.e-2))
 
         """
             3) grasp ready
@@ -1729,20 +1750,20 @@ def compute_ur3_reward(
     approach_done = d1 < 0.02
     approach_reward = 1.5 * torch.where(approach_done, torch.exp(-5.0 * d1), 0.0 * torch.exp(-5.0 * d1))
     # grasping_reward = torch.where((approach_reward > 0.0) & (), 1.0, 0.0)
-    lift_reward = 2.5 * torch.where((bottle_floor_pos[:, 2] > 0.05) & approach_done, 1.0, 0.0)
+    lift_reward = 3.0 * torch.where((bottle_floor_pos[:, 2] > 0.05) & approach_done, 1.0, 0.0)
     # bottle_lean_rew = torch.where(bottle_floor_pos[:, 2] < 0.04, torch.exp(-7.0 * (1 - dot3)), torch.ones_like(dist_reward))
-    up_rot_reward = 7.5 * torch.exp(-3.0 * (1.0 - dot1))
+    up_rot_reward = 5.0 * torch.exp(-3.0 * (1.0 - dot1))
 
 
     # tip_dist_reward =
-    rewards = approach_reward + lift_reward + up_rot_reward - action_penalty_scale * action_penalty
+    rewards = approach_reward + lift_reward + up_rot_reward  #- action_penalty_scale * action_penalty
 
     poured_reward = torch.zeros_like(rewards)
-    poured_reward_scale = 2.0
+    poured_reward_scale = 20.0
     is_poured = (liq_cup_dist_xy < water_in_boundary_xy) & (liq_pos[:, 2] < 0.04)  # 0.015, 0.04
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
-    # rewards += poured_reward_scale * poured_reward
-    rewards = poured_reward_scale * poured_reward
+    rewards += poured_reward_scale * poured_reward
+    # rewards = poured_reward_scale * poured_reward
 
     # check the collisions of both fingers
     # _lfinger_contact_net_force = (lfinger_contact_net_force.T / (lfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
@@ -1764,8 +1785,8 @@ def compute_ur3_reward(
     is_cup_fallen = dot4 < 0.5
     is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.025) & (dot3 < 0.8)
     # is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
-    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
-    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
+    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * 0.0, rewards)  # paper cup fallen reward penalty
+    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * 0.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
     reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)    # bottle fallen

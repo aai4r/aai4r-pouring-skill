@@ -574,6 +574,10 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         if self.recurrent:
             # Recurrent structure
             self.nn = torch.nn.Sequential(
+                torch.nn.Linear(input_size, input_size),
+                torch.nn.LeakyReLU(0.2, inplace=True),
+                torch.nn.Linear(input_size, input_size),
+                torch.nn.LeakyReLU(0.2, inplace=True),
                 BaseProcessingLSTM(self._hp, in_dim=input_size, out_dim=int(self._hp.nz_mid_lstm * 0.5)),
                 torch.nn.Linear(int(self._hp.nz_mid_lstm * 0.5), self._hp.nz_vae * 2)
             )
