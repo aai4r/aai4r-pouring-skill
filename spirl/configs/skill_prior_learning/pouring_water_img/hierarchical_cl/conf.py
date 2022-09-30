@@ -47,7 +47,7 @@ model_config = AttrDict(
     state_cond=True,
     state_cond_size=6,          # only joint values
     use_pretrain=True,
-    layer_freeze=4,             # 4: freeze for skill train, -1: freeze all layers for policy train
+    layer_freeze=5,             # 5: freeze for skill train, -1: freeze all layers for policy train
     recurrent_prior=True,
     weights_dir="weights",
 )

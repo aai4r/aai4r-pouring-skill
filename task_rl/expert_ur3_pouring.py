@@ -161,9 +161,14 @@ class DemoUR3Pouring(BaseTask):
         self.ur3_dof_upper_limits[11] = blim
 
         """ Camera Viewer setting """
-        cam_pos = gymapi.Vec3(0.9263, 0., 0.5420)   # gymapi.Vec3(0.9263, 0.4617, 0.5420)
-        cam_target = gymapi.Vec3(0.0, 0.0, 0.0)        # gymapi.Vec3(0.0, -0.3, 0.0)
-        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
+        cam_pos_third_person = gymapi.Vec3(0.9263, 0., 0.5420)   # gymapi.Vec3(0.9263, 0.4617, 0.5420)
+        cam_target_third_person = gymapi.Vec3(0.0, 0.0, 0.0)        # gymapi.Vec3(0.0, -0.3, 0.0)
+
+        # Vec3(-0.114076, 0.199471, 0.953120)
+        # Quat(0.673537, 0.682974, 0.201253, 0.198472)
+        cam_pos_first_person = gymapi.Vec3(-0.114076, 0.0, 0.953120)
+        cam_target_first_person = gymapi.Vec3(0.5, 0.0, 0.0)
+        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos_third_person, cam_target_third_person)
 
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -360,8 +365,11 @@ class DemoUR3Pouring(BaseTask):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
-        self.default_cam_pos = [0.9, 0.0, 0.6]     # front-top [0.78, 0.0, 0.5], top [0.6, 0.0, 0.6]
-        self.default_cam_stare = [0.28, 0.0, 0.1]
+        third_person_top_pos_stare = [[0.78, 0.0, 0.5], [0.6, 0.0, 0.6]]
+        third_person_view_pos_stare = [[0.9, 0.0, 0.6], [0.28, 0.0, 0.1]]
+        first_person_view_pos_stare = [[-0.114076, 0.0, 0.953120], [0.5, 0.0, 0.0]]
+        self.default_cam_pos = first_person_view_pos_stare[0]
+        self.default_cam_stare = first_person_view_pos_stare[1]
 
         # compute aggregate size
         num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
@@ -1769,8 +1777,8 @@ def compute_ur3_reward(
     is_cup_fallen = dot4 < 0.5
     is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.025) & (dot3 < 0.8)
     # is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
-    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * -1.0, rewards)  # paper cup fallen reward penalty
-    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * -1.0, rewards)  # bottle fallen reward penalty
+    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * 0.0, rewards)  # paper cup fallen reward penalty
+    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * 0.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
     reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)    # bottle fallen

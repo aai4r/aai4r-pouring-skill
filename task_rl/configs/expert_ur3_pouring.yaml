@@ -19,7 +19,7 @@ env:
   rand_init_pos_scale: 3.5
 
   action_noise: True
-  action_noise_scale: 0.25
+  action_noise_scale: 0.2
 
   cam_width: 150
   cam_height: 150
