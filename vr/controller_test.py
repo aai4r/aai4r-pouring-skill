@@ -91,9 +91,7 @@ class SimVR:
         self.gym.subscribe_viewer_keyboard_event(self.viewer, gymapi.KEY_R, "reset")
 
         # viewer camera setting
-        # cam_pos = gymapi.Vec3(0.0, 1.58, 3.58)
         cam_pos = gymapi.Vec3(3.58, 1.58, 0.0)
-        # cam_pos = gymapi.Vec3(5.616872, 1.241800, 1.494509)
         cam_target = gymapi.Vec3(0.0, 0.0, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
@@ -117,7 +115,7 @@ class SimVR:
         cube_asset = self.gym.create_box(self.sim, 0.5, 0.5, 0.5, cube_asset_options)
 
         init_pose = gymapi.Transform()
-        init_pose.p = gymapi.Vec3(0.0, 0.0, 1.5)
+        init_pose.p = gymapi.Vec3(0.0, 0.25, 0.0)
         init_pose.r = gymapi.Quat(0, 0, 0, 1)
         self.cube_handle = self.gym.create_actor(self.env, cube_asset, init_pose, "cube", -1, 0)
         c = 0.5 + 0.5 * np.random.random(3)
@@ -132,13 +130,14 @@ class SimVR:
         for evt in self.gym.query_viewer_action_events(self.viewer):
 
             if evt.action == "exit" and evt.value > 0:
-                print("loop on: ", self.loop_on)
                 self.loop_on = False
-                print("loop on (after): ", self.loop_on)
-                # quit()
 
             if evt.action == "reset" and evt.value > 0:
                 self.gym.set_sim_rigid_body_states(self.sim, self.cube_initial_state, gymapi.STATE_ALL)
+                self.gym.refresh_rigid_body_state_tensor(self.sim)
+                state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
+                print("current cube state: ", state['pose']['p'][0])
+                print("init cube state", self.cube_initial_state['pose']['p'][0])
 
                 # current viewer camera transformation
                 tr = self.gym.get_viewer_camera_transform(self.viewer, self.env)
