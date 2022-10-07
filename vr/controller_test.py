@@ -1,6 +1,6 @@
 import numpy as np
 from isaacgym import gymutil
-from isaacgym import gymapi
+from isaacgym import gymapi, gymtorch
 from math import sqrt
 import torch
 from utils.torch_jit_utils import *
@@ -52,7 +52,8 @@ class SimVR:
                 {"name": "--num_envs", "type": int, "default": 1, "help": "Number of environments to create"}])
 
         dev_num = 1 if torch.cuda.device_count() else 0
-        self.args.sim_device = "cuda:{}".format(dev_num)
+        # self.args.sim_device = "cuda:{}".format(dev_num)
+        self.args.sim_device = "cpu"
         self.args.compute_device_id = dev_num
         self.args.graphics_device_id = dev_num
 
@@ -77,9 +78,30 @@ class SimVR:
 
         self.viewer = self.gym.create_viewer(self.sim, gymapi.CameraProperties())
         self.loop_on = True
+        self.asset_root = "../assets"
 
         self.init_env()
-        self.create_cube()
+
+        self.obj_handles = []
+        # self._create_cube()
+        self._create_ur3()
+
+        # post-processing
+        self.num_dofs = self.gym.get_sim_dof_count(self.sim) // self.args.num_envs
+        self.ur3_dof_targets = torch.zeros((self.args.num_envs, self.num_dofs), dtype=torch.float, device=self.args.sim_device)
+
+        actor_root_state_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
+        dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
+
+        self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+        self.ur3_dof_state = self.dof_state.view(self.args.num_envs, -1, 2)[:, :self.num_dofs]
+        self.ur3_dof_pos = self.ur3_dof_state[..., 0]
+        self.ur3_dof_vel = self.ur3_dof_state[..., 1]
+
+        self.root_state_tensor = gymtorch.wrap_tensor(actor_root_state_tensor).view(self.args.num_envs, -1, 13)
+        self.num_actors = self.root_state_tensor.size()[1]
+        self.global_indices = torch.arange(self.args.num_envs * self.num_actors, dtype=torch.int32, device=self.args.sim_device).view(
+            self.args.num_envs, -1)
 
     def init_env(self):
         # add ground plane
@@ -105,7 +127,7 @@ class SimVR:
         upper = gymapi.Vec3(spacing, spacing, spacing)
         self.env = self.gym.create_env(self.sim, lower, upper, num_per_row)
 
-    def create_cube(self):
+    def _create_cube(self):
         cube_asset_options = gymapi.AssetOptions()
         cube_asset_options.density = 100.
         cube_asset_options.disable_gravity = True
@@ -118,6 +140,8 @@ class SimVR:
         init_pose.p = gymapi.Vec3(0.0, 0.25, 0.0)
         init_pose.r = gymapi.Quat(0, 0, 0, 1)
         self.cube_handle = self.gym.create_actor(self.env, cube_asset, init_pose, "cube", -1, 0)
+        self.obj_handles.append(self.cube_handle)
+
         c = 0.5 + 0.5 * np.random.random(3)
         self.gym.set_rigid_body_color(self.env, self.cube_handle, 0,
                                       gymapi.MESH_VISUAL_AND_COLLISION, gymapi.Vec3(c[0], c[1], c[2]))
@@ -126,6 +150,87 @@ class SimVR:
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.cube_initial_state = np.copy(self.gym.get_sim_rigid_body_states(self.sim, gymapi.STATE_ALL))
 
+    def _create_ur3(self):
+        ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
+
+        asset_options = gymapi.AssetOptions()
+        asset_options.armature = 0.01
+        asset_options.flip_visual_attachments = True
+        asset_options.fix_base_link = True
+        asset_options.collapse_fixed_joints = False
+        asset_options.disable_gravity = True
+        asset_options.thickness = 0.01
+        asset_options.default_dof_drive_mode = gymapi.DOF_MODE_POS
+        asset_options.use_mesh_materials = True
+        ur3_asset = self.gym.load_asset(self.sim, self.asset_root, ur3_asset_file, asset_options)
+        ur3_link_dict = self.gym.get_asset_rigid_body_dict(ur3_asset)
+        print("ur3 link dictionary: ", ur3_link_dict)
+
+        self.ur3_default_dof_pos = to_torch(
+            [deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
+             deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.args.sim_device)
+
+        # ur3 dof properties
+        ur3_dof_props = self.gym.get_asset_dof_properties(ur3_asset)
+        ur3_dof_props["driveMode"].fill(gymapi.DOF_MODE_POS)
+        # ur3 joints
+        ur3_dof_props["stiffness"][:6].fill(300.0)
+        ur3_dof_props["damping"][:6].fill(80.0)
+
+        # robotiq 85 gripper
+        ur3_dof_props["stiffness"][6:].fill(1000.0)
+        ur3_dof_props["damping"][6:].fill(100.0)
+
+        # ur3 joint limits
+        self.ur3_dof_lower_limits = ur3_dof_props['lower']
+        self.ur3_dof_upper_limits = ur3_dof_props['upper']
+
+        self.ur3_dof_lower_limits = to_torch(self.ur3_dof_lower_limits, device=self.args.sim_device)
+        self.ur3_dof_upper_limits = to_torch(self.ur3_dof_upper_limits, device=self.args.sim_device)
+
+        ur3_start_pose = gymapi.Transform()
+        ur3_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
+        ur3_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
+        # correct the ur3 base
+        rot = quat_mul(to_torch([ur3_start_pose.r.x, ur3_start_pose.r.y,
+                                 ur3_start_pose.r.z, ur3_start_pose.r.w], device=self.args.sim_device),
+                       quat_from_euler_xyz(torch.tensor(deg2rad(-90), device=self.args.sim_device),
+                                           torch.tensor(deg2rad(0), device=self.args.sim_device),
+                                           torch.tensor(deg2rad(0), device=self.args.sim_device)))
+        ur3_start_pose.r = gymapi.Quat(rot[0], rot[1], rot[2], rot[3])
+        self.ur3_handle = self.gym.create_actor(self.env, ur3_asset, ur3_start_pose, "ur3", 0, 1)
+        self.gym.set_actor_dof_properties(self.env, self.ur3_handle, ur3_dof_props)
+
+    def reset(self):
+        if hasattr(self, "cube_handle"):
+            self.gym.set_sim_rigid_body_states(self.sim, self.cube_initial_state, gymapi.STATE_ALL)
+            self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+        if hasattr(self, "ur3_handle"):
+            print("ur3 reset!")
+            id = 0
+            pos = tensor_clamp(
+                self.ur3_default_dof_pos.unsqueeze(0) + 0.1 * (torch.rand((1, self.num_dofs), device=self.args.sim_device) - 0.5),
+                self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
+            self.ur3_dof_targets = pos      # targets
+            self.ur3_dof_pos[id, :] = pos
+            self.ur3_dof_pos[id, 8] = 0.0
+            self.ur3_dof_vel[id, :] = torch.zeros_like(self.ur3_dof_vel)
+
+            # for gripper sync.
+            self.ur3_dof_pos[id, 6] = 1 * self.ur3_dof_pos[id, 8]
+            self.ur3_dof_pos[id, 7] = -1. * self.ur3_dof_pos[id, 8]
+            self.ur3_dof_pos[id, 9] = 1 * self.ur3_dof_pos[id, 8]
+            self.ur3_dof_pos[id, 10] = -1. * self.ur3_dof_pos[id, 8]
+            self.ur3_dof_pos[id, 11] = 1 * self.ur3_dof_pos[id, 8]
+
+            robot_indices32 = self.global_indices[:1].flatten()
+            self.gym.set_dof_position_target_tensor_indexed(self.sim,
+                                                            gymtorch.unwrap_tensor(self.ur3_dof_targets),
+                                                            gymtorch.unwrap_tensor(robot_indices32),
+                                                            len(robot_indices32))
+
     def event_handler(self):
         for evt in self.gym.query_viewer_action_events(self.viewer):
 
@@ -133,18 +238,14 @@ class SimVR:
                 self.loop_on = False
 
             if evt.action == "reset" and evt.value > 0:
-                self.gym.set_sim_rigid_body_states(self.sim, self.cube_initial_state, gymapi.STATE_ALL)
-                self.gym.refresh_rigid_body_state_tensor(self.sim)
-                state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
-                print("current cube state: ", state['pose']['p'][0])
-                print("init cube state", self.cube_initial_state['pose']['p'][0])
+                self.reset()
 
                 # current viewer camera transformation
                 tr = self.gym.get_viewer_camera_transform(self.viewer, self.env)
                 print("p: ", tr.p)
                 print("r: ", tr.r)
 
-    def vr_handler(self):
+    def vr_handler_for_cube(self):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
         d = vr.devices["controller_1"].get_controller_inputs()
@@ -152,7 +253,6 @@ class SimVR:
             pv = np.array([v for v in vr.devices["controller_1"].get_velocity()]) * 10.0
             av = np.array([v for v in vr.devices["controller_1"].get_angular_velocity()]) * 1.0
 
-            _p = state['pose']['p'][0]
             state['vel']['linear'].fill((pv[0], pv[1], pv[2]))
             state['vel']['angular'].fill((av[0], av[1], av[2]))
             print("trigger is pushed, ", pv)
@@ -160,6 +260,9 @@ class SimVR:
         self.gym.set_actor_rigid_body_states(self.env, self.cube_handle, state, gymapi.STATE_ALL)
         self.draw_coord(pos=np.asarray(state['pose']['p'][0].tolist()),
                         rot=np.asarray(state['pose']['r'][0].tolist()))
+
+    def vr_handler_for_ur3(self):
+        pass
 
     def draw_coord(self, pos, rot):     # as numpy arrays
         self.gym.clear_lines(self.viewer)
@@ -182,7 +285,7 @@ class SimVR:
 
             # processing
             self.event_handler()
-            self.vr_handler()
+            if hasattr(self, "cube_handle"): self.vr_handler_for_cube()
 
             # update the viewer
             self.gym.step_graphics(self.sim)
