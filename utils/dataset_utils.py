@@ -182,7 +182,7 @@ class DatasetUtil:
         print("Shapes: {}".format(shapes))
         print("rollout: # of batches: {}, total: {:,}, \nrollout counts for each batch folder: {}".
               format(len(rollout_count), sum(rollout_count), rollout_count))
-        print("frames, len: {}, sum: {:,}, frame length: {}".
+        print("frames, episodes: {}, sum: {:,}, frame length: {}".
               format(len(frames.values()), sum(frames.values()), frames.values()))
 
 
@@ -191,5 +191,5 @@ if __name__ == '__main__':
     task_name = "pouring_water_img"      # block_stacking, pouring_water_img, office_TA
 
     du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=False)
-    # du.statistics()
-    du.rollout_play()
+    du.statistics()
+    # du.rollout_play()
