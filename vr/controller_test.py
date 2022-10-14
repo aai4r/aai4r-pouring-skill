@@ -58,6 +58,9 @@ class SimVR:
         self.vr.print_discovered_objects()
         self.rot = mat3d(roll=deg2rad(0), pitch=deg2rad(179.9), yaw=deg2rad(0))
 
+        self.trk_btn_trans = []
+        self.trk_btn_toggle = 1
+
         # initialize the isaac gym simulation
         self.gym = gymapi.acquire_gym()
 
@@ -449,8 +452,8 @@ class SimVR:
         d = self.vr.devices["controller_1"].get_controller_inputs()
         if d['trigger']:
             pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
-            av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0
-            # av = np.array([v for v in vr.devices["controller_1"].get_pose_quaternion()]) * 1.0
+            av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0    # incremental
+            # av = np.array([v for v in vr.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
 
             pv = torch.matmul(self.rot, torch.tensor(pv).unsqueeze(0).T)
             av = torch.tensor(av).unsqueeze(0)
@@ -458,16 +461,21 @@ class SimVR:
             av = quat_apply(_q, av)
 
             goal[:, :3] = pv.T
-            # goal[:, 0] = -pv[0, 0]
-            # goal[:, 1] = pv[0, 1]
-            # goal[:, 2] = -pv[0, 2]
-            # _quat = quat_from_euler_xyz(roll=-av[0], pitch=av[1], yaw=-av[2])
             _quat = quat_from_euler_xyz(roll=av[0, 0], pitch=av[0, 1], yaw=av[0, 2])
-            # _quat = av[3:]
-            # print("quat: ", _quat, _quat.norm())
             goal[:, 3:7] = _quat
             # print("trigger is pushed, ", pv, av)
 
+            # trackpad button transition check and gripper manipulation
+            self.trk_btn_trans.append(0) if d["trackpad_pressed"] else self.trk_btn_trans.append(1)
+            if len(self.trk_btn_trans) > 2: self.trk_btn_trans.pop(0)
+
+            if len(self.trk_btn_trans) > 1:
+                a, b = self.trk_btn_trans
+                if (b - a) < 0:
+                    self.trk_btn_toggle = 0 if self.trk_btn_toggle else 1
+                    print("track pad button pushed, ", self.trk_btn_toggle)
+
+        goal[:, 7] = self.trk_btn_toggle
         _actions = self.solve(goal_pos=goal[:, :3], goal_rot=goal[:, 3:7], goal_grip=goal[:, 7], absolute=False)
         dt = 1 / 30
         action_scale = 10.0
