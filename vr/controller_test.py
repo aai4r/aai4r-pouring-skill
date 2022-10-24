@@ -56,7 +56,7 @@ class SimVR:
         # initialize VR device
         self.vr = triad_openvr.triad_openvr()
         self.vr.print_discovered_objects()
-        self.rot = mat3d(roll=deg2rad(0), pitch=deg2rad(179.9), yaw=deg2rad(0))
+        self.rot = euler_to_mat3d(roll=deg2rad(0), pitch=deg2rad(179.9), yaw=deg2rad(0))
 
         self.trk_btn_trans = []
         self.trk_btn_toggle = 1
@@ -117,8 +117,9 @@ class SimVR:
         self.gym.subscribe_viewer_keyboard_event(self.viewer, gymapi.KEY_R, "reset")
 
         # viewer camera setting
-        cam_pos = gymapi.Vec3(3.58, 1.58, 0.0)
-        cam_target = gymapi.Vec3(0.0, 0.0, 0.0)
+        # cam_pos = gymapi.Vec3(3.58, 1.58, 0.0)  # third person view
+        cam_pos = gymapi.Vec3(-0.202553, 0.890771, -0.211403)  # tele.op. view
+        cam_target = gymapi.Vec3(0.1, 0.0, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
         # set up the grid of environments
@@ -536,16 +537,9 @@ def vr_manipulation_test():
     sv.run()
 
 
-def mat3d(roll, pitch, yaw):    # radian input
-    rx = torch.tensor([[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]])
-    ry = torch.tensor([[np.cos(pitch), 0, np.sin(pitch)], [0, 1, 0], [-np.sin(pitch), 0, np.cos(pitch)]])
-    rz = torch.tensor([[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]])
-    return torch.matmul(rx, torch.matmul(ry, rz))
-
-
 def rotation_matrix_test():
     v = torch.tensor([[0.0, 0.0, 1.0]]).T
-    rot = mat3d(roll=deg2rad(0), pitch=deg2rad(179.5), yaw=deg2rad(0))
+    rot = euler_to_mat3d(roll=deg2rad(0), pitch=deg2rad(179.5), yaw=deg2rad(0))
     result = torch.matmul(rot.float(), v)
     print("input: {}".format(v))
     print("rot \n", rot)

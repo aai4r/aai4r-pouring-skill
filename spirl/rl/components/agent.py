@@ -15,6 +15,10 @@ from spirl.rl.components.policy import Policy
 from spirl.components.checkpointer import CheckpointHandler
 from spirl.rl.utils.mpi import sync_grads
 
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('tkagg')
+
 
 class BaseAgent(nn.Module):
     def __init__(self, config):
@@ -326,15 +330,47 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         super().__init__(config)
         self._steps_since_hl = 0  # number of steps since last high-level step
 
+        self.init_plot()
+        self.reset_plot()
+
     def _default_hparams(self):
         default_dict = ParamDict({
             'hl_interval': 3,       # temporal interval at which high-level actions are executed
         })
         return super()._default_hparams().overwrite(default_dict)
 
+    def init_plot(self):
+        self.max_episode_length = self._hp.env_params.config.cfg['env']['episodeLength']
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(111)
+        self.fig.show()
+
+    def reset_plot(self):
+        self.uncertainties = []
+        self.fig.suptitle('Skill Uncertainty', fontsize=20)
+        self.ax.clear()
+        fontlabel = {"fontsize": "large", "color": "gray", "fontweight": "bold"}
+        self.ax.set_xlabel("steps", fontdict=fontlabel, labelpad=16)
+        self.ax.set_ylabel("Skill Var", fontdict=fontlabel, labelpad=16)
+        # self.ax.set_ylim([0.0, 1.5])
+        self.ax.set_xlim([0.0, self.max_episode_length])
+
     def act(self, *args, **kwargs):
+        if self._steps_since_hl <= 0:
+            self.reset_plot()
+
         output = super().act(*args, **kwargs)
         self._steps_since_hl += 1
+
+        # plot here?
+        sigma = np.exp(self._last_hl_output.dist.log_sigma)
+        # sigma = self._last_hl_output.dist.log_sigma
+        uncertainty = sigma.mean()
+        # uncertainty = val
+        self.uncertainties.append(uncertainty)
+        self.ax.plot(self.uncertainties, color='red')
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
         return output
 
     @property

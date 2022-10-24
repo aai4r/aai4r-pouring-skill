@@ -14,6 +14,13 @@ def deg2rad(deg):
     return deg * (PI / 180.0)
 
 
+def euler_to_mat3d(roll, pitch, yaw):    # radian input
+    rx = torch.tensor([[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]])
+    ry = torch.tensor([[np.cos(pitch), 0, np.sin(pitch)], [0, 1, 0], [-np.sin(pitch), 0, np.cos(pitch)]])
+    rz = torch.tensor([[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]])
+    return torch.matmul(rx, torch.matmul(ry, rz))
+
+
 def quat_to_mat(q):
     sqw = q[:, 3] * q[:, 3]
     sqx = q[:, 0] * q[:, 0]

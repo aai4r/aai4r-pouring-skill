@@ -51,6 +51,11 @@ class BaseTask:
         self.pause = False
         self.btn_pause_que = []
 
+        # VR Teleoperation
+        self.teleoperation_mode = cfg["env"]["teleoperation_mode"]
+        self.trk_btn_trans = []
+        self.trk_btn_toggle = 1
+
         # optimization flags for pytorch JIT
         torch._C._jit_set_profiling_mode(False)
         torch._C._jit_set_profiling_executor(False)
