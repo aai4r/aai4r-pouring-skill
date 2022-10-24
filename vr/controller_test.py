@@ -104,8 +104,8 @@ class SimVR:
         self.init_env()
 
         self.obj_handles = []
-        # self._create_cube()
-        self._create_ur3()
+        self._create_cube()
+        # self._create_ur3()
 
     def init_env(self):
         # add ground plane
@@ -154,6 +154,9 @@ class SimVR:
         # save initial state for reset
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         self.cube_initial_state = np.copy(self.gym.get_sim_rigid_body_states(self.sim, gymapi.STATE_ALL))
+
+        # set viewer perspective setting
+        self.gym.viewer_camera_look_at(self.viewer, None, gymapi.Vec3(3.58, 1.58, 0.0), gymapi.Vec3(0.0, 0.0, 0.0))
 
     def _create_ur3(self):
         ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
@@ -344,8 +347,8 @@ class SimVR:
             print("trigger is pushed, ", pv)
 
         self.gym.set_actor_rigid_body_states(self.env, self.cube_handle, state, gymapi.STATE_ALL)
-        self.draw_coord(pos=np.asarray(state['pose']['p'][0].tolist()),
-                        rot=np.asarray(state['pose']['r'][0].tolist()))
+        self.draw_coord(pos=[np.asarray(state['pose']['p'][0].tolist())],
+                        rot=[np.asarray(state['pose']['r'][0].tolist())])
 
     def sync_gripper_target(self):
         scale = 1.0
@@ -493,8 +496,9 @@ class SimVR:
 
         # self.gym.set_actor_rigid_body_states(self.env, self.ur3_handle, state, gymapi.STATE_ALL)
 
-        self.draw_coord(pos=[np.asarray(state['pose']['p'][0].tolist()), self.ur3_grasp_pos[0].numpy()],
-                        rot=[np.asarray(state['pose']['r'][0].tolist()), self.ur3_grasp_rot[0].numpy()])
+        ar_pos = [np.asarray(state['pose']['p'][0].tolist()), self.ur3_grasp_pos[0].numpy()]
+        ar_rot = [np.asarray(state['pose']['r'][0].tolist()), self.ur3_grasp_rot[0].numpy()]
+        self.draw_coord(pos=ar_pos, rot=ar_rot)
 
     def draw_coord(self, pos, rot, scale=0.2):     # args type: numpy arrays
         self.gym.clear_lines(self.viewer)
@@ -596,6 +600,6 @@ def plot_test():
 
 if __name__ == "__main__":
     # controller_test()
-    # vr_manipulation_test()
+    vr_manipulation_test()
     # rotation_matrix_test()
-    plot_test()
+    # plot_test()

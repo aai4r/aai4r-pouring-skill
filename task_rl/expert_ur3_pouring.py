@@ -172,6 +172,7 @@ class DemoUR3Pouring(BaseTask):
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos_first_person, cam_target_first_person)
 
         self.gym.subscribe_viewer_keyboard_event(self.viewer, gymapi.KEY_M, "mouse_tr")
+        self.gym.subscribe_viewer_keyboard_event(self.viewer, gymapi.KEY_O, "set_ood")
 
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -1124,11 +1125,20 @@ class DemoUR3Pouring(BaseTask):
         if self.interaction_mode:
             self.interaction()
 
+        self.key_event_handling()
+
+    def key_event_handling(self):
         for evt in self.gym.query_viewer_action_events(self.viewer):
-            if evt.action == "mouse_tr":
+            if evt.action == "mouse_tr" and evt.value > 0:
                 tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
                 print("p: ", tr.p)
                 print("r: ", tr.r)
+            if evt.action == "set_ood" and evt.value > 0:
+                if self.debug_viz:
+                    self.debug_viz = False
+                    self.gym.clear_lines(self.viewer)
+                else:
+                    self.debug_viz = True
 
     def interaction(self):
         if self.viewer:

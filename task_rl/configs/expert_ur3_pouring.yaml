@@ -33,7 +33,7 @@ env:
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 extra:
-  skill_uncertainty_plot: False
+  skill_uncertainty_plot: True
 
 expert:
   num_total_frames: 2000000

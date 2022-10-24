@@ -1,4 +1,7 @@
 import os
+import threading
+import time
+
 import torch
 import torch.nn as nn
 import numpy as np
@@ -344,9 +347,14 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
     def init_plot(self):
         self.max_episode_length = self._hp.env_params.config.cfg['env']['episodeLength']
         self.fig = plt.figure()
-        self.fig.suptitle('Skill Uncertainty', fontsize=20)
+        self.fig.subplots_adjust(top=0.8)
+        self.default_props = AttrDict(text='Skill Uncertainty', fontsize=20, color='black')
+        self.fig.suptitle(self.default_props.text, fontsize=self.default_props.fontsize, color=self.default_props.color)
         self.ax = self.fig.add_subplot(111)
         self.fig.show()
+
+        self.b_color = 'red'
+        self.b_timer = time.time()
 
     def reset_plot(self):
         self.ax.clear()
@@ -358,13 +366,12 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.uncertainties = np.array([0])
         self.skill_uc_plot, = self.ax.plot(self.time_line, self.uncertainties, color='red')
 
-    def act(self, *args, **kwargs):
-        if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
-            self.reset_plot()
+    def blink(self, period):
+        if (time.time() - self.b_timer) > period:
+            self.b_timer = time.time()
+            self.b_color = 'blue' if self.b_color == 'red' else 'red'
 
-        output = super().act(*args, **kwargs)
-        self._steps_since_hl += 1
-
+    def uncertainty_plot(self, output):
         if self.skill_uncertainty_plot:
             sigma = np.exp(self._last_hl_output.dist.log_sigma)
             # sigma = self._last_hl_output.dist.log_sigma
@@ -376,6 +383,24 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
             self.ax.set_ylim([0.8, self.uncertainties.max() * 1.1])
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
+
+            if uncertainty > 1.1:   # simple thresholding
+                output.skill_uncertainty = 0.0
+                self.blink(period=0.3)
+                self.fig.suptitle(self.default_props.text + "\nShow me your demonstration!",
+                                  fontsize=self.default_props.fontsize, color=self.b_color)
+            else:
+                output.skill_uncertainty = 1.0
+                self.fig.suptitle(self.default_props.text, fontsize=self.default_props.fontsize, color=self.default_props.color)
+            output.action[:6] *= output.skill_uncertainty
+
+    def act(self, *args, **kwargs):
+        if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
+            self.reset_plot()
+
+        output = super().act(*args, **kwargs)
+        self._steps_since_hl += 1
+        self.uncertainty_plot(output)
         return output
 
     @property
