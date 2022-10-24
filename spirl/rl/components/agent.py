@@ -329,9 +329,11 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
     def __init__(self, config):
         super().__init__(config)
         self._steps_since_hl = 0  # number of steps since last high-level step
+        self.skill_uncertainty_plot = config.env_params.config.cfg['extra']['skill_uncertainty_plot']
 
-        self.init_plot()
-        self.reset_plot()
+        if self.skill_uncertainty_plot:
+            self.init_plot()
+            self.reset_plot()
 
     def _default_hparams(self):
         default_dict = ParamDict({
@@ -342,35 +344,38 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
     def init_plot(self):
         self.max_episode_length = self._hp.env_params.config.cfg['env']['episodeLength']
         self.fig = plt.figure()
+        self.fig.suptitle('Skill Uncertainty', fontsize=20)
         self.ax = self.fig.add_subplot(111)
         self.fig.show()
 
     def reset_plot(self):
-        self.uncertainties = []
-        self.fig.suptitle('Skill Uncertainty', fontsize=20)
         self.ax.clear()
         fontlabel = {"fontsize": "large", "color": "gray", "fontweight": "bold"}
         self.ax.set_xlabel("steps", fontdict=fontlabel, labelpad=16)
         self.ax.set_ylabel("Skill Var", fontdict=fontlabel, labelpad=16)
-        # self.ax.set_ylim([0.0, 1.5])
         self.ax.set_xlim([0.0, self.max_episode_length])
+        self.time_line = np.array([0])
+        self.uncertainties = np.array([0])
+        self.skill_uc_plot, = self.ax.plot(self.time_line, self.uncertainties, color='red')
 
     def act(self, *args, **kwargs):
-        if self._steps_since_hl <= 0:
+        if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
             self.reset_plot()
 
         output = super().act(*args, **kwargs)
         self._steps_since_hl += 1
 
-        # plot here?
-        sigma = np.exp(self._last_hl_output.dist.log_sigma)
-        # sigma = self._last_hl_output.dist.log_sigma
-        uncertainty = sigma.mean()
-        # uncertainty = val
-        self.uncertainties.append(uncertainty)
-        self.ax.plot(self.uncertainties, color='red')
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
+        if self.skill_uncertainty_plot:
+            sigma = np.exp(self._last_hl_output.dist.log_sigma)
+            # sigma = self._last_hl_output.dist.log_sigma
+            uncertainty = sigma.mean()
+            self.time_line = np.append(self.time_line, self.time_line[-1] + 1)
+            self.uncertainties = np.append(self.uncertainties, uncertainty.item())
+            self.skill_uc_plot.set_xdata(self.time_line)
+            self.skill_uc_plot.set_ydata(self.uncertainties)
+            self.ax.set_ylim([0.8, self.uncertainties.max() * 1.1])
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
         return output
 
     @property
