@@ -66,7 +66,7 @@ class DatasetUtil:
         for batch_idx, folder in enumerate(self.folder_list):
             if exit_flag: break
             # print("idx: {},  batch folder: {}".format(batch_idx + 1, folder))
-            path = os.path.join(self.data_path, self.task_name, "batch{}".format(batch_idx + 1))
+            path = os.path.join(self.data_path, self.task_name, folder)
 
             included_extensions = ['h5']
             file_names = [fn for fn in os.listdir(path)

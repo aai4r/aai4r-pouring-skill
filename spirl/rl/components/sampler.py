@@ -89,10 +89,12 @@ class Sampler:
                         # obs = self._postprocess_obs_multi_env(obs)
                         episode.append(AttrDict(
                             observation=self._obs,
+                            state=self._obs[:self._env._env.num_states],
                             reward=reward,
                             done=done,
                             action=agent_output.action,
                             observation_next=obs,
+                            state_next=obs[:self._env._env.num_states],
                             info=obj2np(info),
                         ))
                         if render:

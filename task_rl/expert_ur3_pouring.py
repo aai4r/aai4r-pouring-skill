@@ -63,10 +63,9 @@ class DemoUR3Pouring(BaseTask):
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
             num_states = 47
-            # num_states = 0
         else:
             num_obs = (47, )
-            num_states = 0
+            num_states = 47     # TODO
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
 
