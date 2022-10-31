@@ -19,7 +19,7 @@ data_spec_img = AttrDict(
     n_actions=7,
     state_dim=47,
     env_name="pouring_water_img",
-    split=AttrDict(train=0.95, val=0.05, test=0.0),
+    split=AttrDict(train=0.5, val=0.5, test=0.0),
     res=150,
     crop_rand_subseq=True,
 )

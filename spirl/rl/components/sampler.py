@@ -92,7 +92,7 @@ class Sampler:
                             state=self._obs[:self._env._env.num_states],
                             reward=reward,
                             done=done,
-                            action=agent_output.action,
+                            action=agent_output.action[:self._env._env.num_acts],
                             observation_next=obs,
                             state_next=obs[:self._env._env.num_states],
                             info=obj2np(info),

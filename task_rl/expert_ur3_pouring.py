@@ -741,7 +741,7 @@ class DemoUR3Pouring(BaseTask):
                           / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
         # dof_pos = self.ur3_dof_pos
         dof_pos = torch.index_select(dof_pos_scaled, 1, self.indices)
-        dof_pos[:, -1] = self.ur3_dof_pos[:, -1]
+        # dof_pos[:, -1] = self.ur3_dof_pos[:, -1]  # useless code line...
         dof_vel = torch.index_select(self.ur3_dof_vel, 1, self.indices)
         dof_pos_vel = torch.cat((dof_pos, dof_vel[:, :-1]), dim=-1)     # except for gripper joint speed
 

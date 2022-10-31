@@ -97,10 +97,8 @@ class DatasetUtil:
                     step = 0
                     for img, st, a in zip(data.images, data.states, data.actions):
                         if exit_flag: break
-                        print("batch: {} / {}, rollout: {} / {}".format(batch_idx + 1,
-                                                                        len(self.folder_list),
-                                                                        int(rollout[rollout.find('_')+1:rollout.find('.')]),
-                                                                        len(rollout_list)))
+                        print("batch: {} / {}, rollout: {} / {}".format(batch_idx + 1, len(self.folder_list),
+                                                                        rollout, len(rollout_list)))
                         print("    step: {} / {}, img, shape: {}, min/max: {}/{}  type: {}".format(
                             step, len(data.images), img.shape, img.min(), img.max(), img.dtype))
                         print("      state, shape: {}".format(st.shape))
@@ -188,8 +186,8 @@ class DatasetUtil:
 
 if __name__ == '__main__':
     data_path = "../data"
-    task_name = "pouring_water_img"      # block_stacking, pouring_water_img, office_TA
+    task_name = "pouring_water_img_vr"      # block_stacking, pouring_water_img, office_TA
 
     du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=False)
-    du.statistics()
-    # du.rollout_play()
+    # du.statistics()
+    du.rollout_play()

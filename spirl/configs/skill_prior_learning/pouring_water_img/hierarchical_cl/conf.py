@@ -13,7 +13,7 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
-    'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
+    'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img_vr'),
     'epoch_cycles_train': 10,
     'num_epochs': 501,
     'evaluator': TopOfNSequenceEvaluator,

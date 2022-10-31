@@ -335,8 +335,9 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.skill_uncertainty_plot = config.env_params.config.cfg['extra']['skill_uncertainty_plot']
 
         if self.skill_uncertainty_plot:
-            self.init_plot()
-            self.reset_plot()
+            cfg = AttrDict(max_episode_length=self._hp.env_params.config.cfg['env']['episodeLength'],
+                           nRow=1, nCol=2, super_title="Robot Skill Plot")
+            self.skill_plot = RobotSkillPlot(cfg=cfg)
 
     def _default_hparams(self):
         default_dict = ParamDict({
@@ -344,63 +345,16 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         })
         return super()._default_hparams().overwrite(default_dict)
 
-    def init_plot(self):
-        self.max_episode_length = self._hp.env_params.config.cfg['env']['episodeLength']
-        self.fig = plt.figure()
-        self.fig.subplots_adjust(top=0.8)
-        self.default_props = AttrDict(text='Skill Uncertainty', fontsize=20, color='black')
-        self.fig.suptitle(self.default_props.text, fontsize=self.default_props.fontsize, color=self.default_props.color)
-        self.ax = self.fig.add_subplot(111)
-        self.fig.show()
-
-        self.b_color = 'red'
-        self.b_timer = time.time()
-
-    def reset_plot(self):
-        self.ax.clear()
-        fontlabel = {"fontsize": "large", "color": "gray", "fontweight": "bold"}
-        self.ax.set_xlabel("steps", fontdict=fontlabel, labelpad=16)
-        self.ax.set_ylabel("Skill Var", fontdict=fontlabel, labelpad=16)
-        self.ax.set_xlim([0.0, self.max_episode_length])
-        self.time_line = np.array([0])
-        self.uncertainties = np.array([0])
-        self.skill_uc_plot, = self.ax.plot(self.time_line, self.uncertainties, color='red')
-
-    def blink(self, period):
-        if (time.time() - self.b_timer) > period:
-            self.b_timer = time.time()
-            self.b_color = 'blue' if self.b_color == 'red' else 'red'
-
-    def uncertainty_plot(self, output):
-        if self.skill_uncertainty_plot:
-            sigma = np.exp(self._last_hl_output.dist.log_sigma)
-            # sigma = self._last_hl_output.dist.log_sigma
-            uncertainty = sigma.mean()
-            self.time_line = np.append(self.time_line, self.time_line[-1] + 1)
-            self.uncertainties = np.append(self.uncertainties, uncertainty.item())
-            self.skill_uc_plot.set_xdata(self.time_line)
-            self.skill_uc_plot.set_ydata(self.uncertainties)
-            self.ax.set_ylim([0.8, self.uncertainties.max() * 1.1])
-            self.fig.canvas.draw()
-            self.fig.canvas.flush_events()
-
-            if uncertainty > 1.1:   # simple thresholding
-                output.skill_uncertainty = 0.0
-                self.blink(period=0.3)
-                self.fig.suptitle(self.default_props.text + "\nShow me your demonstration!",
-                                  fontsize=self.default_props.fontsize, color=self.b_color)
-            else:
-                output.skill_uncertainty = 1.0
-                self.fig.suptitle(self.default_props.text, fontsize=self.default_props.fontsize, color=self.default_props.color)
-            output.action[:6] *= output.skill_uncertainty
-
     def act(self, *args, **kwargs):
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
-            self.reset_plot()
+            self.skill_plot.reset()
 
         output = super().act(*args, **kwargs)
         self._steps_since_hl += 1
-        self.uncertainty_plot(output)
+        if self.skill_uncertainty_plot:
+            self.skill_plot.plot(uncertainty=np.exp(self._last_hl_output.dist.log_sigma).mean(),
+                                 curr_state=args[0][:7])
+            output.action[:6] *= self.skill_plot.skill_uncertainty_binary
         return output
 
     @property
@@ -410,6 +364,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
     def reset(self):
         super().reset()
         self._steps_since_hl = 0     # start new episode with high-level step
+        if self.skill_uncertainty_plot: self.skill_plot.reset()
 
 
 class MultiEnvFixedIntervalHierarchicalAgent(FixedIntervalHierarchicalAgent):
@@ -449,3 +404,113 @@ class MultiEnvFixedIntervalHierarchicalAgent(FixedIntervalHierarchicalAgent):
     def reset(self):
         HierarchicalAgent.reset(self)
         self._steps_since_hl = np.zeros_like(self._steps_since_hl)     # start new episode with high-level step
+
+
+# TODO, should be moved to the other file later
+class RobotSkillPlot:
+    def __init__(self, cfg):
+        """
+            * max_episode_length
+            * nRow, nCol, for grid of sub plots
+            * super_title
+        :param cfg:
+        """
+        self.cfg = cfg
+        self.max_episode_length = self.cfg.max_episode_length
+        self.nRow, self.nCol = self.cfg.nRow, self.cfg.nCol
+        self.fig = plt.figure(figsize=(6.4 * self.nCol, 4.8 * self.nRow))
+        self.fig.subplots_adjust(top=0.8)
+        self.super_props = AttrDict(text=self.cfg.super_title, fontsize=20, color='black')
+        self.fig.suptitle(self.super_props.text, fontsize=self.super_props.fontsize, color=self.super_props.color)
+        self.fontlabel = {"fontsize": "large", "color": "gray", "fontweight": "bold"}
+
+        self.refresh_freq = 5  # 1: refresh every step, 2: refresh every two steps, and so on.
+        self.refresh_count = 1
+
+        self.init_plot()
+
+    def init_plot(self):
+        self.init_skill_uncertainty_subplot()
+        self.init_robot_state_subplot()
+        self.reset()
+        self.refresh(instant=True)
+
+    def init_skill_uncertainty_subplot(self):
+        self.ax_skill = self.fig.add_subplot(self.nRow * 100 + self.nCol * 10 + 1)
+        self.skill_uncertainty_binary = 0.0
+
+        self.b_color = 'red'
+        self.b_timer = time.time()
+
+    def init_robot_state_subplot(self):
+        self.ax_joint = self.fig.add_subplot(self.nRow * 100 + self.nCol * 10 + 2)
+        self.labels = ['J1', 'J2', 'J3', 'J4', 'J5', 'J6', 'Grip']
+
+    def reset(self):
+        if hasattr(self, 'ax_skill'): self.reset_skill_uc()
+        if hasattr(self, 'ax_joint'): self.reset_robot_state()
+
+    def reset_skill_uc(self):
+        self.ax_skill.clear()
+        self.ax_skill.set_title("Skill Uncertainty")
+        self.ax_skill.set_xlabel("steps", fontdict=self.fontlabel, labelpad=16)
+        self.ax_skill.set_ylabel("Skill Var", fontdict=self.fontlabel, labelpad=16)
+        self.ax_skill.set_xlim([0.0, self.max_episode_length])
+        self.time_step = np.array([0])
+        self.uncertainties = np.array([0])
+        self.skill_uc_plot, = self.ax_skill.plot(self.time_step, self.uncertainties, color='red')
+
+    def reset_robot_state(self):
+        self.ax_joint.clear()
+        if self.ax_joint.get_legend(): self.ax_joint.get_legend().remove()
+        self.ax_joint.set_title("Robot Joint State")
+        self.ax_joint.set_xlabel("steps", fontdict=self.fontlabel, labelpad=16)
+        self.ax_joint.set_ylabel("Joint Traj.", fontdict=self.fontlabel, labelpad=16)
+        self.ax_joint.set_xlim([0.0, self.max_episode_length])
+        self.joints = np.zeros((len(self.labels), 1))   # includes gripper state
+        self.joint_act_plots = []
+        for i in range(len(self.labels)):
+            _plot, = self.ax_joint.plot(self.time_step, self.joints[i], label=self.labels[i])
+            self.joint_act_plots.append(_plot)
+            self.ax_joint.legend()
+
+    def plot(self, uncertainty, curr_state):
+        self.time_step = np.append(self.time_step, self.time_step[-1] + 1)
+        self.uncertainty_plot(uncertainty=uncertainty)
+        self.joint_state_plot(curr_state=curr_state)
+        self.refresh()
+
+    def uncertainty_plot(self, uncertainty):
+        self.uncertainties = np.append(self.uncertainties, uncertainty.item())
+        self.skill_uc_plot.set_xdata(self.time_step)
+        self.skill_uc_plot.set_ydata(self.uncertainties)
+        self.ax_skill.set_ylim([0.8, self.uncertainties.max() * 1.1])
+
+        if uncertainty > 1.1:  # simple thresholding
+            self.skill_uncertainty_binary = 0.0
+            self.blink(period_sec=0.3)
+            self.fig.suptitle(self.super_props.text + "\nShow me your demonstration!",
+                              fontsize=self.super_props.fontsize, color=self.b_color)
+        else:
+            self.skill_uncertainty_binary = 1.0
+            self.fig.suptitle(self.super_props.text, fontsize=self.super_props.fontsize, color=self.super_props.color)
+
+    def joint_state_plot(self, curr_state):
+        self.joints = np.append(self.joints, np.expand_dims(curr_state, axis=1), axis=-1)
+        self.ax_joint.set_ylim([self.joints.min() * 0.8, self.joints.max() * 1.1])
+        for i in range(len(self.labels)):
+            self.joint_act_plots[i].set_xdata(self.time_step)
+            self.joint_act_plots[i].set_ydata(self.joints[i])
+
+    def blink(self, period_sec):
+        if (time.time() - self.b_timer) > period_sec:
+            self.b_timer = time.time()
+            self.b_color = 'blue' if self.b_color == 'red' else 'red'
+
+    def refresh(self, instant=False):
+        if not hasattr(self, 'fig'): return
+        if (self.refresh_count % self.refresh_freq == 0) or instant:
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+        self.refresh_count += 1
+        if self.refresh_count > self.refresh_freq * 100: self.refresh_count = 1     # to prevent overflow
