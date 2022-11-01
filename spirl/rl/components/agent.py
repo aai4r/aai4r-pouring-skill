@@ -336,7 +336,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
         if self.skill_uncertainty_plot:
             cfg = AttrDict(max_episode_length=self._hp.env_params.config.cfg['env']['episodeLength'],
-                           nRow=1, nCol=2, super_title="Robot Skill Plot")
+                           nRow=2, nCol=1, super_title="Robot Skill Plot")
             self.skill_plot = RobotSkillPlot(cfg=cfg)
 
     def _default_hparams(self):
@@ -419,7 +419,7 @@ class RobotSkillPlot:
         self.max_episode_length = self.cfg.max_episode_length
         self.nRow, self.nCol = self.cfg.nRow, self.cfg.nCol
         self.fig = plt.figure(figsize=(6.4 * self.nCol, 4.8 * self.nRow))
-        self.fig.subplots_adjust(top=0.8)
+        self.fig.subplots_adjust(hspace=0.5, wspace=0.5)
         self.super_props = AttrDict(text=self.cfg.super_title, fontsize=20, color='black')
         self.fig.suptitle(self.super_props.text, fontsize=self.super_props.fontsize, color=self.super_props.color)
         self.fontlabel = {"fontsize": "large", "color": "gray", "fontweight": "bold"}
@@ -434,6 +434,7 @@ class RobotSkillPlot:
         self.init_robot_state_subplot()
         self.reset()
         self.refresh(instant=True)
+        self.fig.show()
 
     def init_skill_uncertainty_subplot(self):
         self.ax_skill = self.fig.add_subplot(self.nRow * 100 + self.nCol * 10 + 1)
@@ -465,7 +466,7 @@ class RobotSkillPlot:
         if self.ax_joint.get_legend(): self.ax_joint.get_legend().remove()
         self.ax_joint.set_title("Robot Joint State")
         self.ax_joint.set_xlabel("steps", fontdict=self.fontlabel, labelpad=16)
-        self.ax_joint.set_ylabel("Joint Traj.", fontdict=self.fontlabel, labelpad=16)
+        self.ax_joint.set_ylabel("Joint Traj (rad).", fontdict=self.fontlabel, labelpad=16)
         self.ax_joint.set_xlim([0.0, self.max_episode_length])
         self.joints = np.zeros((len(self.labels), 1))   # includes gripper state
         self.joint_act_plots = []
