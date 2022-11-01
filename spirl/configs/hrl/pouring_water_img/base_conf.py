@@ -33,7 +33,7 @@ configuration = {
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
     'num_epochs': 300,
-    'max_rollout_len': 1000,
+    'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
     'n_warmup_steps': 1.5e3,
 }

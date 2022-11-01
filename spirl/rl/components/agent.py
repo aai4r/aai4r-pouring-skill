@@ -354,7 +354,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         if self.skill_uncertainty_plot:
             self.skill_plot.plot(uncertainty=np.exp(self._last_hl_output.dist.log_sigma).mean(),
                                  curr_state=args[0][:7])
-            output.action[:6] *= self.skill_plot.skill_uncertainty_binary
+            output.action[:7] *= self.skill_plot.skill_uncertainty_binary
         return output
 
     @property

@@ -15,6 +15,8 @@ class RolloutRepository(object):
 
         self.batch_count = self.get_last_batch_num() + 1 if batch_start_num is None else batch_start_num
         self.epi_count = 0
+        self.cut_off_len = 50       # Doesn't save the data less than cut off length
+        self.front_trim_len = 3     # trim first three frames due to noisy inputs of previous episode
 
     def get_last_batch_num(self):     # return batch num 0 if the path does not exist
         path = os.path.join(self.root_dir, self.task_name)
@@ -28,6 +30,13 @@ class RolloutRepository(object):
 
     def save_rollout_to_file(self, episode):
         """Saves an episode to the next file index of the target folder."""
+        if len(episode.done) < self.cut_off_len:
+            print("Invalid episode length... {} < {}".format(len(episode.done), self.cut_off_len))
+            return
+
+        # front trim
+        for key in episode: episode[key] = episode[key][self.front_trim_len:]
+
         batch_folder = "batch{}".format(self.batch_count) if self.batch_count is not None else ""
         task_batch_path = os.path.join(self.root_dir, self.task_name, batch_folder)
         if not os.path.exists(task_batch_path):
