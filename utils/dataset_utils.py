@@ -145,6 +145,7 @@ class DatasetUtil:
         rollout_count = []
         keys = []
         shapes = {}
+        data_range = {}
         for batch_idx, folder in enumerate(self.folder_list):
             # print("idx: {},  batch folder: {}".format(batch_idx + 1, folder))
             path = os.path.join(self.data_path, self.task_name, "batch{}".format(batch_idx + 1))
@@ -152,6 +153,7 @@ class DatasetUtil:
             # print("rollout lists: ", rollout_list)
             rollout_count.append(len(rollout_list))
 
+            print("batch{}...........................".format(batch_idx + 1))
             for rollout in rollout_list:
                 _path = os.path.join(path, rollout)
                 _rolloutID = os.path.join("batch{}".format(batch_idx + 1), rollout)
@@ -159,14 +161,16 @@ class DatasetUtil:
                     key = 'traj{}'.format(0)
                     keys = list(f[key].keys())
 
-                    for name in f[key].keys():
-                        if name not in shapes:
-                            data = f[key + '/' + name][()]
-                            shapes[name] = data.shape[1:]   # remove batch shape
+                    for name in f[key].keys():  # actions, states, ....
+                        data = f[key + '/' + name][()]
+                        _min, _max = data.min(), data.max()
+                        _min_key, _max_key = name + '_min', name + '_max'
+                        data_range[_min_key] = min(data_range[_min_key], _min) if hasattr(data_range, _min_key) else _min
+                        data_range[_max_key] = min(data_range[_max_key], _max) if hasattr(data_range, _max_key) else _max
 
                         if _rolloutID not in frames:
-                            data = f[key + '/' + name][()].astype(np.float32)
-                            frames[_rolloutID] = (len(data))
+                            frames[_rolloutID] = (len(data.astype(np.float32)))
+                            if name not in shapes: shapes[name] = data.shape[1:]  # remove batch shape
 
                         # if name in ['actions']:
                         #     data = f[key + '/' + name][()].astype(np.float32)
@@ -183,6 +187,7 @@ class DatasetUtil:
               format(len(rollout_count), sum(rollout_count), rollout_count))
         print("frames, episodes: {}, sum: {:,}, frame length: {}".
               format(len(frames.values()), sum(frames.values()), frames.values()))
+        print("Dataset range: {}".format(data_range))
 
 
 if __name__ == '__main__':
@@ -190,5 +195,5 @@ if __name__ == '__main__':
     task_name = "pouring_water_img"      # block_stacking, pouring_water_img, office_TA
 
     du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
-    # du.statistics()
-    du.rollout_play()
+    du.statistics()
+    # du.rollout_play()
