@@ -13,7 +13,7 @@ from spirl.components.checkpointer import CheckpointHandler, save_cmd, save_git,
 from spirl.utils.general_utils import AttrDict, ParamDict, AverageTimer, timing, pretty_print
 from spirl.rl.utils.mpi import update_with_mpi_config, set_shutdown_hooks, mpi_sum, mpi_gather_experience
 from spirl.rl.utils.wandb import WandBLogger
-from spirl.rl.utils.rollout_utils import RolloutSaver
+from spirl.rl.utils.rollout_utils import RolloutRepository
 from spirl.rl.components.sampler import Sampler
 from spirl.rl.components.replay_buffer import RolloutStorage, PouringSkillRolloutStorage
 
@@ -80,8 +80,11 @@ class RLTrainer:
             self.val()
         elif args.mode == 'demo':
             self.demo()
+        elif args.mode == 'collect':
+            self.collect_rollouts()
         else:
-            self.generate_rollouts()
+            print("Invalid mode...")
+            raise ValueError
 
     def _default_hparams(self):
         default_dict = ParamDict({
@@ -201,24 +204,18 @@ class RLTrainer:
                     n_total += 1
         # print("Rewards: {:d} / {:d} = {:.3f}%".format(n_success, n_total, float(n_success) / n_total * 100))
 
-    def generate_rollouts(self):
+    def collect_rollouts(self):
         """Generate rollouts and save to hdf5 files."""
-        print("Saving {} rollouts to directory {}...".format(self.args.n_val_samples, self.args.save_dir))
-        saver = RolloutSaver(self.args.save_dir)
-        n_success = 0
-        n_total = 0
+        print("Saving {} rollouts to directory {}...".format(self.args.n_val_samples, self.args.save_root))
+        repo = RolloutRepository(root_dir=self.args.save_root, task_name=self.args.task_name + self.args.task_subfix)
         with self.agent.val_mode():
             with torch.no_grad():
                 for _ in tqdm(range(self.args.n_val_samples)):
                     while True:     # keep producing rollouts until we get a valid one
                         episode = self.sampler.sample_episode(is_train=False, render=True)
-                        valid = not hasattr(self.agent, 'rollout_valid') or self.agent.rollout_valid
-                        n_total += 1
-                        if valid:
-                            n_success += 1
-                            break
-                    saver.save_rollout_to_file(episode)
-        print("Success rate: {:d} / {:d} = {:.3f}%".format(n_success, n_total, float(n_success) / n_total * 100))
+                        print("episode: ", type(episode))
+                        repo.save_rollout_to_file(episode)
+        print("Collect and save rollout done... ")
 
     def warmup(self):
         """Performs pre-training warmup experience collection with random policy."""
@@ -373,7 +370,8 @@ if __name__ == '__main__':
     args.seed = 0
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
+    args.task_subfix = "_vr"
     # args.resume = "latest"
-    args.mode = "val"     # "train" / "val" / "demo" / else: rollout_save
-    args.save_dir = os.path.join(os.environ["DATA_DIR"], task_name)     # TODO, add batch sub dir
+    args.mode = "val"     # "train" / "val" / "demo" / "collect"
+    args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
     RLTrainer(args=args)

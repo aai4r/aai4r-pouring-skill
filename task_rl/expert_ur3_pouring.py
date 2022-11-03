@@ -63,10 +63,9 @@ class DemoUR3Pouring(BaseTask):
         if self.img_obs:
             num_obs = (self.camera_props.height, self.camera_props.width, 3)
             num_states = 47
-            # num_states = 0
         else:
             num_obs = (47, )
-            num_states = 0
+            num_states = 47     # TODO
 
         num_acts = 8 if self.use_ik else 7   # 8 for task space ==> pos(3), ori(4), grip(1)
 
@@ -82,10 +81,11 @@ class DemoUR3Pouring(BaseTask):
 
         super().__init__(cfg=self.cfg)
 
-        if self.interaction_mode:
+        if self.interaction_mode or self.teleoperation_mode:
             """ VR interface setting """
             self.vr = triad_openvr.triad_openvr()
             self.vr.print_discovered_objects()
+            self.vr_ref_rot = euler_to_mat3d(roll=deg2rad(-90.0), pitch=deg2rad(0.0), yaw=deg2rad(179.9))
 
         # set gripper params
         self.grasp_z_offset = 0.135      # (meter)
@@ -168,9 +168,10 @@ class DemoUR3Pouring(BaseTask):
         # Quat(0.673537, 0.682974, 0.201253, 0.198472)
         cam_pos_first_person = gymapi.Vec3(-0.114076, 0.0, 0.953120)
         cam_target_first_person = gymapi.Vec3(0.5, 0.0, 0.0)
-        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos_third_person, cam_target_third_person)
+        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos_first_person, cam_target_first_person)
 
-        # self.gym.subscribe_viewer_mouse_event(self.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_left")
+        self.gym.subscribe_viewer_keyboard_event(self.viewer, gymapi.KEY_M, "mouse_tr")
+        self.gym.subscribe_viewer_keyboard_event(self.viewer, gymapi.KEY_O, "set_ood")
 
     def create_sim(self):
         self.sim_params.up_axis = gymapi.UP_AXIS_Z
@@ -370,8 +371,8 @@ class DemoUR3Pouring(BaseTask):
         third_person_top_pos_stare = [[0.78, 0.0, 0.5], [0.6, 0.0, 0.6]]
         third_person_view_pos_stare = [[0.9, 0.0, 0.6], [0.28, 0.0, 0.1]]
         first_person_view_pos_stare = [[-0.068866, -0.014887, 0.777630], [0.5, 0.0, 0.0]]
-        self.default_cam_pos = first_person_view_pos_stare[0]
-        self.default_cam_stare = first_person_view_pos_stare[1]
+        self.default_cam_pos = third_person_view_pos_stare[0]
+        self.default_cam_stare = third_person_view_pos_stare[1]
 
         # compute aggregate size
         num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
@@ -516,6 +517,11 @@ class DemoUR3Pouring(BaseTask):
         # self.rfinger_idxs = []
         # for i in range(self.num_envs):
         #     lfinger_idx = self.gym.find_actor_rigid_body_index(self.envs[i], mirobot_handle, "left_finger", gymapi.DOMAIN_SIM)
+        ref_pose = gymapi.Transform()
+        ref_pose.p = gymapi.Vec3(0.0, 0.0, 0.005)
+        ref_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+        self.ref_pos = to_torch([ref_pose.p.x, ref_pose.p.y, ref_pose.p.z], device=self.device).repeat((self.num_envs, 1))
+        self.ref_rot = to_torch([ref_pose.r.x, ref_pose.r.y, ref_pose.r.z, ref_pose.r.w], device=self.device).repeat((self.num_envs, 1))
 
         hand = self.gym.find_actor_rigid_body_handle(self.envs[0], self.ur3_robots[0], "tool0")
         lfinger = self.gym.find_actor_rigid_body_handle(self.envs[0], self.ur3_robots[0], "robotiq_85_left_finger_tip_link")
@@ -735,7 +741,7 @@ class DemoUR3Pouring(BaseTask):
                           / (self.ur3_dof_upper_limits - self.ur3_dof_lower_limits) - 1.0)
         # dof_pos = self.ur3_dof_pos
         dof_pos = torch.index_select(dof_pos_scaled, 1, self.indices)
-        dof_pos[:, -1] = self.ur3_dof_pos[:, -1]
+        # dof_pos[:, -1] = self.ur3_dof_pos[:, -1]  # useless code line...
         dof_vel = torch.index_select(self.ur3_dof_vel, 1, self.indices)
         dof_pos_vel = torch.cat((dof_pos, dof_vel[:, :-1]), dim=-1)     # except for gripper joint speed
 
@@ -846,6 +852,8 @@ class DemoUR3Pouring(BaseTask):
         for e_id in env_ids:
             self.gym.set_rigid_body_color(self.envs[e_id], self.bottles[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
                                           gymapi.Vec3(_uniform(1, 1), _uniform(0.0, 0.5), _uniform(0.0, 0.5)))
+                                          # gymapi.Vec3(_uniform(0, 0.1), _uniform(0.0, 1.0), _uniform(0.0, 1.0)))
+
 
         # reset cup
         place = self.default_cup_states[env_ids]
@@ -1092,6 +1100,9 @@ class DemoUR3Pouring(BaseTask):
                 cv2.imshow('pause', img)
                 cv2.waitKey(1)
 
+        if self.teleoperation_mode:
+            self.teleoperation()
+
         targets = self.ur3_dof_pos + self.ur3_dof_speed_scales * self.dt * self.actions * self.action_scale
         # targets1 = self.ur3_dof_pos[:, :6] + self.ur3_dof_speed_scales * (1/32) * self.actions[:, :6] * self.action_scale
         # targets2 = self.ur3_dof_pos[:, 6:] + self.ur3_dof_speed_scales * (1/28) * self.actions[:, 6:] * self.action_scale
@@ -1113,11 +1124,20 @@ class DemoUR3Pouring(BaseTask):
         if self.interaction_mode:
             self.interaction()
 
-        # for evt in self.gym.query_viewer_action_events(self.viewer):
-        #     if evt.action == "mouse_left":
-        #         tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
-        #         print("p: ", tr.p)
-        #         print("r: ", tr.r)
+        self.key_event_handling()
+
+    def key_event_handling(self):
+        for evt in self.gym.query_viewer_action_events(self.viewer):
+            if evt.action == "mouse_tr" and evt.value > 0:
+                tr = self.gym.get_viewer_camera_transform(self.viewer, self.envs[0])
+                print("p: ", tr.p)
+                print("r: ", tr.r)
+            if evt.action == "set_ood" and evt.value > 0:
+                if self.debug_viz:
+                    self.debug_viz = False
+                    self.gym.clear_lines(self.viewer)
+                else:
+                    self.debug_viz = True
 
     def interaction(self):
         if self.viewer:
@@ -1193,6 +1213,45 @@ class DemoUR3Pouring(BaseTask):
             #         print("cup pos: {}".format(self.cup_pos[0, :]))
             #         print("======================================")
 
+    def teleoperation(self):
+        if self.viewer:
+            if self.gym.query_viewer_has_closed(self.viewer): exit()
+            goal = torch.zeros(1, 8, device=self.device)
+            goal[:, -2:] = 1.0
+            d = self.vr.devices["controller_1"].get_controller_inputs()
+            if d['trigger']:
+                pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
+                av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
+                # av = np.array([v for v in vr.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
+
+                pv = torch.matmul(self.vr_ref_rot, torch.tensor(pv).unsqueeze(0).T)
+                av = torch.tensor(av).unsqueeze(0)
+                _q = mat_to_quat(self.vr_ref_rot.unsqueeze(0))
+                av = quat_apply(_q, av)
+
+                goal[:, :3] = pv.T
+                _quat = quat_from_euler_xyz(roll=av[0, 0], pitch=av[0, 1], yaw=av[0, 2])
+                goal[:, 3:7] = _quat
+
+                # trackpad button transition check and gripper manipulation
+                self.trk_btn_trans.append(0) if d["trackpad_pressed"] else self.trk_btn_trans.append(1)
+                if len(self.trk_btn_trans) > 2: self.trk_btn_trans.pop(0)
+                if len(self.trk_btn_trans) > 1:
+                    a, b = self.trk_btn_trans
+                    if (b - a) < 0:
+                        self.trk_btn_toggle = 0 if self.trk_btn_toggle else 1
+                        print("track pad button pushed, ", self.trk_btn_toggle)
+
+                goal[:, 7] = self.trk_btn_toggle
+                _actions = self.solve(goal_pos=goal[:, :3], goal_rot=goal[:, 3:7], goal_grip=goal[:, 7], absolute=False)
+
+                actions = torch.zeros_like(self.actions)
+                actions[:, :6] = _actions[:, :6]
+                gripper_actuation = _actions[:, -1]
+                actions[:, 6] = actions[:, 8] = actions[:, 9] = actions[:, 11] = gripper_actuation
+                actions[:, 7] = actions[:, 11] = -1 * gripper_actuation
+                self.actions = actions
+
     def post_physics_step(self):
         self.progress_buf += 1
 
@@ -1232,6 +1291,15 @@ class DemoUR3Pouring(BaseTask):
             self.gym.refresh_rigid_body_state_tensor(self.sim)
 
             for i in range(self.num_envs):
+                px = (self.ref_pos[i] + quat_apply(self.ref_rot[i], to_torch([1, 0, 0], device=self.device) * 0.4)).cpu().numpy()
+                py = (self.ref_pos[i] + quat_apply(self.ref_rot[i], to_torch([0, 1, 0], device=self.device) * 0.4)).cpu().numpy()
+                pz = (self.ref_pos[i] + quat_apply(self.ref_rot[i], to_torch([0, 0, 1], device=self.device) * 0.4)).cpu().numpy()
+
+                p0 = self.ref_pos[i].cpu().numpy()
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+                self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
                 # px = (self.hand_pos[i] + quat_apply(self.hand_rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
                 # py = (self.hand_pos[i] + quat_apply(self.hand_rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
                 # pz = (self.hand_pos[i] + quat_apply(self.hand_rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()

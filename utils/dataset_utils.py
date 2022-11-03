@@ -66,7 +66,7 @@ class DatasetUtil:
         for batch_idx, folder in enumerate(self.folder_list):
             if exit_flag: break
             # print("idx: {},  batch folder: {}".format(batch_idx + 1, folder))
-            path = os.path.join(self.data_path, self.task_name, "batch{}".format(batch_idx + 1))
+            path = os.path.join(self.data_path, self.task_name, folder)
 
             included_extensions = ['h5']
             file_names = [fn for fn in os.listdir(path)
@@ -76,6 +76,7 @@ class DatasetUtil:
             for rollout in rollout_list:
                 if exit_flag: break
                 _path = os.path.join(path, rollout)
+                print("path: ", _path)
                 with h5py.File(_path, 'r') as f:
                     data = AttrDict()
                     key = 'traj{}'.format(0)
@@ -93,18 +94,16 @@ class DatasetUtil:
                             data[name] = f[key + '/' + name][()].astype(np.float32)
 
                         print("{}: shape: {}".format(name, data[name].shape))
+                    print("pad_mask: {}".format(data.pad_mask))
 
                     step = 0
                     for img, st, a in zip(data.images, data.states, data.actions):
                         if exit_flag: break
-                        print("batch: {} / {}, rollout: {} / {}".format(batch_idx + 1,
-                                                                        len(self.folder_list),
-                                                                        int(rollout[rollout.find('_')+1:rollout.find('.')]),
-                                                                        len(rollout_list)))
-                        print("    step: {} / {}, img, shape: {}, min/max: {}/{}  type: {}".format(
-                            step, len(data.images), img.shape, img.min(), img.max(), img.dtype))
-                        print("      state, shape: {}".format(st.shape))
-                        print("        action: joint={}, grip={}".format(a[:6], a[6:]))
+                        print("{} / {},    {} / {}".format(folder, len(self.folder_list), rollout, len(rollout_list)))
+                        print("    step: {} / {}, ".format(step, len(data.images)))
+                        print("    image, shape: {}, min/max: {}/{}, type: {}".format(img.shape, img.min(), img.max(), img.dtype))
+                        print("    state, shape: {}".format(st.shape))
+                        print("    action: joint={}, grip={}".format(a[:6], a[6:]))
                         print("        dof_pos: {}".format(st[:6]))
                         print("        grip_pos: {}".format(st[6:7]))
                         offset = 6
@@ -121,7 +120,7 @@ class DatasetUtil:
                             self.plot3d(p=st[7+offset:10+offset], label="grasp_pos")
 
                         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                        cv2.imshow(task_name, img)
+                        cv2.imshow(task_name + " r: skip rollout, b: skip batch", img)
                         k = cv2.waitKey(0)
                         if k == 27:
                             exit_flag = True
@@ -134,8 +133,8 @@ class DatasetUtil:
                             break
                         step += 1
 
-                if self.plot_state:
-                    self.reset_plot()
+                    if self.plot_state:
+                        self.reset_plot()
 
                 if batch_skip:
                     batch_skip = False
@@ -182,7 +181,7 @@ class DatasetUtil:
         print("Shapes: {}".format(shapes))
         print("rollout: # of batches: {}, total: {:,}, \nrollout counts for each batch folder: {}".
               format(len(rollout_count), sum(rollout_count), rollout_count))
-        print("frames, len: {}, sum: {:,}, frame length: {}".
+        print("frames, episodes: {}, sum: {:,}, frame length: {}".
               format(len(frames.values()), sum(frames.values()), frames.values()))
 
 
@@ -190,6 +189,6 @@ if __name__ == '__main__':
     data_path = "../data"
     task_name = "pouring_water_img"      # block_stacking, pouring_water_img, office_TA
 
-    du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=False)
+    du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
     # du.statistics()
     du.rollout_play()

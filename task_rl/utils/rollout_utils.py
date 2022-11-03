@@ -2,23 +2,21 @@ import os
 import h5py
 import numpy as np
 
-from spirl.rl.utils.rollout_utils import RolloutSaver
+from spirl.rl.utils.rollout_utils import RolloutRepository
 
 
-class RolloutSaverIsaac(RolloutSaver):
+class RolloutSaverIsaac(RolloutRepository):
     def __init__(self, cfg):
         self.cfg = cfg
-        super().__init__(save_dir=cfg['expert']['data_path'])
-        self.task_name = cfg['task']['name']
+        super().__init__(root_dir=cfg['expert']['data_path'], task_name=cfg['task']['name'])
         self.save_resume = cfg['expert']['save_resume']
-        self.batch_count = 1
         self.pre_size = 0
 
         if self.save_resume:
             self.check_batch_resume()
 
     def check_batch_resume(self):
-        path = os.path.join(self.save_dir, self.task_name)
+        path = os.path.join(self.root_dir, self.task_name)
         if not os.path.exists(path):
             return
 
@@ -26,7 +24,7 @@ class RolloutSaverIsaac(RolloutSaver):
         self.pre_size = self.get_dir_size(path)
         folders = os.listdir(path)
         if folders:
-            latest_num = sorted(folders)[-1][5:]    # assume folder name 'batch'
+            latest_num = self.get_last_batch_num()
             self.batch_count = int(latest_num) + 1
             print("Dataset pre-size: {}    Current batch count : {}".format(self.pre_size, self.batch_count))
 
@@ -44,10 +42,10 @@ class RolloutSaverIsaac(RolloutSaver):
         """Saves an episode to the next file index of the target folder."""
         _obs_shape = episode.observations.shape
         _opt_path = "batch{}".format(self.batch_count) if len(_obs_shape) > 2 else ""
-        path = os.path.join(self.save_dir, self.task_name, _opt_path)
+        path = os.path.join(self.root_dir, self.task_name, _opt_path)
         if not os.path.exists(path):
             os.makedirs(path)
-        save_path = os.path.join(path, "rollout_{}.h5".format(self.counter))
+        save_path = os.path.join(path, "rollout_{}.h5".format(self.epi_count))
 
         # save rollout to file
         f = h5py.File(save_path, "w")
@@ -73,5 +71,5 @@ class RolloutSaverIsaac(RolloutSaver):
 
         f.close()
 
-        self.counter += 1
+        self.epi_count += 1
         print("Rollout is stored in {}".format(save_path))

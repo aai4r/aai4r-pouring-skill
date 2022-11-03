@@ -79,7 +79,6 @@ class Sampler:
                     while not done and self._episode_step < self._max_episode_len:
                         # perform one rollout step
                         agent_output = self.sample_action(self._obs)
-                        # print("log_sigma: ", np.linalg.norm(self._agent._last_hl_output.dist.log_sigma))
                         if agent_output.action is None:
                             break
                         agent_output = self._postprocess_agent_output(agent_output)
@@ -90,10 +89,12 @@ class Sampler:
                         # obs = self._postprocess_obs_multi_env(obs)
                         episode.append(AttrDict(
                             observation=self._obs,
+                            state=self._obs[:self._env._env.num_states],
                             reward=reward,
                             done=done,
-                            action=agent_output.action,
+                            action=agent_output.action[:self._env._env.num_acts],
                             observation_next=obs,
+                            state_next=obs[:self._env._env.num_states],
                             info=obj2np(info),
                         ))
                         if render:

@@ -25,11 +25,15 @@ env:
   cam_height: 150
 
   interaction_mode: False
+  teleoperation_mode: False
 
   asset:
     assetRoot: "../assets"
     assetFileNameUR3: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
     assetFileNameBottle: "urdf/objects/bottle.urdf"
+
+extra:
+  skill_uncertainty_plot: False
 
 expert:
   num_total_frames: 2000000

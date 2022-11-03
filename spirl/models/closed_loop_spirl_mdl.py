@@ -6,7 +6,7 @@ from spirl.utils.pytorch_utils import get_constant_parameter, ResizeSpatial, Rem
 from spirl.models.skill_prior_mdl import SkillPriorMdl, ImageSkillPriorMdl
 from spirl.modules.subnetworks import Predictor, BaseProcessingLSTM, Encoder, PreTrainEncoder
 from spirl.modules.variational_inference import MultivariateGaussian
-from spirl.components.checkpointer import load_by_key, freeze_modules
+from spirl.components.checkpointer import load_by_key, freeze_modules, freeze_model_until
 
 
 class ClSPiRLMdl(SkillPriorMdl):
@@ -83,6 +83,7 @@ class ImageClSPiRLMdl(ClSPiRLMdl, ImageSkillPriorMdl):
                                              PreTrainEncoder(self._hp, freeze=True),
                                              RemoveSpatial(), )
             self._hp.nz_enc = 512      # resnet18 feature dim.
+            freeze_model_until(self.img_encoder[1].net, until=self._hp.layer_freeze)
         else:
             self.img_encoder = nn.Sequential(ResizeSpatial(self._hp.prior_input_res),  # encodes image inputs
                                              Encoder(self._updated_encoder_params()),
