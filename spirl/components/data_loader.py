@@ -145,9 +145,6 @@ class VideoDataset(Dataset):
     def _get_raw_data(self, index):
         data = AttrDict()
         file_index = index // self.samples_per_file
-        # TODO, file length!!!, list index out of range.....
-        # 최소 몇 개의 데이터셋이 있어야 돌아가는 형식인지??
-        print("index: {}, file_index: {}, len of files: {}".format(index, file_index, len(self.filenames)))
         path = self.filenames[file_index]
 
         try:

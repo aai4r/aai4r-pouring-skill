@@ -25,7 +25,7 @@ env:
   cam_height: 150
 
   interaction_mode: False
-  teleoperation_mode: True
+  teleoperation_mode: False
 
   asset:
     assetRoot: "../assets"
@@ -33,7 +33,7 @@ env:
     assetFileNameBottle: "urdf/objects/bottle.urdf"
 
 extra:
-  skill_uncertainty_plot: True
+  skill_uncertainty_plot: False
 
 expert:
   num_total_frames: 2000000

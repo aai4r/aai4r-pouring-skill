@@ -187,7 +187,7 @@ class DatasetUtil:
 
 if __name__ == '__main__':
     data_path = "../data"
-    task_name = "pouring_water_img_vr"      # block_stacking, pouring_water_img, office_TA
+    task_name = "pouring_water_img"      # block_stacking, pouring_water_img, office_TA
 
     du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
     # du.statistics()
