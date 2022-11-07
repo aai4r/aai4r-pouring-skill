@@ -35,7 +35,7 @@ configuration = {
     'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
-    'n_warmup_steps': 1.5e3,
+    'n_warmup_steps': 1.5e2,
 }
 configuration = AttrDict(configuration)
 
@@ -69,17 +69,17 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="latest",    # target epoch number of weight to download
+    epoch="100",    # target epoch number of weight to download
 )
 
-# import yaml
-# # assuming starts from spirl/rl/train.py
-# path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
-# with io.open(path, 'r') as f:
-#     ftp_yaml_params = yaml.safe_load(f)
-#
-# for a, b in zip(ftp_params, ftp_yaml_params):
-#     ftp_params[a] = ftp_yaml_params[b]
+import yaml
+# assuming starts from spirl/rl/train.py
+path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
+with io.open(path, 'r') as f:
+    ftp_yaml_params = yaml.safe_load(f)
+
+for a, b in zip(ftp_params, ftp_yaml_params):
+    ftp_params[a] = ftp_yaml_params[b]
 
 
 ###### Low-Level ######
@@ -104,7 +104,7 @@ ll_model_params = AttrDict(
     state_cond_size=6,
     use_pretrain=True,      # A
     layer_freeze=-1,    # 5: freeze for skill train, -1: freeze all layers of pre-trained net
-    model_download=False,
+    model_download=True,
     ftp_server_info=ftp_params,
     weights_dir="weights",
     recurrent_prior=True,   # D

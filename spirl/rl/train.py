@@ -372,6 +372,6 @@ if __name__ == '__main__':
     args.task_name = task_name
     args.task_subfix = "_vr"
     # args.resume = "latest"
-    args.mode = "val"     # "train" / "val" / "demo" / "collect"
+    args.mode = "train"     # "train" / "val" / "demo" / "collect"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
     RLTrainer(args=args)
