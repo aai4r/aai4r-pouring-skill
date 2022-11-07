@@ -1827,11 +1827,11 @@ def compute_ur3_reward(
     rewards = approach_reward + lift_reward + up_rot_reward  #- action_penalty_scale * action_penalty
 
     poured_reward = torch.zeros_like(rewards)
-    poured_reward_scale = 20.0
+    poured_reward_scale = 10.0
     is_poured = (liq_cup_dist_xy < water_in_boundary_xy) & (liq_pos[:, 2] < 0.04)  # 0.015, 0.04
     poured_reward = torch.where(is_poured, poured_reward + 1.0, poured_reward)
-    rewards += poured_reward_scale * poured_reward
-    # rewards = poured_reward_scale * poured_reward
+    # rewards += poured_reward_scale * poured_reward
+    rewards = poured_reward_scale * poured_reward
 
     # check the collisions of both fingers
     # _lfinger_contact_net_force = (lfinger_contact_net_force.T / (lfinger_contact_net_force.norm(p=2, dim=-1) + 1e-8)).T
@@ -1853,8 +1853,8 @@ def compute_ur3_reward(
     is_cup_fallen = dot4 < 0.5
     is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.025) & (dot3 < 0.8)
     # is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
-    rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * 0.0, rewards)  # paper cup fallen reward penalty
-    rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * 0.0, rewards)  # bottle fallen reward penalty
+    # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * 0.0, rewards)  # paper cup fallen reward penalty
+    # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * 0.0, rewards)  # bottle fallen reward penalty
 
     # early stopping
     reset_buf = torch.where(is_bottle_fallen, torch.ones_like(reset_buf), reset_buf)    # bottle fallen

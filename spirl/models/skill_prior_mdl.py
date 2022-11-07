@@ -563,10 +563,11 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
 
     def build_network(self):
         self.resize = ResizeSpatial(self._hp.prior_input_res)
-        pre_trained_model = models.resnet18(pretrained=True)
-        self.enc = nn.Sequential(*list(pre_trained_model.children())[:-1])
+        # pre_trained_model = models.resnet18(pretrained=True)
+        # self.enc = nn.Sequential(*list(pre_trained_model.children())[:-1])
+        self.enc = PreTrainEncoder(self._hp, freeze=True)
         # freeze_modules([self.enc])
-        freeze_model_until(self.enc, until=self._hp.layer_freeze)   # resnet 18 has 9 layers except for the last fc layer
+        # freeze_model_until(self.enc, until=self._hp.layer_freeze)   # resnet 18 has 9 layers except for the last fc layer
         self.rm_spatial = RemoveSpatial()
 
         resnet_mid = 512   # resnet 18 feature size
@@ -574,10 +575,10 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         if self.recurrent:
             # Recurrent structure
             self.nn = torch.nn.Sequential(
-                torch.nn.Linear(input_size, input_size),
-                torch.nn.LeakyReLU(0.2, inplace=True),
-                torch.nn.Linear(input_size, input_size),
-                torch.nn.LeakyReLU(0.2, inplace=True),
+                # torch.nn.Linear(input_size, input_size),
+                # torch.nn.LeakyReLU(0.2, inplace=True),
+                # torch.nn.Linear(input_size, input_size),
+                # torch.nn.LeakyReLU(0.2, inplace=True),
                 BaseProcessingLSTM(self._hp, in_dim=input_size, out_dim=int(self._hp.nz_mid_lstm * 0.5)),
                 torch.nn.Linear(int(self._hp.nz_mid_lstm * 0.5), self._hp.nz_vae * 2)
             )
@@ -599,14 +600,15 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
 
     def forward(self, inputs):
         _img = self.resize(inputs.images)
-        h, w, c = _img.shape[-2], _img.shape[-1], 3  # height, width, channel
-        unroll = torch.tensor([]).to(self._hp.device)
-        for i in range(self._hp.n_input_frames):
-            start, end = i * c, (i + 1) * c
-            unroll = torch.cat((unroll, _img[:, start:end]), dim=-1)
-
-        unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later.
-        out = self.enc(unroll)
+        # h, w, c = _img.shape[-2], _img.shape[-1], 3  # height, width, channel
+        # unroll = torch.tensor([]).to(self._hp.device)
+        # for i in range(self._hp.n_input_frames):
+        #     start, end = i * c, (i + 1) * c
+        #     unroll = torch.cat((unroll, _img[:, start:end]), dim=-1)
+        #
+        # unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later.
+        # out = self.enc(unroll)
+        out = self.enc(_img)
         out = self.rm_spatial(out)
         out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out

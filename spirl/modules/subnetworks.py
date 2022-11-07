@@ -70,7 +70,7 @@ class PreTrainEncoder(nn.Module):
         self.net = nn.Sequential(*list(pre_trained_model.children())[:-1])  # exclude the last fc layer
         if freeze:
             # freeze_modules([self.net])
-            freeze_model_until(model=self.net, until=4)  # resnet 18 has 9 layers except for the last fc layer
+            freeze_model_until(model=self.net, until=self._hp.layer_freeze)  # resnet 18 has 9 layers except for the last fc layer
 
         # self.net.eval()
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],

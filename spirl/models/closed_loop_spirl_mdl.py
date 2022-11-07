@@ -83,7 +83,6 @@ class ImageClSPiRLMdl(ClSPiRLMdl, ImageSkillPriorMdl):
                                              PreTrainEncoder(self._hp, freeze=True),
                                              RemoveSpatial(), )
             self._hp.nz_enc = 512      # resnet18 feature dim.
-            freeze_model_until(self.img_encoder[1].net, until=self._hp.layer_freeze)
         else:
             self.img_encoder = nn.Sequential(ResizeSpatial(self._hp.prior_input_res),  # encodes image inputs
                                              Encoder(self._updated_encoder_params()),
@@ -95,6 +94,7 @@ class ImageClSPiRLMdl(ClSPiRLMdl, ImageSkillPriorMdl):
         stacked_imgs = torch.cat([inputs.images[:, t:t+inputs.actions.shape[1]]
                                   for t in range(self._hp.n_input_frames)], dim=2)
         # encode stacked seq
+        # TODO, image pre-processing
         return batch_apply(stacked_imgs, self.img_encoder)
 
     def _learned_prior_input(self, inputs):

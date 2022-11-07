@@ -40,14 +40,14 @@ model_config = AttrDict(
     n_input_frames=2,
     nz_vae=12,                  # skill embedding dim.
     nz_enc=256,                 # encoder output dim. (img -> nz_enc)
-    nz_mid_prior=128,
+    nz_mid_prior=256,
     n_processing_layers=3,      # num_layers of skill decoder
     num_prior_net_layers=3,     # prior_net Predictor
     cond_decode=True,
     state_cond=True,
     state_cond_size=6,          # only joint values
     use_pretrain=True,
-    layer_freeze=5,             # 5: freeze for skill train, -1: freeze all layers for policy train
+    layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
     recurrent_prior=True,
     weights_dir="weights",
 )

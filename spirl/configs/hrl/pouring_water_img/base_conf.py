@@ -32,7 +32,7 @@ configuration = {
     'environment': PouringWaterEnv,
     'sampler': ACMultiImageAugmentedHierarchicalSampler,
     'data_dir': '.',
-    'num_epochs': 300,
+    'num_epochs': 100,
     'max_rollout_len': 500,
     'n_steps_per_epoch': 10000,
     'n_warmup_steps': 1.5e3,
@@ -72,14 +72,14 @@ ftp_params = AttrDict(
     epoch="latest",    # target epoch number of weight to download
 )
 
-import yaml
-# assuming starts from spirl/rl/train.py
-path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
-with io.open(path, 'r') as f:
-    ftp_yaml_params = yaml.safe_load(f)
-
-for a, b in zip(ftp_params, ftp_yaml_params):
-    ftp_params[a] = ftp_yaml_params[b]
+# import yaml
+# # assuming starts from spirl/rl/train.py
+# path = os.path.join(os.getcwd(), "../", "configs", "ftp_login_info_data.yaml")
+# with io.open(path, 'r') as f:
+#     ftp_yaml_params = yaml.safe_load(f)
+#
+# for a, b in zip(ftp_params, ftp_yaml_params):
+#     ftp_params[a] = ftp_yaml_params[b]
 
 
 ###### Low-Level ######
@@ -97,7 +97,7 @@ ll_model_params = AttrDict(
     nz_vae=12,
     n_rollout_steps=10,
     nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
-    nz_mid_prior=128,
+    nz_mid_prior=256,
     n_processing_layers=3,
     num_prior_net_layers=3,
     state_cond=True,        # B
