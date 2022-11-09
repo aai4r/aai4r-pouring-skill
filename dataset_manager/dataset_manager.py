@@ -153,8 +153,8 @@ class SkillDatasetManager(QMainWindow, form_class):
                     self.update_pad_mask()
 
                     # slider setting
-                    self.hslider_img_step.setRange(0, self.data.max_step)
                     self.hslider_img_step.setValue(self.data.step)
+                    self.hslider_img_step.setRange(0, self.data.max_step)
 
                     self.step_progress_label_update()
 
