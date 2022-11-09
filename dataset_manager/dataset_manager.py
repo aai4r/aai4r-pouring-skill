@@ -36,8 +36,19 @@ class SkillDatasetManager(QMainWindow, form_class):
         self.treeview_files.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.treeview_files.customContextMenuRequested.connect(self.on_treeview_custom_context_menu)
 
+        # auto play check box
+        self.cb_autoplay.stateChanged.connect(self.auto_play_checkbox_state_changed)
+
+        # timer setup for auto play
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(100)
+        self.timer.timeout.connect(self.func_timeout)
+
+        # spin box for auto play time tick
+        self.sb_autoplay_tick.setRange(1, 10)
+
         # horizontal slider
-        self.hslider_img_step.valueChanged.connect(self.value_changed)
+        self.hslider_img_step.valueChanged.connect(self.progress_hslider_value_changed)
         self.hslider_img_step.setRange(0, 0)
 
         # dataset
@@ -71,6 +82,7 @@ class SkillDatasetManager(QMainWindow, form_class):
                                          QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if reply == QMessageBox.Yes:
                 shutil.rmtree(file_path) if os.path.isdir(file_path) else os.remove(file_path)
+                self.textEdit_log.append("{} is removed..".format(file_name))
 
     def on_treeview_clicked(self, index):
         index_item = self.fs_model.index(index.row(), 0, index.parent())
@@ -81,8 +93,26 @@ class SkillDatasetManager(QMainWindow, form_class):
             print("file_name: ", file_name)
             print("file_path: ", file_path)
 
-    def value_changed(self, value):
+    def auto_play_checkbox_state_changed(self, state):
+        if state == QtCore.Qt.Checked:
+            self.timer.start()
+            self.textEdit_log.append("Auto play is activated")
+        else:
+            self.timer.stop()
+            self.textEdit_log.append("Auto play is deactivated")
+
+    def func_timeout(self):
+        if hasattr(self.data, "images"):
+            _tick = self.sb_autoplay_tick.value()
+            self.data.step = min(self.data.max_step, self.data.step + _tick)
+            self.refresh()
+
+    def progress_hslider_value_changed(self, value):
         self.data.step = value
+        self.refresh()
+
+    def refresh(self):
+        self.hslider_img_step.setValue(self.data.step)
         self.update_image()
         self.update_pad_mask()
         self.step_progress_label_update()
@@ -105,7 +135,7 @@ class SkillDatasetManager(QMainWindow, form_class):
             self.lb_pad_mask.setPixmap(pixmap)
             self.lb_pad_mask.show()
         else:
-            self.textEdit_log.setText("Does NOT have pad_mask")
+            self.textEdit_log.append("Does NOT have pad_mask")
 
     def update_image(self):
         if hasattr(self.data, "images"):
@@ -118,7 +148,7 @@ class SkillDatasetManager(QMainWindow, form_class):
             self.lb_img.setPixmap(pixmap)
             self.lb_img.show()
         else:
-            self.textEdit_log.setText("Does NOT have images")
+            self.textEdit_log.append("Does NOT have images")
 
     def handle_selection_changed(self, selected, deselected):
         indexes = selected.indexes()
