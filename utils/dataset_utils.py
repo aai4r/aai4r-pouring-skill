@@ -10,6 +10,22 @@ plt.ion()
 from spirl.utils.general_utils import AttrDict
 np.set_printoptions(precision=3)
 
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QMainWindow
+
+
+class SkillDatasetManagerGUI(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("Skill Dataset Manager GUI")
+        self.statusBar().showMessage('Ready')
+        self.move(300, 300)
+        self.resize(400, 200)
+        self.show()
+
 
 class DatasetUtil:
     def __init__(self, data_path, task_name, plot_state):
@@ -26,6 +42,9 @@ class DatasetUtil:
         self.plot_state = plot_state
         if plot_state:
             self.init_plot()
+
+        # list to be excluded in dataset
+        self.exclusion_list = []    # rollout_#.h5@batch%
 
     def init_plot(self):
         self.fig = plt.figure()
@@ -60,6 +79,38 @@ class DatasetUtil:
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
+    def append_exclusion(self, batch_name, rollout_name):
+        integrated = rollout_name + '@' + batch_name
+        if not integrated in self.exclusion_list:
+            self.exclusion_list.append(integrated)
+
+    def print_exclusion_list(self):
+        if not self.exclusion_list:
+            print("Empty exclusion list...")
+            return
+
+        for string in self.exclusion_list:
+            idx = string.find("@")
+            if idx < 0: raise ValueError("Invalid string... '@' is missing")
+            rollout_name, batch_name = string[:idx], string[idx + 1:]
+            print("{} / {}".format(batch_name, rollout_name))
+
+    def print_state_details(self, image, state, action):
+        print("    image, shape: {}, min/max: {}/{}, type: {}".format(image.shape, image.min(), image.max(), image.dtype))
+        print("    state, shape: {}".format(state.shape))
+        print("    action: joint={}, grip={}".format(action[:6], action[6:]))
+        print("        dof_pos: {}".format(state[:6]))
+        print("        grip_pos: {}".format(state[6:7]))
+        offset = 6
+        print("        grasp_pos: {}".format(state[7 + offset:10 + offset]))
+        print("        grasp_rot: {}".format(state[10 + offset:14 + offset]))
+        print("        cup-bottle_tip_diff: {}".format(state[14 + offset:17 + offset]))
+        print("        bottle_pos: {}".format(state[17 + offset:20 + offset]))
+        print("        bottle_rot: {}".format(state[20 + offset:24 + offset]))
+        print("        cup_pos: {}".format(state[24 + offset:27 + offset]))
+        print("        cup_rot: {}".format(state[27 + offset:31 + offset]))
+        print("        liq_pos: {}".format(state[31 + offset:]))
+
     def rollout_play(self):
         exit_flag = False
         batch_skip = False
@@ -76,7 +127,7 @@ class DatasetUtil:
             for rollout in rollout_list:
                 if exit_flag: break
                 _path = os.path.join(path, rollout)
-                print("path: ", _path)
+                # print("path: ", _path)
                 with h5py.File(_path, 'r') as f:
                     data = AttrDict()
                     key = 'traj{}'.format(0)
@@ -92,31 +143,18 @@ class DatasetUtil:
                             data[name] = f[key + '/' + name][()].astype(np.uint8)
                         elif name in ['dones']:
                             data[name] = f[key + '/' + name][()].astype(np.float32)
-
                         print("{}: shape: {}".format(name, data[name].shape))
-                    print("pad_mask: {}".format(data.pad_mask))
+                    # print("pad_mask: {}".format(data.pad_mask))
 
-                    step = 0
-                    for img, st, a in zip(data.images, data.states, data.actions):
+                    print("{} / {},    {} / {}".format(folder, len(self.folder_list), rollout, len(rollout_list)))
+                    step, n_frames = 0, len(data.states)
+                    while step < n_frames:
+                        img, st, a = data.images[step], data.states[step], data.actions[step]
                         if exit_flag: break
-                        print("{} / {},    {} / {}".format(folder, len(self.folder_list), rollout, len(rollout_list)))
                         print("    step: {} / {}, ".format(step, len(data.images)))
-                        print("    image, shape: {}, min/max: {}/{}, type: {}".format(img.shape, img.min(), img.max(), img.dtype))
-                        print("    state, shape: {}".format(st.shape))
-                        print("    action: joint={}, grip={}".format(a[:6], a[6:]))
-                        print("        dof_pos: {}".format(st[:6]))
-                        print("        grip_pos: {}".format(st[6:7]))
-                        offset = 6
-                        print("        grasp_pos: {}".format(st[7+offset:10+offset]))
-                        print("        grasp_rot: {}".format(st[10+offset:14+offset]))
-                        print("        cup-bottle_tip_diff: {}".format(st[14+offset:17+offset]))
-                        print("        bottle_pos: {}".format(st[17+offset:20+offset]))
-                        print("        bottle_rot: {}".format(st[20+offset:24+offset]))
-                        print("        cup_pos: {}".format(st[24+offset:27+offset]))
-                        print("        cup_rot: {}".format(st[27+offset:31+offset]))
-                        print("        liq_pos: {}".format(st[31+offset:]))
-
+                        # self.print_state_details(image=img, state=st, action=a)
                         if self.plot_state:
+                            offset = 6
                             self.plot3d(p=st[7+offset:10+offset], label="grasp_pos")
 
                         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -131,6 +169,13 @@ class DatasetUtil:
                             print("skip batch")
                             batch_skip = True
                             break
+                        elif k == ord('s'):
+                            print("step jump")
+                            step += 4
+                        elif k == ord('m'):
+                            print("mark as an exclusive item")
+                            step -= 1
+                            self.append_exclusion(batch_name=folder, rollout_name=rollout)
                         step += 1
 
                     if self.plot_state:
@@ -139,6 +184,9 @@ class DatasetUtil:
                 if batch_skip:
                     batch_skip = False
                     break
+
+        print("end of loop")
+        self.print_exclusion_list()
 
     def statistics(self):
         frames = {}
@@ -194,6 +242,10 @@ if __name__ == '__main__':
     data_path = "../data"
     task_name = "pouring_water_img"      # block_stacking, pouring_water_img, office_TA
 
-    du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
-    du.statistics()
+    # du = DatasetUtil(data_path=data_path, task_name=task_name, plot_state=True)
+    # du.statistics()
     # du.rollout_play()
+
+    app = QApplication(sys.argv)
+    ex = SkillDatasetManagerGUI()
+    sys.exit(app.exec_())
