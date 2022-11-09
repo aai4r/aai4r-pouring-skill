@@ -1,6 +1,8 @@
 import os
 import sys
 import shutil
+import time
+
 import h5py
 import numpy as np
 from PyQt5.QtWidgets import *
@@ -41,7 +43,7 @@ class SkillDatasetManager(QMainWindow, form_class):
 
         # timer setup for auto play
         self.timer = QtCore.QTimer()
-        self.timer.setInterval(100)
+        self.timer.setInterval(50)
         self.timer.timeout.connect(self.func_timeout)
 
         # spin box for auto play time tick
@@ -58,7 +60,7 @@ class SkillDatasetManager(QMainWindow, form_class):
 
     def initialize_default_status(self, task):
         # default mainframe size
-        self.resize(1300, 970)
+        self.resize(1300, 1000)
 
         # default root path
         folder_name = QtCore.QDir.currentPath()
@@ -67,6 +69,29 @@ class SkillDatasetManager(QMainWindow, form_class):
         self.lineEdit_path.setText(folder_name)
         self.path = folder_name
         self.update_treeview()
+
+    def keyPressEvent(self, e):
+        if e.key() == QtCore.Qt.Key_Delete:
+            index = self.treeview_files.currentIndex()
+            index_item = self.fs_model.index(index.row(), 0, index.parent())
+            file_name = self.fs_model.fileName(index_item)
+            file_path = self.fs_model.filePath(index_item)
+            if file_name:
+                self.delete_file(file_name=file_name, file_path=file_path)
+
+        elif e.key() == QtCore.Qt.Key_Escape:
+            print("ESC")
+
+    def delete_file(self, file_name, file_path, confirm_dialog=True):
+        reply = QMessageBox.Yes
+        if confirm_dialog:
+            reply = QMessageBox.question(self, "Message", "Are you sure to delete the {}?".format(file_name),
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            shutil.rmtree(file_path) if os.path.isdir(file_path) else os.remove(file_path)
+            start, sep = file_path.find("batch"), file_path.rfind('/')
+            folder_name = file_path[start:sep]
+            self.textEdit_log.append("{}, {} is removed..".format(folder_name, file_name))
 
     def on_treeview_custom_context_menu(self, position):
         index = self.treeview_files.currentIndex()
@@ -78,11 +103,7 @@ class SkillDatasetManager(QMainWindow, form_class):
         delete_action = menu.addAction("Delete")
         action = menu.exec_(self.treeview_files.mapToGlobal(position))
         if action == delete_action:
-            reply = QMessageBox.question(self, "Message", "Are you sure to delete the {}?".format(file_name),
-                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                shutil.rmtree(file_path) if os.path.isdir(file_path) else os.remove(file_path)
-                self.textEdit_log.append("{} is removed..".format(file_name))
+            self.delete_file(file_name=file_name, file_path=file_path)
 
     def on_treeview_clicked(self, index):
         index_item = self.fs_model.index(index.row(), 0, index.parent())
@@ -173,7 +194,10 @@ class SkillDatasetManager(QMainWindow, form_class):
                             self.data[name] = f[key + '/' + name][()].astype(np.float32)
                         elif name in ['images']:
                             self.data[name] = f[key + '/' + name][()].astype(np.uint8)
-                        self.textEdit_data_info.append("{}: shape: {}".format(name, self.data[name].shape))
+                        info = "{}: \n    shape: {}, \n    type: {}, \n    min / max: {:.2f} / {:.2f}".\
+                            format(name, self.data[name].shape, self.data[name].dtype,
+                                   self.data[name].min(), self.data[name].max())
+                        self.textEdit_data_info.append(info)
 
                     # step value
                     self.data.step = 0
@@ -200,9 +224,26 @@ class SkillDatasetManager(QMainWindow, form_class):
         self.path = folder_name
         self.update_treeview()
 
+    def dataset_statistics(self):
+        n_rollouts, n_frames = 0, 0
+        for _bat in os.listdir(self.path):  # rollout file level
+            _path = os.path.join(self.path, _bat)
+            file_names = [fn for fn in os.listdir(_path) if any(fn.endswith(ext) for ext in ['h5'])]
+            n_rollouts += len(file_names)
+            for _file in file_names:        # frame level
+                with h5py.File(os.path.join(_path, _file), 'r') as f:
+                    key = 'traj{}'.format(0)
+                    for name in f[key].keys():
+                        if name in ['actions', 'states', 'rewards', 'terminals', 'pad_mask']:
+                            n_frames += len(f[key + '/' + name][()])
+                            break
+        self.textEdit_log.append("Total # of rollouts: {:,}".format(n_rollouts))
+        self.textEdit_log.append("Total # of frames: {:,}".format(n_frames))
+
     def btn_function_clicked(self):
         print("function button clicked...")
         print(self.frameSize())
+        self.dataset_statistics()
 
 
 if __name__ == "__main__":
