@@ -54,6 +54,7 @@ class RLTrainer:
         self.conf.env.seed = self._hp.seed
         if 'task_params' in self.conf.env: self.conf.env.task_params.seed=self._hp.seed
         if 'general' in self.conf: self.conf.general.seed=self._hp.seed
+        if self.args.mode == 'collect': self.conf.env.cfg['env']['episodeLength'] = 1000
         self.env = self._hp.environment(self.conf.env)
         self.conf.agent.env_params = self.env      # (optional) set params from env for agent
         if self.is_chef:
@@ -213,7 +214,6 @@ class RLTrainer:
                 for _ in tqdm(range(self.args.n_val_samples)):
                     while True:     # keep producing rollouts until we get a valid one
                         episode = self.sampler.sample_episode(is_train=False, render=True)
-                        print("episode: ", type(episode))
                         repo.save_rollout_to_file(episode)
         print("Collect and save rollout done... ")
 
@@ -372,6 +372,6 @@ if __name__ == '__main__':
     args.task_name = task_name
     args.task_subfix = "_vr"
     # args.resume = "latest"
-    args.mode = "train"     # "train" / "val" / "demo" / "collect"
+    args.mode = "collect"     # "train" / "val" / "demo" / "collect"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
     RLTrainer(args=args)

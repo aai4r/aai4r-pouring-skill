@@ -88,7 +88,7 @@ aux_pred_indices = [13, 14, 15, 23, 24, 25, 30, 31, 32, 40, 41, 42, 43, 44, 45, 
 ll_model_params = AttrDict(
     state_dim=data_spec_img.state_dim,
     action_dim=data_spec_img.n_actions,
-    aux_pred_dim=len(aux_pred_indices),         # C, 0 or 9
+    aux_pred_dim=len([]),         # C, 0 or 9
     aux_pred_index=aux_pred_indices,    # target index of obs. variable
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
     kl_div_weight=2e-4,
@@ -96,18 +96,18 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
-    nz_mid_prior=256,
+    nz_enc=128,     # will automatically be set to 512(resnet18) if use_pretrain=True
+    nz_mid_prior=128,
     n_processing_layers=3,
     num_prior_net_layers=3,
     state_cond=True,        # B
     state_cond_size=6,
     use_pretrain=True,      # A
     layer_freeze=-1,    # 5: freeze for skill train, -1: freeze all layers of pre-trained net
-    model_download=True,
+    model_download=False,
     ftp_server_info=ftp_params,
     weights_dir="weights",
-    recurrent_prior=True,   # D
+    recurrent_prior=False,   # D
 )
 
 if ll_model_params.recurrent_prior:

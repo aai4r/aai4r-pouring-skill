@@ -72,7 +72,8 @@ class PreTrainEncoder(nn.Module):
             # freeze_modules([self.net])
             freeze_model_until(model=self.net, until=self._hp.layer_freeze)  # resnet 18 has 9 layers except for the last fc layer
 
-        # self.net.eval()
+        # if self._hp.layer_freeze == -1:
+        #     self.net.eval()
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])
 
@@ -86,20 +87,25 @@ class PreTrainEncoder(nn.Module):
             temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
             img = np.concatenate((img, temp), axis=-2)
 
+        img = ((img + 1) * (255/2)).astype(np.uint8)
         cv2.imshow("images", img)
         cv2.waitKey()
 
     def forward(self, input):
-        # input shape: (batch*n_rollout, 3*n_channel, h, w)
+        # input shape: (batch*n_rollout, n_frames*n_channel, h, w)
         n_channel = 3
         unroll = torch.tensor([]).to(self._hp.device)
         for i in range(self._hp.n_input_frames):
             start, end = i * n_channel, (i + 1) * n_channel
             unroll = torch.cat((unroll, input[:, start:end]), dim=-1)
 
-        unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later. it takes some time..
         # self.visualize(unroll, 0)
+        unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later. it takes some time..
         out = self.net(unroll)
+        # if self._hp.layer_freeze == -1:
+        #     with torch.no_grad(): out = self.net(unroll)
+        # else:
+        #     out = self.net(unroll)
         return out
 
 
