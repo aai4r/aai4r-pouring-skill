@@ -87,9 +87,10 @@ class GlobalSplitDataset(Dataset):
 
     def _load_h5_files(self, dir):
         filenames = []
-        for root, dirs, files in os.walk(dir):
-            for file in files:
-                if file.endswith(".h5"): filenames.append(os.path.join(root, file))
+        for _dir in dir:    # multiple dataset folders
+            for root, dirs, files in os.walk(_dir):
+                for file in files:
+                    if file.endswith(".h5"): filenames.append(os.path.join(root, file))
         return filenames
 
     def _split_with_percentage(self, frac, filenames):

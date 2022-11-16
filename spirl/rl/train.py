@@ -211,10 +211,10 @@ class RLTrainer:
         repo = RolloutRepository(root_dir=self.args.save_root, task_name=self.args.task_name + self.args.task_subfix)
         with self.agent.val_mode():
             with torch.no_grad():
-                for _ in tqdm(range(self.args.n_val_samples)):
-                    while True:     # keep producing rollouts until we get a valid one
-                        episode = self.sampler.sample_episode(is_train=False, render=True)
-                        repo.save_rollout_to_file(episode)
+                for i in tqdm(range(self.args.n_val_samples)):
+                    episode = self.sampler.sample_episode(is_train=False, render=True)
+                    repo.save_rollout_to_file(episode)
+                    print("Episode # {}".format(i))
         print("Collect and save rollout done... ")
 
     def warmup(self):
@@ -371,6 +371,7 @@ if __name__ == '__main__':
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
     args.task_subfix = "_vr"
+    args.n_val_samples = 100
     # args.resume = "latest"
     args.mode = "collect"     # "train" / "val" / "demo" / "collect"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)

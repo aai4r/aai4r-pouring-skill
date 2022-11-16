@@ -13,9 +13,10 @@ current_dir = os.path.dirname(os.path.realpath(__file__))
 configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
-    'data_dir': os.path.join(os.environ['DATA_DIR'], 'pouring_water_img'),
+    'data_dir': [os.path.join(os.environ['DATA_DIR'], path)
+                 for path in ['pouring_water_img', 'pouring_water_img_vr']],
     'epoch_cycles_train': 10,
-    'num_epochs': 300,
+    'num_epochs': 302,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -39,8 +40,8 @@ model_config = AttrDict(
     prior_input_res=data_spec_img.res,
     n_input_frames=2,
     nz_vae=12,                  # skill embedding dim.
-    nz_enc=128,                 # encoder output dim. (img -> nz_enc)
-    nz_mid_prior=128,
+    nz_enc=256,                 # encoder output dim. (img -> nz_enc)
+    nz_mid_prior=256,
     n_processing_layers=3,      # num_layers of skill decoder
     num_prior_net_layers=3,     # prior_net Predictor
     cond_decode=True,

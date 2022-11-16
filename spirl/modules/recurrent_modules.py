@@ -199,6 +199,7 @@ class CustomLSTMCell(BaseCell):
         embedded = self.embed(cell_input.view(-1, self.input_size))
         h_in = embedded
         for i in range(self.n_layers):
+            self.hidden[i] = (self.hidden[i][0].cuda(), self.hidden[i][1].cuda())
             self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
             h_in = self.hidden[i][0]
         output = self.output(h_in)

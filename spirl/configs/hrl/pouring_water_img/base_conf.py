@@ -96,8 +96,8 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=128,     # will automatically be set to 512(resnet18) if use_pretrain=True
-    nz_mid_prior=128,
+    nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
+    nz_mid_prior=256,
     n_processing_layers=3,
     num_prior_net_layers=3,
     state_cond=True,        # B
@@ -198,7 +198,7 @@ args.headless = False
 args.test = False
 
 dev_num = 0
-# if torch.cuda.device_count() > 1:
+if torch.cuda.device_count() > 1: dev_num = 1
 assert torch.cuda.get_device_name(dev_num)
 args.compute_device_id = dev_num
 args.device_id = dev_num

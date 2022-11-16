@@ -87,12 +87,12 @@ class ModelTrainer(BaseTrainer):
             'logger_test': None,
             'evaluator': None,
             'data_dir': None,  # directory where dataset is in
-            'batch_size': 64,
+            'batch_size': 32,
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
             'optimizer': 'adam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
-            'lr': 1e-4,
+            'lr': 2e-4,
             'gradient_clip': None,
             'init_grad_clip': 0.001,
             'init_grad_clip_step': 100,     # clip gradients in initial N steps to avoid NaNs
@@ -293,7 +293,7 @@ class ModelTrainer(BaseTrainer):
         model = params.model_class(self.conf.model, logger)
         if torch.cuda.device_count() > 1:
             print("\nUsing {} GPUs!\n".format(torch.cuda.device_count()))
-            model = DataParallelWrapper(model)
+            model = DataParallelWrapper(model, output_device=0)
         model = model.to(self.device)
         model.device = self.device
         loader = self.get_dataset(self.args, model, self.conf.data, phase, params.n_repeat, params.dataset_size)
@@ -409,8 +409,8 @@ def set_run_params():
 
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
-    sys.argv.append("--val_data_size={}".format(80))    # 160, should be less than (total_data * val_ratio)
-    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    sys.argv.append("--val_data_size={}".format(140))    # 160, should be less than (total_data * val_ratio)
+    sys.argv.append("--resume={}".format('300'))     # latest or number..
 
 
 if __name__ == '__main__':
