@@ -1,4 +1,6 @@
 import sys
+import time
+
 import isaacgym
 import torch
 import os
@@ -209,12 +211,14 @@ class RLTrainer:
         """Generate rollouts and save to hdf5 files."""
         print("Saving {} rollouts to directory {}...".format(self.args.n_val_samples, self.args.save_root))
         repo = RolloutRepository(root_dir=self.args.save_root, task_name=self.args.task_name + self.args.task_subfix)
+        start = time.time()
         with self.agent.val_mode():
             with torch.no_grad():
                 for i in tqdm(range(self.args.n_val_samples)):
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     repo.save_rollout_to_file(episode)
                     print("Episode # {}".format(i))
+        print("Total elapsed time to collect: {}".format(time.time() - start))
         print("Collect and save rollout done... ")
 
     def warmup(self):
@@ -373,6 +377,6 @@ if __name__ == '__main__':
     args.task_subfix = "_vr"
     args.n_val_samples = 100
     # args.resume = "latest"
-    args.mode = "collect"     # "train" / "val" / "demo" / "collect"
+    args.mode = "val"     # "train" / "val" / "demo" / "collect"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
     RLTrainer(args=args)

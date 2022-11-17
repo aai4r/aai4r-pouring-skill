@@ -103,7 +103,7 @@ class ModelTrainer(BaseTrainer):
             'logging_target': 'wandb',
         })
         return default_dict
-    
+
     def train(self, start_epoch):
         if not self.args.skip_first_val:
             self.val()
@@ -125,6 +125,9 @@ class ModelTrainer(BaseTrainer):
 
     def train_epoch(self, epoch):
         self.model.train()
+        # TODO, pre_trained net eval mode
+        # self.model.img_encoder[1].net.eval()
+        # self.model.p[0].enc.net.eval()
         epoch_len = len(self.train_loader)
         end = time.time()
         batch_time = AverageMeter()
@@ -410,7 +413,7 @@ def set_run_params():
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(140))    # 160, should be less than (total_data * val_ratio)
-    sys.argv.append("--resume={}".format('300'))     # latest or number..
+    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
 
 if __name__ == '__main__':

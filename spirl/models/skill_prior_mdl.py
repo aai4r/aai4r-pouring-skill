@@ -398,7 +398,7 @@ class ImageSkillPriorMdl(SkillPriorMdl):
     def _build_prior_net(self):
         if self._hp.state_cond:
             # return StateCondImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
-            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params())
+            return PreTrainImageSkillPriorNet(hp=self._hp, enc_params=self._updated_encoder_params(), img_encoder=self.img_encoder)
         else:
             return nn.Sequential(
                 ResizeSpatial(self._hp.prior_input_res),
@@ -557,19 +557,12 @@ class StateCondImageSkillPriorNet(nn.Module):
 
 
 class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
-    def __init__(self, hp, enc_params):
+    def __init__(self, hp, enc_params, img_encoder):
         self.recurrent = hp.recurrent_prior
         super().__init__(hp=hp, enc_params=enc_params)
+        self.img_encoder = copy.deepcopy(img_encoder)
 
     def build_network(self):
-        self.resize = ResizeSpatial(self._hp.prior_input_res)
-        # pre_trained_model = models.resnet18(pretrained=True)
-        # self.enc = nn.Sequential(*list(pre_trained_model.children())[:-1])
-        self.enc = PreTrainEncoder(self._hp, freeze=True)
-        # freeze_modules([self.enc])
-        # freeze_model_until(self.enc, until=self._hp.layer_freeze)   # resnet 18 has 9 layers except for the last fc layer
-        self.rm_spatial = RemoveSpatial()
-
         resnet_mid = 512   # resnet 18 feature size
         input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
         if self.recurrent:
@@ -587,33 +580,10 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
                                 output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
                                 mid_size=self._hp.nz_mid_prior)
 
-        # self.fc = Predictor(self._hp, input_size=resnet_mid,
-        #                     output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers - 2,
-        #                     mid_size=self._hp.nz_mid_prior)
-        #
-        # self.fc_last = Predictor(self._hp, input_size=self._hp.nz_mid_prior + self._hp.state_cond_size,
-        #                          output_size=self._hp.nz_vae * 2, num_layers=1,
-        #                          mid_size=self._hp.nz_mid_prior)
-
-        self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                           std=[0.229, 0.224, 0.225])])
-
     def forward(self, inputs):
-        _img = self.resize(inputs.images)
-        # h, w, c = _img.shape[-2], _img.shape[-1], 3  # height, width, channel
-        # unroll = torch.tensor([]).to(self._hp.device)
-        # for i in range(self._hp.n_input_frames):
-        #     start, end = i * c, (i + 1) * c
-        #     unroll = torch.cat((unroll, _img[:, start:end]), dim=-1)
-        #
-        # unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later.
-        # out = self.enc(unroll)
-        out = self.enc(_img)
-        out = self.rm_spatial(out)
+        out = self.img_encoder(inputs.images)
         out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
         z = self.nn(out)
         z = z.squeeze(1) if self.recurrent else z
-        # out = self.fc(out)
-        # z = self.fc_last(torch.cat((out, inputs.states), dim=-1))
         return z
