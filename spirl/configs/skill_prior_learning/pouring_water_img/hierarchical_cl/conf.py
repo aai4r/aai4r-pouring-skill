@@ -16,7 +16,7 @@ configuration = {
     'data_dir': [os.path.join(os.environ['DATA_DIR'], path)
                  for path in ['pouring_water_img', 'pouring_water_img_vr']],
     'epoch_cycles_train': 10,
-    'num_epochs': 501,
+    'num_epochs': 120 + 1,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -36,19 +36,19 @@ model_config = AttrDict(
     aux_pred_index=aux_pred_indices,
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
     n_rollout_steps=10,
-    kl_div_weight=2e-4,
+    kl_div_weight=5e-4,
     prior_input_res=data_spec_img.res,
-    n_input_frames=2,
+    n_input_frames=1,
     nz_vae=12,                  # skill embedding dim.
-    nz_enc=256,                 # encoder output dim. (img -> nz_enc)
-    nz_mid_prior=256,
-    n_processing_layers=2,      # num_layers of skill decoder
-    num_prior_net_layers=2,     # prior_net Predictor
+    nz_enc=128,                 # encoder output dim. (img -> nz_enc)
+    nz_mid_prior=128,
+    n_processing_layers=3,      # num_layers of skill decoder
+    num_prior_net_layers=3,     # prior_net Predictor
     cond_decode=True,
-    state_cond=True,
+    state_cond=False,
     state_cond_size=6,          # only joint values
     use_pretrain=True,
-    layer_freeze=5,             # 5: freeze for skill train, -1: freeze all layers
+    layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
     recurrent_prior=False,
     weights_dir="weights",
 )

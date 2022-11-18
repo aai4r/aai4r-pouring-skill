@@ -74,11 +74,13 @@ class PreTrainEncoder(nn.Module):
 
         # if self._hp.layer_freeze == -1:
         #     self.net.eval()
-        self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                           std=[0.229, 0.224, 0.225])])
+        self.tr = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])])
 
     def visualize(self, unroll, index):     # for debugging
-        w = self._hp.prior_input_res
+        w = self._hp.prior_input_res if self._hp.n_input_frames > 1 else 224    # Resnet resize value
         img = unroll[index, :, :, :w].cpu().numpy().transpose(1, 2, 0)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         for i in range(1, self._hp.n_input_frames):
@@ -92,7 +94,7 @@ class PreTrainEncoder(nn.Module):
         cv2.waitKey()
 
     def forward(self, input):
-        # input shape: (batch*n_rollout, n_frames*n_channel, h, w)
+        # input shape: (batch*n_rollout, n_frames*n_channel, h, w),  range: [-1, 1]
         n_channel = 3
         unroll = torch.tensor([]).to(self._hp.device)
         for i in range(self._hp.n_input_frames):

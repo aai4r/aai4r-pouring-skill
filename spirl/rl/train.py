@@ -56,7 +56,11 @@ class RLTrainer:
         self.conf.env.seed = self._hp.seed
         if 'task_params' in self.conf.env: self.conf.env.task_params.seed=self._hp.seed
         if 'general' in self.conf: self.conf.general.seed=self._hp.seed
-        if self.args.mode == 'collect': self.conf.env.cfg['env']['episodeLength'] = 1000
+        if self.args.mode == 'collect':
+            self.conf.env.cfg['env']['episodeLength'] = 1000
+            self.conf.env.cfg['env']['teleoperation_mode'] = True
+        if self.args.mode == 'val':
+            self.conf.env.cfg['env']['teleoperation_mode'] = False
         self.env = self._hp.environment(self.conf.env)
         self.conf.agent.env_params = self.env      # (optional) set params from env for agent
         if self.is_chef:

@@ -405,7 +405,7 @@ def set_run_params():
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     task_name = "pouring_water_img"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
     mode = "hierarchical_cl"

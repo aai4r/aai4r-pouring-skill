@@ -49,9 +49,6 @@ replay_params = AttrDict(
 # Observation Normalization
 obs_norm_params = AttrDict(
 )
-sampler_config = AttrDict(
-    n_frames=2,
-)
 
 base_agent_params = AttrDict(
     batch_size=128,
@@ -91,13 +88,13 @@ ll_model_params = AttrDict(
     aux_pred_dim=len([]),         # C, 0 or 9
     aux_pred_index=aux_pred_indices,    # target index of obs. variable
     state_cond_pred=False,   # TODO  # robot state(joint, gripper) conditioned prediction
-    kl_div_weight=2e-4,
-    n_input_frames=2,
+    kl_div_weight=5e-4,
+    n_input_frames=1,
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
-    nz_mid_prior=256,
+    nz_enc=128,     # will automatically be set to 512(resnet18) if use_pretrain=True
+    nz_mid_prior=128,
     n_processing_layers=3,
     num_prior_net_layers=3,
     state_cond=True,        # B
@@ -133,7 +130,7 @@ hl_policy_params = AttrDict(
     max_action_range=2.,        # prior is Gaussian with unit variance
     nz_mid=256,
     nz_enc=256,
-    n_layers=3,
+    n_layers=2,
     policy_lr=1.5e-4,
     state_cond=ll_model_params.state_cond,
     state_cond_size=ll_model_params.state_cond_size,
