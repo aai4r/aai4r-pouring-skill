@@ -53,6 +53,7 @@ class TopOfNEvaluator:
         self._erase_eval_buffer()
         for n in range(self._top_of_n):
             model_output = model(inputs)
+            inputs.observations = inputs.actions    # TODO, to be fixed later...
             self.eval_single(inputs, model_output, sample_idx=n)
         self._flush_eval_buffer()
 

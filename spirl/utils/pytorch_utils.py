@@ -265,7 +265,45 @@ class DataParallelWrapper(torch.nn.DataParallel):
 
     def gather(self, outputs, output_device):
         """Overrides the standard gather function to handle custom classes that implement a 'reduce' function."""
-        return gather(outputs, output_device, dim=self.dim)
+        # return gather(outputs, output_device, dim=self.dim)
+        return _gather(outputs, output_device, dim=self.dim)
+
+
+def _gather(outputs, target_device, dim=0):
+    """
+        for MultivariateGaussian / Gaussian instance
+    """
+    def gather_map(outputs):
+        out = outputs[0]
+        if isinstance(out, torch.Tensor):
+            return Gather.apply(target_device, dim, *outputs)
+        if out is None:
+            return None
+        if isinstance(out, dict):
+            if not all((len(out) == len(d) for d in outputs)):
+                raise ValueError('All dicts must have the same number of keys')
+            return type(out)(((k, gather_map([d[k] for d in outputs]))
+                              for k in out))
+
+        # out = MultivariateGaussian(16, 3)
+        # outputs -> list: 2 = [MG_0, MG_1]
+        mus = [d.mu for d in outputs]
+        log_sigmas = [d.sigma for d in outputs]
+        mu_out = Gather.apply(target_device, dim, *mus)
+        sigma_out = Gather.apply(target_device, dim, *log_sigmas)
+        merged = type(out)(mu=mu_out, log_sigma=sigma_out)
+        return merged
+        # try:
+        #     # return type(out)(map(gather_map, zip(*outputs)))
+        # except:
+        #     return type(out).reduce(*outputs)
+
+    # Recursive function calls like this create reference cycles.
+    # Setting the function to None clears the refcycle.
+    try:
+        return gather_map(outputs)
+    finally:
+        gather_map = None
 
 
 def gather(outputs, target_device, dim=0):
