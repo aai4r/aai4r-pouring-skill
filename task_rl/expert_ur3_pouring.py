@@ -226,6 +226,24 @@ class DemoUR3Pouring(BaseTask):
         bottle_asset = self.gym.load_asset(self.sim, self.asset_root, bottle_asset_file, asset_options)
         return bottle_asset
 
+    def _create_asset_gourd_bottle(self):
+        self.bottle_height = 0.2
+        self.bottle_diameter = 0.065
+        asset_options = gymapi.AssetOptions()
+        # asset_options.fix_base_link = True
+        # asset_options.armature = 0.005
+        asset_options.vhacd_enabled = True
+        asset_options.vhacd_params.resolution = 1500000
+        # asset_options.vhacd_params.max_convex_hulls = 128
+        # asset_options.vhacd_params.max_num_vertices_per_ch = 32
+
+        bottle_asset_file = "urdf/objects/gourd_bottle.urdf"
+        if "asset" in self.cfg["env"]:
+            bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
+
+        bottle_asset = self.gym.load_asset(self.sim, self.asset_root, bottle_asset_file, asset_options)
+        return bottle_asset
+
     def _create_asset_cup(self):
         asset_options = gymapi.AssetOptions()
         # asset_options.armature = 0.01
@@ -261,7 +279,7 @@ class DemoUR3Pouring(BaseTask):
 
         asset_options = gymapi.AssetOptions()
         asset_options.density = 997
-        asset_options.armature = 0.01
+        asset_options.armature = 0.0
         liquid_asset = self.gym.create_sphere(self.sim, self.water_drop_radius, asset_options)   # radius
         return liquid_asset
 
@@ -299,6 +317,7 @@ class DemoUR3Pouring(BaseTask):
 
         ur3_asset = self._create_asset_ur3()
         bottle_asset = self._create_asset_bottle()
+        # bottle_asset = self._create_asset_gourd_bottle()
         cup_asset = self._create_asset_cup()
         liq_asset = self.create_asset_water_drops()
         self.water_in_boundary_xy = self.cup_inner_radius - self.water_drop_radius
@@ -870,7 +889,7 @@ class DemoUR3Pouring(BaseTask):
 
         # reset liquid
         init_liq_pose = pick + rand_bottle_pos
-        init_liq_pose[:, 2] = init_liq_pose[:, 2] + 0.12
+        init_liq_pose[:, 2] = init_liq_pose[:, 2] + 0.22
         offset_z = 0.05
         for i in range(self.liquid_states.shape[1]):
             self.liquid_states[env_ids, i] = init_liq_pose

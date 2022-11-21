@@ -66,7 +66,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="200",    # target epoch number of weight to download
+    epoch="300",    # target epoch number of weight to download
 )
 
 import yaml
@@ -101,7 +101,7 @@ ll_model_params = AttrDict(
     state_cond_size=7,
     use_pretrain=True,      # A
     layer_freeze=-1,    # 5: freeze for skill train, -1: freeze all layers of pre-trained net
-    model_download=True,
+    model_download=False,
     ftp_server_info=ftp_params,
     weights_dir="weights",
     recurrent_prior=True,   # D
@@ -195,7 +195,7 @@ args.headless = False
 args.test = False
 
 dev_num = 0
-if torch.cuda.device_count() > 1: dev_num = 1
+# if torch.cuda.device_count() > 1: dev_num = 1
 assert torch.cuda.get_device_name(dev_num)
 args.compute_device_id = dev_num
 args.device_id = dev_num
