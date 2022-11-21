@@ -125,9 +125,6 @@ class ModelTrainer(BaseTrainer):
 
     def train_epoch(self, epoch):
         self.model.train()
-        # TODO, pre_trained net eval mode
-        # self.model.img_encoder[1].net.eval()
-        # self.model.p[0].enc.net.eval()
         epoch_len = len(self.train_loader)
         end = time.time()
         batch_time = AverageMeter()

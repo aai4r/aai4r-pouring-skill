@@ -90,6 +90,7 @@ class PriorInitializedPolicy(Policy):
             print("Empty weight list in remote server!")
             return
 
+        # TODO, if target folder doesn't exist, we need to create one...
         proj_path = os.path.join(os.getcwd(), '../', '../')
         save_path = os.path.join(proj_path, 'experiments', 'skill_prior_learning', task, method, weight_type)
         curr_path = os.getcwd()
