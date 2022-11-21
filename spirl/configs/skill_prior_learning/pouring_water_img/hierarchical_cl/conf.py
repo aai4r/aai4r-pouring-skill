@@ -16,7 +16,7 @@ configuration = {
     'data_dir': [os.path.join(os.environ['DATA_DIR'], path)
                  for path in ['pouring_water_img', 'pouring_water_img_vr']],
     'epoch_cycles_train': 10,
-    'num_epochs': 120 + 1,
+    'num_epochs': 300 + 1,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -45,11 +45,11 @@ model_config = AttrDict(
     n_processing_layers=3,      # num_layers of skill decoder
     num_prior_net_layers=3,     # prior_net Predictor
     cond_decode=True,
-    state_cond=False,
-    state_cond_size=6,          # only joint values
+    state_cond=True,
+    state_cond_size=7,          # only joint values
     use_pretrain=True,
     layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
-    recurrent_prior=False,
+    recurrent_prior=True,
     weights_dir="weights",
 )
 

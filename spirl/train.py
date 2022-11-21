@@ -87,12 +87,12 @@ class ModelTrainer(BaseTrainer):
             'logger_test': None,
             'evaluator': None,
             'data_dir': None,  # directory where dataset is in
-            'batch_size': 32,
+            'batch_size': 64,
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
-            'optimizer': 'adam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
-            'lr': 2e-4,
+            'optimizer': 'radam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
+            'lr': 3e-4,
             'gradient_clip': None,
             'init_grad_clip': 0.001,
             'init_grad_clip_step': 100,     # clip gradients in initial N steps to avoid NaNs
@@ -127,7 +127,7 @@ class ModelTrainer(BaseTrainer):
         self.model.train()
         # TODO, pre_trained net eval mode
         # self.model.img_encoder[1].net.eval()
-        # self.model.p[0].enc.net.eval()
+        # self.model.p[0].img_encoder[1].net.eval()
         epoch_len = len(self.train_loader)
         end = time.time()
         batch_time = AverageMeter()
