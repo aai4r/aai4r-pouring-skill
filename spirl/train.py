@@ -87,7 +87,7 @@ class ModelTrainer(BaseTrainer):
             'logger_test': None,
             'evaluator': None,
             'data_dir': None,  # directory where dataset is in
-            'batch_size': 64,
+            'batch_size': 32,
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
@@ -409,10 +409,11 @@ def set_run_params():
 
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
-    sys.argv.append("--val_data_size={}".format(140))    # batch_size < val_data_size < (total_data * val_ratio)
-    sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    sys.argv.append("--val_data_size={}".format(140))    # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
+    sys.argv.append("--resume={}".format('300'))     # latest or number..
 
 
 if __name__ == '__main__':
     set_run_params()    # comment out if run outside
-    ModelTrainer(args=get_args())
+    args = get_args()
+    ModelTrainer(args=args)

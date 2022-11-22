@@ -195,7 +195,7 @@ args.headless = False
 args.test = False
 
 dev_num = 0
-if torch.cuda.device_count() > 1: dev_num = 1
+# if torch.cuda.device_count() > 1: dev_num = 1
 assert torch.cuda.get_device_name(dev_num)
 args.compute_device_id = dev_num
 args.device_id = dev_num

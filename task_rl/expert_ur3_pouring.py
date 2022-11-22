@@ -279,7 +279,7 @@ class DemoUR3Pouring(BaseTask):
 
         asset_options = gymapi.AssetOptions()
         asset_options.density = 997
-        asset_options.armature = 0.0
+        asset_options.armature = 0.005
         liquid_asset = self.gym.create_sphere(self.sim, self.water_drop_radius, asset_options)   # radius
         return liquid_asset
 
@@ -1466,8 +1466,8 @@ class DemoUR3Pouring(BaseTask):
 
         # Target: 2) grasping
         finger_dist = torch.norm(self.ur3_lfinger_pos - self.ur3_rfinger_pos, p=2, dim=-1).unsqueeze(-1)
-        self.task_status.grasping = torch.where((d1 < 0.05) & (finger_dist < self.bottle_diameter + 0.005),
-                                                 1.0, self.task_status.grasping.double())
+        grasp_cond = (d1 < 0.05) & (finger_dist < self.bottle_diameter + 0.005)
+        self.task_status.grasping = torch.where(grasp_cond, 1.0, self.task_status.grasping.double())
 
         # Target: 3) lifting
         self.task_status.lifting = torch.where((self.task_status.grasping == 1.0) & (self.bottle_floor_pos[:, -1] > 0.08),
@@ -1479,6 +1479,7 @@ class DemoUR3Pouring(BaseTask):
                                                 1.0, self.task_status.pouring.double())
 
         # Target: 6) task success
+        # Target: 6) task success
         # is_cup_fallen = dot4 < 0.5
         # is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.8)
         # is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
@@ -1489,7 +1490,8 @@ class DemoUR3Pouring(BaseTask):
         # Failure: 1) bottle fallen
         axis1 = tf_vector(self.bottle_grasp_rot, self.bottle_up_axis)
         dot1 = torch.bmm(axis1.view(self.num_envs, 1, 3), self.bottle_up_axis.view(self.num_envs, 3, 1)).squeeze(-1).squeeze(-1)
-        is_bottle_fallen = (self.bottle_floor_pos[:, 2] < 0.02) & (dot1 < 0.8)
+        # is_bottle_fallen = (self.bottle_floor_pos[:, 2] < 0.02) & (dot1 < 0.7)
+        is_bottle_fallen = torch.logical_not(grasp_cond) & (dot1 < 0.7)
         self.task_status.bottle_fallen = torch.where(is_bottle_fallen, 1.0, self.task_status.bottle_fallen.double())
 
         # Failure: 2) grasping stability

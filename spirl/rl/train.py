@@ -378,7 +378,7 @@ if __name__ == '__main__':
     args.seed = 0
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
-    args.task_subfix = "_vr"    # [_vr: motion correction, _unseen: gourd bottle]
+    args.task_subfix = "_unseen"    # [_vr: motion correction, _unseen: gourd bottle]
     args.n_val_samples = 100
     # args.resume = "10"
     args.mode = "val"     # "train" / "val" / "demo" / "collect"

@@ -14,9 +14,9 @@ configuration = {
     'model': ImageClSPiRLMdl,
     'logger': SkillSpaceLogger,
     'data_dir': [os.path.join(os.environ['DATA_DIR'], path)
-                 for path in ['pouring_water_img', 'pouring_water_img_vr']],
+                 for path in ['pouring_water_img', 'pouring_water_img_vr', 'pouring_water_img_unseen']],    # 'pouring_water_img', 'pouring_water_img_vr'
     'epoch_cycles_train': 10,
-    'num_epochs': 500 + 1,
+    'num_epochs': 350 + 1,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
