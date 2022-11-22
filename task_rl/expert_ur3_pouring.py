@@ -228,12 +228,12 @@ class DemoUR3Pouring(BaseTask):
 
     def _create_asset_gourd_bottle(self):
         self.bottle_height = 0.2
-        self.bottle_diameter = 0.065
+        self.bottle_diameter = 0.037 * 2
         asset_options = gymapi.AssetOptions()
         # asset_options.fix_base_link = True
         # asset_options.armature = 0.005
         asset_options.vhacd_enabled = True
-        asset_options.vhacd_params.resolution = 1500000
+        asset_options.vhacd_params.resolution = 2000000
         # asset_options.vhacd_params.max_convex_hulls = 128
         # asset_options.vhacd_params.max_num_vertices_per_ch = 32
 
@@ -316,8 +316,8 @@ class DemoUR3Pouring(BaseTask):
         self.random_texture_handle = self.gym.create_texture_from_buffer(self.sim, 128, 128, texture)
 
         ur3_asset = self._create_asset_ur3()
-        bottle_asset = self._create_asset_bottle()
-        # bottle_asset = self._create_asset_gourd_bottle()
+        # bottle_asset = self._create_asset_bottle()
+        bottle_asset = self._create_asset_gourd_bottle()
         cup_asset = self._create_asset_cup()
         liq_asset = self.create_asset_water_drops()
         self.water_in_boundary_xy = self.cup_inner_radius - self.water_drop_radius
@@ -1870,7 +1870,8 @@ def compute_ur3_reward(
     # rewards = torch.where((bottle_height < 0.07) & (dot3 < 0.5), torch.ones_like(rewards) * -1.0, rewards)
     # rewards = torch.where(dot4 < 0.5, torch.ones_like(rewards) * -1.0, rewards)
     is_cup_fallen = dot4 < 0.5
-    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.025) & (dot3 < 0.8)
+    # is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.03) & (dot3 < 0.7) & (d1 > 0.05)
+    is_bottle_fallen = (bottle_floor_pos[:, 2] < 0.02) & (dot3 < 0.6)
     # is_pouring_finish = (bottle_pos[:, 2] > 0.09 + 0.074 * 0.5) & (liq_pos[:, 2] < 0.03)
     # rewards = torch.where(is_cup_fallen, torch.ones_like(rewards) * 0.0, rewards)  # paper cup fallen reward penalty
     # rewards = torch.where(is_bottle_fallen, torch.ones_like(rewards) * 0.0, rewards)  # bottle fallen reward penalty

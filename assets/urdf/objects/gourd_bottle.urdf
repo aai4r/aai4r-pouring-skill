@@ -1,14 +1,14 @@
 <?xml version="1.0" ?>
-<robot name="gourd_bottle">
-  <link name="gourd_bottle">
+<robot name="bottle">
+  <link name="bottle">
 
     <inertial>
-      <origin rpy="0 0 0" xyz="0 0 0.076"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
        <mass value="0.2"/>
        <inertia ixx="0.005" ixy="0.0" ixz="0.0" iyy="0.005" iyz="0.0" izz="0.002"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0.00649375"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://objects/meshes/gourd_bottle.obj" scale="1 1 1"/>
       </geometry>
@@ -17,7 +17,7 @@
       </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.00649375"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="package://objects/meshes/gourd_bottle.obj" scale="1 1 1"/>
       </geometry>

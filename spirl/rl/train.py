@@ -378,9 +378,9 @@ if __name__ == '__main__':
     args.seed = 0
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
-    args.task_subfix = "_vr"
+    args.task_subfix = "_vr"    # [_vr: motion correction, _unseen: gourd bottle]
     args.n_val_samples = 100
-    # args.resume = "latest"
+    # args.resume = "10"
     args.mode = "val"     # "train" / "val" / "demo" / "collect"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
     RLTrainer(args=args)
