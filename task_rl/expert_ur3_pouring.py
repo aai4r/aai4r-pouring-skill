@@ -2,7 +2,6 @@ import copy
 import random
 import cv2
 import os
-import torch
 
 from utils.torch_jit_utils import *
 from utils.utils import *
