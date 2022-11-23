@@ -51,6 +51,106 @@ def controller_test():
                 time.sleep(sleep_time)
 
 
+class IsaacElement:
+    def __init__(self, gym, viewer, sim, env, device):
+        self.gym = gym
+        self.viewer = viewer
+        self.sim = sim
+        self.env = env
+        self.device = device
+
+
+class BaseObject:
+    def __init__(self, isaac_elem):
+        assert type(isaac_elem) is IsaacElement
+
+        self.gym = isaac_elem.gym
+        self.viewer = isaac_elem.viewer
+        self.sim = isaac_elem.sim
+        self.env = isaac_elem.env
+        self.device = isaac_elem.device
+        self._create()
+
+    def _create(self):
+        raise NotImplementedError
+
+    def reset(self):
+        raise NotImplementedError
+
+    def vr_handler(self):
+        raise NotImplementedError
+
+    def draw_coord(self, pos, rot, scale=0.2):     # args type: numpy arrays
+        self.gym.clear_lines(self.viewer)
+        for p, r in zip(pos, rot):
+            pos = torch.tensor(p, device=self.device, dtype=torch.float32)
+            rot = torch.tensor(r, device=self.device, dtype=torch.float32)
+            px = (pos + quat_apply(rot, to_torch([1, 0, 0], device=self.device, dtype=torch.float32) * scale)).cpu().numpy()
+            py = (pos + quat_apply(rot, to_torch([0, 1, 0], device=self.device, dtype=torch.float32) * scale)).cpu().numpy()
+            pz = (pos + quat_apply(rot, to_torch([0, 0, 1], device=self.device, dtype=torch.float32) * scale)).cpu().numpy()
+
+            p0 = pos.cpu().numpy()
+            self.gym.add_lines(self.viewer, self.env, 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+            self.gym.add_lines(self.viewer, self.env, 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+            self.gym.add_lines(self.viewer, self.env, 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
+
+
+class Cube(BaseObject):
+    def __init__(self, isaac_elem, vr):
+        self.vr = vr
+        super().__init__(isaac_elem)
+
+    def _create(self):
+        cube_asset_options = gymapi.AssetOptions()
+        cube_asset_options.density = 100.
+        cube_asset_options.disable_gravity = True
+        cube_asset_options.linear_damping = 20  # damping is important for stabilizing the movement
+        cube_asset_options.angular_damping = 20
+
+        cube_asset = self.gym.create_box(self.sim, 0.5, 0.5, 0.5, cube_asset_options)
+
+        init_pose = gymapi.Transform()
+        init_pose.p = gymapi.Vec3(0.0, 0.25, 0.0)
+        init_pose.r = gymapi.Quat(0, 0, 0, 1)
+        self.cube_handle = self.gym.create_actor(self.env, cube_asset, init_pose, "cube", -1, 0)
+
+        c = 0.5 + 0.5 * np.random.random(3)
+        self.gym.set_rigid_body_color(self.env, self.cube_handle, 0,
+                                      gymapi.MESH_VISUAL_AND_COLLISION, gymapi.Vec3(c[0], c[1], c[2]))
+
+        # save initial state for reset
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        self.cube_initial_state = np.copy(self.gym.get_sim_rigid_body_states(self.sim, gymapi.STATE_ALL))
+
+        # set viewer perspective setting
+        self.gym.viewer_camera_look_at(self.viewer, None, gymapi.Vec3(3.58, 1.58, 0.0), gymapi.Vec3(0.0, 0.0, 0.0))
+
+    def reset(self):
+        self.gym.set_sim_rigid_body_states(self.sim, self.cube_initial_state, gymapi.STATE_ALL)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+
+    def vr_handler(self):
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
+        d = self.vr.devices["controller_1"].get_controller_inputs()
+        if d['trigger']:
+            pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 10.0
+            av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0
+
+            state['vel']['linear'].fill((pv[0], pv[1], pv[2]))
+            state['vel']['angular'].fill((av[0], av[1], av[2]))
+            print("trigger is pushed, ", pv)
+
+        self.gym.set_actor_rigid_body_states(self.env, self.cube_handle, state, gymapi.STATE_ALL)
+        self.draw_coord(pos=[np.asarray(state['pose']['p'][0].tolist())],
+                        rot=[np.asarray(state['pose']['r'][0].tolist())])
+
+
+class UR3:
+    def __init__(self):
+        pass
+
+
 class SimVR:
     def __init__(self):
         # initialize VR device
@@ -103,8 +203,8 @@ class SimVR:
 
         self.init_env()
 
-        self.obj_handles = []
-        self._create_cube()
+        _isaac = IsaacElement(gym=self.gym, viewer=self.viewer, sim=self.sim, env=self.env, device=self.device)
+        self.obj = Cube(isaac_elem=_isaac, vr=self.vr)
         # self._create_ur3()
 
     def init_env(self):
@@ -131,32 +231,6 @@ class SimVR:
         lower = gymapi.Vec3(-spacing, 0.0, -spacing)
         upper = gymapi.Vec3(spacing, spacing, spacing)
         self.env = self.gym.create_env(self.sim, lower, upper, num_per_row)
-
-    def _create_cube(self):
-        cube_asset_options = gymapi.AssetOptions()
-        cube_asset_options.density = 100.
-        cube_asset_options.disable_gravity = True
-        cube_asset_options.linear_damping = 20  # damping is important for stabilizing the movement
-        cube_asset_options.angular_damping = 20
-
-        cube_asset = self.gym.create_box(self.sim, 0.5, 0.5, 0.5, cube_asset_options)
-
-        init_pose = gymapi.Transform()
-        init_pose.p = gymapi.Vec3(0.0, 0.25, 0.0)
-        init_pose.r = gymapi.Quat(0, 0, 0, 1)
-        self.cube_handle = self.gym.create_actor(self.env, cube_asset, init_pose, "cube", -1, 0)
-        self.obj_handles.append(self.cube_handle)
-
-        c = 0.5 + 0.5 * np.random.random(3)
-        self.gym.set_rigid_body_color(self.env, self.cube_handle, 0,
-                                      gymapi.MESH_VISUAL_AND_COLLISION, gymapi.Vec3(c[0], c[1], c[2]))
-
-        # save initial state for reset
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
-        self.cube_initial_state = np.copy(self.gym.get_sim_rigid_body_states(self.sim, gymapi.STATE_ALL))
-
-        # set viewer perspective setting
-        self.gym.viewer_camera_look_at(self.viewer, None, gymapi.Vec3(3.58, 1.58, 0.0), gymapi.Vec3(0.0, 0.0, 0.0))
 
     def _create_ur3(self):
         ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
@@ -289,10 +363,6 @@ class SimVR:
         self.j_eef = self.j_eef[:, :, :6]  # up to UR3 joints
 
     def reset(self):
-        if hasattr(self, "cube_handle"):
-            self.gym.set_sim_rigid_body_states(self.sim, self.cube_initial_state, gymapi.STATE_ALL)
-            self.gym.refresh_rigid_body_state_tensor(self.sim)
-
         if hasattr(self, "ur3_handle"):
             print("ur3 reset!")
             id = 0
@@ -327,28 +397,13 @@ class SimVR:
                 self.loop_on = False
 
             if evt.action == "reset" and evt.value > 0:
-                self.reset()
+                self.obj.reset()
+                # self.reset()
 
                 # current viewer camera transformation
                 tr = self.gym.get_viewer_camera_transform(self.viewer, self.env)
                 print("p: ", tr.p)
                 print("r: ", tr.r)
-
-    def vr_handler_for_cube(self):
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
-        state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
-        d = self.vr.devices["controller_1"].get_controller_inputs()
-        if d['trigger']:
-            pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 10.0
-            av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0
-
-            state['vel']['linear'].fill((pv[0], pv[1], pv[2]))
-            state['vel']['angular'].fill((av[0], av[1], av[2]))
-            print("trigger is pushed, ", pv)
-
-        self.gym.set_actor_rigid_body_states(self.env, self.cube_handle, state, gymapi.STATE_ALL)
-        self.draw_coord(pos=[np.asarray(state['pose']['p'][0].tolist())],
-                        rot=[np.asarray(state['pose']['r'][0].tolist())])
 
     def sync_gripper_target(self):
         scale = 1.0
@@ -446,6 +501,7 @@ class SimVR:
         self.ur3_rfinger_rot, self.ur3_rfinger_pos = \
             compute_grasp_transforms(self.ur3_rfinger_rot, self.ur3_rfinger_pos,
                                      self.ur3_local_rfinger_rot, self.ur3_local_rfinger_pos)
+        print("joint angles: {:.3}".format(list(map(rad2deg, self.ur3_dof_pos[:, :6].cpu().numpy()))))
 
     def vr_handler_for_ur3(self):
         self.compute_obs()
@@ -522,8 +578,9 @@ class SimVR:
 
             # processing
             self.event_handler()
-            if hasattr(self, "cube_handle"): self.vr_handler_for_cube()
-            if hasattr(self, "ur3_handle"): self.vr_handler_for_ur3()
+            self.obj.vr_handler()
+            # if hasattr(self, "cube_handle"): self.vr_handler_for_cube()
+            # if hasattr(self, "ur3_handle"): self.vr_handler_for_ur3()
 
             # update the viewer
             self.gym.step_graphics(self.sim)

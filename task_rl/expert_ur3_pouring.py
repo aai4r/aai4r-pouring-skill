@@ -316,8 +316,8 @@ class DemoUR3Pouring(BaseTask):
         self.random_texture_handle = self.gym.create_texture_from_buffer(self.sim, 128, 128, texture)
 
         ur3_asset = self._create_asset_ur3()
-        # bottle_asset = self._create_asset_bottle()
-        bottle_asset = self._create_asset_gourd_bottle()
+        bottle_asset = self._create_asset_bottle()
+        # bottle_asset = self._create_asset_gourd_bottle()
         cup_asset = self._create_asset_cup()
         liq_asset = self.create_asset_water_drops()
         self.water_in_boundary_xy = self.cup_inner_radius - self.water_drop_radius
@@ -1577,7 +1577,7 @@ class DemoUR3Pouring(BaseTask):
         vx = bottle_pos - robot_base_pos
         vx[:, 2] = 0.0
         vx = normalize(vx, p=2.0, dim=-1)
-        appr_bottle_pos = bottle_pos.clone().detach() - (vx * self.bottle_diameter * 1.6)
+        appr_bottle_pos = bottle_pos.clone().detach() - (vx * self.bottle_diameter * 1.7)
         appr_bottle_pos[:, 2] = self.bottle_height + 0.05
 
         q_z90 = torch.tensor([[0.0, 0.0, 0.707, 0.707]] * self.num_envs, device=self.device)
@@ -1592,7 +1592,7 @@ class DemoUR3Pouring(BaseTask):
         self.appr_bottle_pos[env_ids], self.appr_bottle_rot[env_ids] = appr_bottle_pos[env_ids], appr_bottle_rot[env_ids]
         appr_bottle_grip = to_torch([0.085], device=self.device).repeat((self.num_envs, 1))  # full open
         self.tpl.append_pose(pos=appr_bottle_pos, rot=appr_bottle_rot, grip=appr_bottle_grip,
-                             err=ViaPointProperty(pos=3.e-1, rot=1.5e-1, grip=1.e-2))
+                             err=ViaPointProperty(pos=3.e-1, rot=2.e-2, grip=1.e-2))
 
         """
             3) grasp ready

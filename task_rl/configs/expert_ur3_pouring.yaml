@@ -16,7 +16,7 @@ env:
   rotRewardScale: 0.02
   openRewardScale: 4.0
   actionPenaltyScale: 0.01
-  rand_init_pos_scale: 3.5
+  rand_init_pos_scale: 1.5
 
   action_noise: True
   action_noise_scale: 0.2
