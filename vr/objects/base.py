@@ -3,6 +3,19 @@ from utils.utils import *
 from isaacgym import gymutil
 from isaacgym import gymapi, gymtorch
 import torch
+import json
+
+
+class JsonTypeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(JsonTypeEncoder, self).default(obj)
 
 
 class IsaacElement:

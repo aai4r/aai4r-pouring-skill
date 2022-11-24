@@ -1,13 +1,18 @@
+import socket
 from math import sqrt
 
 from objects.base import *
 from objects.cube import Cube
 from objects.ur3_robotiq85 import UR3
+from spirl.utils.general_utils import AttrDict
 from utils.torch_jit_utils import *
-
 
 import triad_openvr
 import sys
+
+import socket
+import json
+from threading import Event, Thread
 
 
 def simple_controller_test():
@@ -41,10 +46,12 @@ def simple_controller_test():
 
 
 class SimVR:
-    def __init__(self):
+    def __init__(self, cfg):
         # initialize VR device
-        self.vr = triad_openvr.triad_openvr()
-        self.vr.print_discovered_objects()
+        self.cfg = cfg
+        self.vr = triad_openvr.triad_openvr() if self.cfg.vr_on else None
+        if self.cfg.vr_on:
+            self.vr.print_discovered_objects()
         self.rot = euler_to_mat3d(roll=deg2rad(0), pitch=deg2rad(179.9), yaw=deg2rad(0))
 
         # initialize the isaac gym simulation
@@ -92,8 +99,13 @@ class SimVR:
         _isaac = IsaacElement(gym=self.gym, viewer=self.viewer, sim=self.sim, env=self.env, num_envs=self.num_envs,
                               device=self.device, asset_root=self.asset_root)
         _vr = VRElement(vr=self.vr, rot=self.rot)
-        # self.obj = Cube(isaac_elem=_isaac, vr_elem=_vr)
-        self.obj = UR3(isaac_elem=_isaac, vr_elem=_vr)
+        self.obj = Cube(isaac_elem=_isaac, vr_elem=_vr)
+        # self.obj = UR3(isaac_elem=_isaac, vr_elem=_vr)
+
+        if self.cfg.socket_open:
+            self.threads = []
+            self.events = []
+            self.open_socket_server()
 
     def init_env(self):
         # add ground plane
@@ -106,7 +118,8 @@ class SimVR:
 
         # viewer camera setting
         # cam_pos = gymapi.Vec3(3.58, 1.58, 0.0)  # third person view
-        cam_pos = gymapi.Vec3(-0.202553, 0.890771, -0.211403)  # tele.op. view
+        # cam_pos = gymapi.Vec3(-0.202553, 0.890771, -0.211403)  # tele.op. view
+        cam_pos = gymapi.Vec3(-0.157551, 0.699674, -0.498374)
         cam_target = gymapi.Vec3(0.1, 0.0, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
@@ -119,6 +132,53 @@ class SimVR:
         lower = gymapi.Vec3(-spacing, 0.0, -spacing)
         upper = gymapi.Vec3(spacing, spacing, spacing)
         self.env = self.gym.create_env(self.sim, lower, upper, num_per_row)
+
+    def open_socket_server(self):
+        HOST = "127.0.0.1"
+        PORT = 9999
+
+        # create socket and listen
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.bind((HOST, PORT))
+        self.server_socket.listen()
+
+        print("socket server start!")
+        event = Event()
+        t = Thread(target=self._threaded, args=(event, ))
+        self.events.append(event)
+        self.threads.append(t)
+        t.start()
+        # t.join()
+
+    def _threaded(self, event):
+        print("Socket server starts!")
+        client_socket, addr = self.server_socket.accept()
+        print("Connected by {}:{} ".format(addr[0], addr[1]))
+        start = time.time()
+        while True:
+            if event.is_set():
+                print("Kill Thread...")
+                self.server_socket.close()
+                break
+
+            try:
+                data = client_socket.recv(1024)
+
+                if (time.time() - start) > 1:
+                    if not data: raise ConnectionError
+                    print("Received: ", data.decode())
+                    start = time.time()
+                s_data = self.obj.get_status()
+                client_socket.send(s_data.encode())
+            except ConnectionResetError as e:
+                print("Disconnected from {}:{}".format(addr[0], addr[1]))
+                break
+            except ConnectionError as e:
+                try:
+                    client_socket, addr = self.server_socket.accept()
+                except:
+                    break
 
     def event_handler(self):
         for evt in self.gym.query_viewer_action_events(self.viewer):
@@ -142,9 +202,7 @@ class SimVR:
 
             # processing
             self.event_handler()
-            self.obj.vr_handler()
-            # if hasattr(self, "cube_handle"): self.vr_handler_for_cube()
-            # if hasattr(self, "ur3_handle"): self.vr_handler_for_ur3()
+            self.obj.move()
 
             # update the viewer
             self.gym.step_graphics(self.sim)
@@ -155,10 +213,16 @@ class SimVR:
             self.gym.sync_frame_time(self.sim)
         self.gym.destroy_viewer(self.viewer)
         self.gym.destroy_sim(self.sim)
+        self.kill_all_threads()
+
+    def kill_all_threads(self):
+        self.server_socket.shutdown(socket.SHUT_RDWR)
+        [e.set() for e in self.events]
 
 
 def vr_manipulation_test():
-    sv = SimVR()
+    cfg = AttrDict(vr_on=False, socket_open=True)
+    sv = SimVR(cfg=cfg)
     sv.run()
 
 

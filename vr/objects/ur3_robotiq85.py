@@ -282,23 +282,34 @@ class UR3(BaseObject):
         self.ur3_rfinger_rot, self.ur3_rfinger_pos = \
             compute_grasp_transforms(self.ur3_rfinger_rot, self.ur3_rfinger_pos,
                                      self.ur3_local_rfinger_rot, self.ur3_local_rfinger_pos)
-        self.print_status()
 
-    def print_status(self):
-        if (time.time() - self.start_time) * 1000 > self.print_duration:
-            # joint angles (deg)
-            joints = list(map(rad2deg, self.ur3_dof_pos[:, :6].cpu().numpy()))
-            print("Joint angles (deg)")
-            [print(round(j, 2), end="  ") for j in joints[0]]
-            print("")
-            self.start_time = time.time()
+    def get_status(self):
+        robot_status = dict()
+        joints = dict()
+        gripper = dict()
 
-    def vr_handler(self):
-        self.compute_obs()
-        goal = torch.zeros(1, 8, device=self.device)
-        goal[:, -2:] = 1.0
+        """
+            Joint angles (rad)
+        """
+        val_list = self.ur3_dof_pos[0, :6].cpu().numpy()
+        for key, val in zip(['j1', 'j2', 'j3', 'j4', 'j5', 'j6'], val_list): joints[key] = val
 
-        state = self.gym.get_actor_rigid_body_states(self.env, self.ur3_handle, gymapi.STATE_NONE)
+        """
+            Robotiq-2f-85
+            Full open: 85(mm), 0.085(m) --> 0
+            Full close: 0(mm), 0.0(m)   --> 1 
+        """
+        # gripper range: [full open: 0 ~ full close: 1]
+        stroke = self.angle_to_stroke(self.ur3_dof_pos[0, 8]).cpu().numpy()
+        gripper["stroke"] = round(stroke / 0.085, 3)
+
+        robot_status["joint"] = joints
+        robot_status["gripper"] = gripper
+        json_parsed = json.dumps(robot_status, indent="\t", cls=JsonTypeEncoder)
+        return json_parsed
+
+    def vr_handler(self, goal):
+        if not self.vr: return
         d = self.vr.devices["controller_1"].get_controller_inputs()
         if d['trigger']:
             pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
@@ -324,13 +335,26 @@ class UR3(BaseObject):
                 if (b - a) < 0:
                     self.trk_btn_toggle = 0 if self.trk_btn_toggle else 1
                     print("track pad button pushed, ", self.trk_btn_toggle)
-
         goal[:, 7] = self.trk_btn_toggle
+        # return goal
+
+    def move(self):
+        self.compute_obs()
+        goal = torch.zeros(1, 8, device=self.device)
+        goal[:, -2:] = 1.0
+        self.vr_handler(goal=goal)
+
+        state = self.gym.get_actor_rigid_body_states(self.env, self.ur3_handle, gymapi.STATE_NONE)
+
         _actions = self.solve(goal_pos=goal[:, :3], goal_rot=goal[:, 3:7], goal_grip=goal[:, 7], absolute=False)
         dt = 1 / 30
         action_scale = 10.0
+
+        # joint angles
         actions = torch.zeros_like(self.ur3_dof_pos)
         actions[:, :6] = _actions[:, :6]
+
+        # gripper angles
         drv = _actions[:, -1]
         actions[:, 6] = actions[:, 8] = actions[:, 9] = actions[:, 11] = drv
         actions[:, 7] = actions[:, 11] = -1 * drv

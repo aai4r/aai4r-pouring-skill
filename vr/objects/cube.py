@@ -36,9 +36,7 @@ class Cube(BaseObject):
         self.gym.set_sim_rigid_body_states(self.sim, self.cube_initial_state, gymapi.STATE_ALL)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
-    def vr_handler(self):
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
-        state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
+    def vr_handler(self, state):
         d = self.vr.devices["controller_1"].get_controller_inputs()
         if d['trigger']:
             pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 10.0
@@ -47,6 +45,11 @@ class Cube(BaseObject):
             state['vel']['linear'].fill((pv[0], pv[1], pv[2]))
             state['vel']['angular'].fill((av[0], av[1], av[2]))
             print("trigger is pushed, ", pv)
+
+    def move(self):
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
+        self.vr_handler(state=state)
 
         self.gym.set_actor_rigid_body_states(self.env, self.cube_handle, state, gymapi.STATE_ALL)
         self.draw_coord(pos=[np.asarray(state['pose']['p'][0].tolist())],
