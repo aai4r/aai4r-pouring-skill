@@ -37,6 +37,7 @@ class Cube(BaseObject):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
     def vr_handler(self, state):
+        if not self.vr: return
         d = self.vr.devices["controller_1"].get_controller_inputs()
         if d['trigger']:
             pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 10.0

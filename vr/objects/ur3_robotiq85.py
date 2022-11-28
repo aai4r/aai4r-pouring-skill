@@ -23,6 +23,10 @@ class UR3(BaseObject):
         self.print_duration = 1000  # ms
         self.start_time = time.time()
 
+        self.basis = quat_from_euler_xyz(torch.tensor(deg2rad(90), device=self.device),
+                                         torch.tensor(deg2rad(0), device=self.device),
+                                         torch.tensor(deg2rad(0), device=self.device)).unsqueeze(0)
+
     def _create(self):
         ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
 
@@ -39,8 +43,14 @@ class UR3(BaseObject):
         ur3_link_dict = self.gym.get_asset_rigid_body_dict(ur3_asset)
         print("ur3 link dictionary: ", ur3_link_dict)
 
+        # self.ur3_default_dof_pos = to_torch(
+        #     [deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
+        #      deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
+        # self.ur3_default_dof_pos = to_torch(
+        #     [deg2rad(-30.0), deg2rad(-60.0), deg2rad(80.0), deg2rad(-117.0), deg2rad(-90.0), deg2rad(-25.0),
+        #      deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         self.ur3_default_dof_pos = to_torch(
-            [deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
+            [deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(90.0),
              deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         self.ur3_zero_dof_pos = torch.zeros_like(self.ur3_default_dof_pos)
 
@@ -70,7 +80,7 @@ class UR3(BaseObject):
         rot = quat_mul(to_torch([ur3_start_pose.r.x, ur3_start_pose.r.y,
                                  ur3_start_pose.r.z, ur3_start_pose.r.w], device=self.device),
                        quat_from_euler_xyz(torch.tensor(deg2rad(-90), device=self.device),
-                                           torch.tensor(deg2rad(0), device=self.device),
+                                           torch.tensor(deg2rad(180), device=self.device),
                                            torch.tensor(deg2rad(0), device=self.device)))
         ur3_start_pose.r = gymapi.Quat(rot[0], rot[1], rot[2], rot[3])
         self.ur3_handle = self.gym.create_actor(self.env, ur3_asset, ur3_start_pose, "ur3", 0, 1)
@@ -96,7 +106,7 @@ class UR3(BaseObject):
         self.global_indices = torch.arange(self.num_envs * self.num_actors, dtype=torch.int32,
                                            device=self.device).view(self.num_envs, -1)
 
-        self.hand_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle, "tool0")
+        self.hand_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle, "ee_link")
         self.lfinger_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle,
                                                                     "robotiq_85_left_finger_tip_link")
         self.rfinger_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle,
@@ -138,6 +148,8 @@ class UR3(BaseObject):
                                                _rfinger_pose.r.z, _rfinger_pose.r.w], device=self.device).repeat(
             (self.num_envs, 1))
 
+        self.ur3_ee_pos = torch.zeros_like(self.ur3_local_grasp_pos)
+        self.ur3_ee_rot = torch.zeros_like(self.ur3_local_grasp_rot)
         self.ur3_grasp_pos = torch.zeros_like(self.ur3_local_grasp_pos)
         self.ur3_grasp_rot = torch.zeros_like(self.ur3_local_grasp_rot)
         self.ur3_grasp_rot[..., -1] = 1
@@ -163,7 +175,7 @@ class UR3(BaseObject):
         print("ur3 reset!")
         id = 0
         pos = tensor_clamp(
-            self.ur3_default_dof_pos.unsqueeze(0) + 0.1 * (torch.rand((1, self.num_dofs), device=self.device) - 0.5),
+            self.ur3_default_dof_pos.unsqueeze(0) + 0.0 * (torch.rand((1, self.num_dofs), device=self.device) - 0.5),
             self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         self.ur3_dof_targets = pos  # targets
         self.ur3_dof_pos[id, :] = pos
@@ -267,6 +279,10 @@ class UR3(BaseObject):
         hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
 
+        self.ur3_ee_pos, self.ur3_ee_rot = hand_pos, hand_rot
+        # self.ur3_ee_pos = quat_apply(self.basis, hand_pos)
+        # self.ur3_ee_rot = quat_mul(self.basis, hand_rot)
+
         self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
             compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
 
@@ -287,6 +303,8 @@ class UR3(BaseObject):
         robot_status = dict()
         joints = dict()
         gripper = dict()
+        grip_pos = dict()
+        grip_rot = dict()
 
         """
             Joint angles (rad)
@@ -301,10 +319,26 @@ class UR3(BaseObject):
         """
         # gripper range: [full open: 0 ~ full close: 1]
         stroke = self.angle_to_stroke(self.ur3_dof_pos[0, 8]).cpu().numpy()
-        gripper["stroke"] = round(stroke / 0.085, 3)
+        gripper["stroke"] = 1 - round(stroke / 0.085, 3)
+
+        """
+            Robot Pose
+            : grip_pose, (grasping point) 
+            : ee_pose, 
+            :  
+        """
+        ee_pos_list = self.ur3_ee_pos[0, :3].cpu().numpy()
+        roll, pitch, yaw = get_euler_xyz(self.ur3_ee_rot)
+        ee_rot_list = []
+        for x in [roll, pitch, yaw]:
+            ee_rot_list.append(x.cpu().numpy().item() % (2 * np.pi))
+        for key, val in zip(['x', 'y', 'z'], ee_pos_list): grip_pos[key] = val
+        for key, val in zip(['rx', 'ry', 'rz'], ee_rot_list): grip_rot[key] = val
 
         robot_status["joint"] = joints
         robot_status["gripper"] = gripper
+        robot_status["grip_pos"] = grip_pos
+        robot_status["grip_rot"] = grip_rot
         json_parsed = json.dumps(robot_status, indent="\t", cls=JsonTypeEncoder)
         return json_parsed
 
@@ -366,6 +400,8 @@ class UR3(BaseObject):
 
         # self.gym.set_actor_rigid_body_states(self.env, self.ur3_handle, state, gymapi.STATE_ALL)
 
-        ar_pos = [np.asarray(state['pose']['p'][0].tolist()), self.ur3_grasp_pos[0].numpy()]
-        ar_rot = [np.asarray(state['pose']['r'][0].tolist()), self.ur3_grasp_rot[0].numpy()]
+        # ar_pos = [np.asarray(state['pose']['p'][0].tolist()), self.ur3_grasp_pos[0].cpu().numpy()]
+        # ar_rot = [np.asarray(state['pose']['r'][0].tolist()), self.ur3_grasp_rot[0].cpu().numpy()]
+        ar_pos = [np.asarray(state['pose']['p'][0].tolist()), self.ur3_ee_pos[0].cpu().numpy()]
+        ar_rot = [np.asarray(state['pose']['r'][0].tolist()), self.ur3_ee_rot[0].cpu().numpy()]
         self.draw_coord(pos=ar_pos, rot=ar_rot)

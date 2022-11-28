@@ -219,13 +219,14 @@
   <joint name="ee_fixed_joint" type="fixed">
     <parent link="wrist_3_link"/>
     <child link="ee_link"/>
-    <origin rpy="0.0 0.0 1.57079632679" xyz="0.0 0.0819 0.0"/>
+    <origin rpy="-1.57079632679 0.0 0" xyz="0.0 0.0819 0.0"/>
   </joint>
   <link name="ee_link">
     <collision>
       <geometry>
         <box size="0.01 0.01 0.01"/>
       </geometry>
+<!--      <origin rpy="-1.57079632679 0 3.14159265359" xyz="-0.01 0 0"/>-->
       <origin rpy="0 0 0" xyz="-0.01 0 0"/>
     </collision>
   </link>
@@ -311,15 +312,15 @@
                  not corrected wrt the real robot (ie: rotated over 180
                  degrees)
       -->
-    <origin rpy="0 0 -3.14159265359" xyz="0 0 0"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/> <!-- rpy="0 0 -3.14159265359" -->
     <parent link="base_link"/>
     <child link="base"/>
   </joint>
   <!-- Frame coincident with all-zeros TCP on UR controller -->
   <link name="tool0"/>
   <joint name="wrist_3_link-tool0_fixed_joint" type="fixed">
-    <origin rpy="-1.57079632679 0 0" xyz="0 0.0819 0"/>
-    <parent link="wrist_3_link"/>
+    <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/> <!-- <origin rpy="-1.57079632679 0 0" xyz="0 0.0819 0"/> -->
+    <parent link="ee_link"/>
     <child link="tool0"/>
   </joint>
   <link name="world"/>
@@ -334,7 +335,7 @@
   <link name="robotiq_coupler">
     <visual>
       <geometry>
-        <mesh filename="../../robotiq_description/meshes/robotiq_85_coupler.stl"/>
+        <mesh filename="../../robotiq_description/meshes/visual/robotiq_85_coupler.dae"/>
       </geometry>
       <material name="flat_black"/>
     </visual>
@@ -350,7 +351,7 @@
     </inertial>
   </link>
   <joint name="robotiq_coupler_joint" type="fixed">
-    <origin rpy="0 0 -1.57079632679" xyz="0 0 0.004"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/> <!--    <origin rpy="0 0 -1.57079632679" xyz="0 0 0.004"/>-->
     <parent link="tool0"/>
     <child link="robotiq_coupler"/>
   </joint>
@@ -369,7 +370,8 @@
   <joint name="robotiq_85_base_joint" type="fixed">
     <parent link="robotiq_coupler"/>
     <child link="robotiq_85_base_link"/>
-    <origin rpy="0 -1.57079632679 3.14159265359" xyz="0 0 0.004"/>
+<!--    <origin rpy="0 -1.57079632679 3.14159265359" xyz="0 0 0.004"/>-->
+    <origin rpy="0 0 -1.57079632679" xyz="0 0 0"/>
   </joint>
   <link name="robotiq_85_base_link">
     <visual>

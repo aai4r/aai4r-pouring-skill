@@ -75,24 +75,40 @@ class RobotControlGUI(QMainWindow, form_class):
                 message = "CONTROL SIGNAL"
                 self.client_socket.send(message.encode())
 
-                data = self.client_socket.recv(1024)
-                self.parse_to_gui(js=data.decode())
+                json_data = self.client_socket.recv(1024)
+                self.parse_to_gui(json_data=json_data.decode())
             except:
                 pass
 
-    def parse_to_gui(self, js):
-        parsed = json.loads(js)
+    def parse_to_gui(self, json_data):
+        parsed = json.loads(json_data)
 
+        # joint
         show_deg = self.checkBox_show_deg.checkState()
         r2d = 180.0 / np.pi if show_deg else 1
         joints = list(map(lambda x: str(round(x * r2d, 2)), parsed.get("joint").values()))
-
         self.lineEdit_j1_disp.setText(joints[0])
         self.lineEdit_j2_disp.setText(joints[1])
         self.lineEdit_j3_disp.setText(joints[2])
         self.lineEdit_j4_disp.setText(joints[3])
         self.lineEdit_j5_disp.setText(joints[4])
         self.lineEdit_j6_disp.setText(joints[5])
+
+        # gripper
+        gripper = list(map(lambda x: str(round(x, 2)), parsed.get("gripper").values()))
+        self.lineEdit_grip_disp.setText(gripper[0])
+
+        # pose
+        # : grip_pose, ee_pose, etc.
+        mm = 1000.0
+        grip_pos = list(map(lambda x: str(round(x * mm, 2)), parsed.get("grip_pos").values()))
+        grip_rot = list(map(lambda x: str(round(x, 2)), parsed.get("grip_rot").values()))
+        self.lineEdit_x_disp.setText(grip_pos[0])
+        self.lineEdit_y_disp.setText(grip_pos[1])
+        self.lineEdit_z_disp.setText(grip_pos[2])
+        self.lineEdit_rx_disp.setText(grip_rot[0])
+        self.lineEdit_ry_disp.setText(grip_rot[1])
+        self.lineEdit_rz_disp.setText(grip_rot[2])
 
     def kill_all_threads(self):
         [e.set() for e in self.events]

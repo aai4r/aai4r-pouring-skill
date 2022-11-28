@@ -99,8 +99,7 @@ class SimVR:
         _isaac = IsaacElement(gym=self.gym, viewer=self.viewer, sim=self.sim, env=self.env, num_envs=self.num_envs,
                               device=self.device, asset_root=self.asset_root)
         _vr = VRElement(vr=self.vr, rot=self.rot)
-        self.obj = Cube(isaac_elem=_isaac, vr_elem=_vr)
-        # self.obj = UR3(isaac_elem=_isaac, vr_elem=_vr)
+        self.obj = self.cfg.target_obj(isaac_elem=_isaac, vr_elem=_vr)
 
         if self.cfg.socket_open:
             self.threads = []
@@ -119,8 +118,8 @@ class SimVR:
         # viewer camera setting
         # cam_pos = gymapi.Vec3(3.58, 1.58, 0.0)  # third person view
         # cam_pos = gymapi.Vec3(-0.202553, 0.890771, -0.211403)  # tele.op. view
-        cam_pos = gymapi.Vec3(-0.157551, 0.699674, -0.498374)
-        cam_target = gymapi.Vec3(0.1, 0.0, 0.0)
+        cam_pos = gymapi.Vec3(0.223259, 0.694804, 0.573643)
+        cam_target = gymapi.Vec3(-0.2, 0.0, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
         # set up the grid of environments
@@ -221,7 +220,8 @@ class SimVR:
 
 
 def vr_manipulation_test():
-    cfg = AttrDict(vr_on=False, socket_open=True)
+    target_obj = {"Cube": Cube, "UR3": UR3}
+    cfg = AttrDict(vr_on=False, socket_open=True, target_obj=target_obj["UR3"])
     sv = SimVR(cfg=cfg)
     sv.run()
 

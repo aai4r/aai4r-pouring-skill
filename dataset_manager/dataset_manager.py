@@ -47,7 +47,7 @@ class SkillDatasetManager(QMainWindow, form_class):
         self.timer.timeout.connect(self.func_timeout)
 
         # spin box for auto play time tick
-        self.sb_autoplay_tick.setRange(1, 10)
+        self.sb_autoplay_tick.setRange(1, 30)
 
         # horizontal slider
         self.hslider_img_step.valueChanged.connect(self.progress_hslider_value_changed)

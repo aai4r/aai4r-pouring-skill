@@ -199,9 +199,9 @@ class SACAgent(ACAgent):
     def _run_policy(self, obs):
         """Allows child classes to post-process policy outputs."""
         # TODO, should be implemented in more elegant way...(twkim)
-        self.policy.net.p[0].nn[4].reset(for_update=True)
-        if hasattr(self.policy, 'prior_net'):
-            self.policy.prior_net.p[0].nn[4].reset(for_update=True)
+        #self.policy.net.p[0].nn[4].reset(for_update=True)
+        #if hasattr(self.policy, 'prior_net'):
+            #self.policy.prior_net.p[0].nn[4].reset(for_update=True)
         return self.policy(obs)
 
     def _update_alpha(self, experience_batch, policy_output):

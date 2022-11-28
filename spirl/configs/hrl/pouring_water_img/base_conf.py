@@ -51,7 +51,7 @@ obs_norm_params = AttrDict(
 )
 
 base_agent_params = AttrDict(
-    batch_size=128,
+    batch_size=32,
     update_iterations=1,        # replay buffer
     replay=UniformReplayBuffer,
     replay_params=replay_params,
@@ -93,18 +93,18 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=128,     # will automatically be set to 512(resnet18) if use_pretrain=True
-    nz_mid_prior=128,
-    n_processing_layers=3,
+    nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
+    nz_mid_prior=256,
+    n_processing_layers=5,
     num_prior_net_layers=3,
-    state_cond=True,        # B
+    state_cond=False,        # B
     state_cond_size=7,
     use_pretrain=True,      # A
     layer_freeze=-1,    # 5: freeze for skill train, -1: freeze all layers of pre-trained net
     model_download=False,
     ftp_server_info=ftp_params,
     weights_dir="weights",
-    recurrent_prior=True,   # D
+    recurrent_prior=False,   # D
 )
 
 if ll_model_params.recurrent_prior:
