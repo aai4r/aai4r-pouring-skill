@@ -8,41 +8,9 @@ from spirl.utils.general_utils import AttrDict
 from utils.torch_jit_utils import *
 
 import triad_openvr
-import sys
 
 import socket
-import json
 from threading import Event, Thread
-
-
-def simple_controller_test():
-    vr = triad_openvr.triad_openvr()
-    vr.print_discovered_objects()
-
-    if len(sys.argv) == 1:
-        interval = 1 / 250
-    elif len(sys.argv) == 2:
-        interval = 1 / float(sys.argv[1])
-    else:
-        print("Invalid number of arguments")
-        interval = False
-
-    if interval:
-        while True:
-            start = time.time()
-            pv, av = [], []
-            for each in zip(vr.devices["controller_1"].get_velocity(), vr.devices["controller_1"].get_angular_velocity()):
-                # [x, y, z, yaw, pitch, roll]
-                pv.append(each[0]), av.append(each[1])
-            print(pv + av)
-
-            d = vr.devices["controller_1"].get_controller_inputs()
-            if d['trigger']:
-                print("trigger is pushed")
-
-            sleep_time = interval - (time.time() - start)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
 
 
 class SimVR:
@@ -52,7 +20,7 @@ class SimVR:
         self.vr = triad_openvr.triad_openvr() if self.cfg.vr_on else None
         if self.cfg.vr_on:
             self.vr.print_discovered_objects()
-        self.rot = euler_to_mat3d(roll=deg2rad(0), pitch=deg2rad(179.9), yaw=deg2rad(0))
+        self.rot = euler_to_mat3d(roll=deg2rad(0), pitch=deg2rad(179.99), yaw=deg2rad(0))
 
         # initialize the isaac gym simulation
         self.gym = gymapi.acquire_gym()
@@ -221,7 +189,7 @@ class SimVR:
 
 def vr_manipulation_test():
     target_obj = {"Cube": Cube, "UR3": UR3}
-    cfg = AttrDict(vr_on=False, socket_open=True, target_obj=target_obj["UR3"])
+    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target_obj["UR3"])
     sv = SimVR(cfg=cfg)
     sv.run()
 

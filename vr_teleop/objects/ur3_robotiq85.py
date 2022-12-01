@@ -43,15 +43,15 @@ class UR3(BaseObject):
         ur3_link_dict = self.gym.get_asset_rigid_body_dict(ur3_asset)
         print("ur3 link dictionary: ", ur3_link_dict)
 
-        # self.ur3_default_dof_pos = to_torch(
-        #     [deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
-        #      deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
+        self.ur3_default_dof_pos = to_torch(
+            [deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
+             deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         # self.ur3_default_dof_pos = to_torch(
         #     [deg2rad(-30.0), deg2rad(-60.0), deg2rad(80.0), deg2rad(-117.0), deg2rad(-90.0), deg2rad(-25.0),
         #      deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
-        self.ur3_default_dof_pos = to_torch(
-            [deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(90.0),
-             deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
+        # self.ur3_default_dof_pos = to_torch(
+        #     [deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(90.0),
+        #      deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         self.ur3_zero_dof_pos = torch.zeros_like(self.ur3_default_dof_pos)
 
         # ur3 dof properties
@@ -348,7 +348,7 @@ class UR3(BaseObject):
         if d['trigger']:
             pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
             av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
-            # av = np.array([v for v in vr.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
+            # av = np.array([v for v in vr_teleop.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
 
             pv = torch.matmul(self.rot, torch.tensor(pv).unsqueeze(0).T)
             av = torch.tensor(av).unsqueeze(0)

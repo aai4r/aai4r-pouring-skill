@@ -10,8 +10,8 @@ from tasks.base.base_task import BaseTask, AttrDict
 from isaacgym import gymtorch
 from isaacgym import gymapi
 
-# vr interface
-from vr import triad_openvr
+# vr_teleop interface
+from vr_teleop import triad_openvr
 
 
 def _uniform(low, high, size=1):
@@ -1163,7 +1163,7 @@ class DemoUR3Pouring(BaseTask):
             if self.gym.query_viewer_has_closed(self.viewer):
                 exit()
 
-            # vr controller
+            # vr_teleop controller
             pose = self.vr.devices["controller_1"].get_pose_euler()
             vel = self.vr.devices["controller_1"].get_velocity()
             d = self.vr.devices["controller_1"].get_controller_inputs()
@@ -1240,7 +1240,7 @@ class DemoUR3Pouring(BaseTask):
             if d['trigger']:
                 pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
                 av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
-                # av = np.array([v for v in vr.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
+                # av = np.array([v for v in vr_teleop.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
 
                 pv = torch.matmul(self.vr_ref_rot, torch.tensor(pv).unsqueeze(0).T)
                 av = torch.tensor(av).unsqueeze(0)
