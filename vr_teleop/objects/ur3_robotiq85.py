@@ -12,7 +12,7 @@ def compute_grasp_transforms(hand_rot, hand_pos, ur3_local_grasp_rot, ur3_local_
     return global_franka_rot, global_franka_pos
 
 
-class UR3(BaseObject):
+class IsaacUR3(BaseObject):
     def __init__(self, isaac_elem, vr_elem):
         self.vr = vr_elem.vr
         self.rot = vr_elem.rot

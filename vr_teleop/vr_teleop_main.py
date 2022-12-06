@@ -3,7 +3,7 @@ from math import sqrt
 
 from objects.base import *
 from objects.cube import Cube
-from objects.ur3_robotiq85 import UR3
+from objects.ur3_robotiq85 import IsaacUR3
 from spirl.utils.general_utils import AttrDict
 from utils.torch_jit_utils import *
 
@@ -187,72 +187,9 @@ class SimVR:
         [e.set() for e in self.events]
 
 
-def vr_manipulation_test():
-    target_obj = {"Cube": Cube, "UR3": UR3}
-    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target_obj["UR3"])
+if __name__ == "__main__":
+    target_list = [Cube, IsaacUR3]
+    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=IsaacUR3)
     sv = SimVR(cfg=cfg)
     sv.run()
 
-
-def rotation_matrix_test():
-    v = torch.tensor([[0.0, 0.0, 1.0]]).T
-    rot = euler_to_mat3d(roll=deg2rad(0), pitch=deg2rad(179.5), yaw=deg2rad(0))
-    result = torch.matmul(rot.float(), v)
-    print("input: {}".format(v))
-    print("rot \n", rot)
-    print("result: {}".format(result))
-
-    q = mat_to_quat(rot.unsqueeze(0))
-    print("mat to quat: ", q)
-
-
-import matplotlib.pyplot as plt
-import time
-
-
-def plot_test():
-    # x = np.linspace(0, 6 * np.pi, 100)
-    # y = np.sin(x)
-    # y = np.random.rand(10)
-    x = []
-    y = []
-    x.append(0)
-    y.append(np.random.rand(1).item())
-    x = np.array([])
-    y = np.array([])
-    x = np.append(x, 0)
-    y = np.append(y, np.random.rand(1).item())
-
-    # You probably won't need this if you're embedding things in a tkinter plot...
-    plt.ion()
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.clear()
-    ax.set_xlim([0.0, 500])
-    ax.set_ylim([-1.0, 1.0])
-    # line1, = ax.plot(x, y, 'r-')  # Returns a tuple of line objects, thus the comma
-    line1, = ax.plot(x, y, 'r-')  # Returns a tuple of line objects, thus the comma
-
-    start = time.time()
-    for phase in np.linspace(0, 10 * np.pi, 500):
-        # line1.set_ydata(np.sin(x + phase))
-        # print("y: ", y)
-        line1.set_xdata(x)
-        line1.set_ydata(y)
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        x = np.append(x, x[-1] + 1)
-        y = np.append(y, np.random.rand(1).item())
-        # print("x: {}, y: {}".format(x.shape, y.shape))
-
-        # x.append(x[-1] + 1)
-        # y.append(np.random.rand(1).item())
-    print("elapsed: ", time.time() - start)
-
-
-if __name__ == "__main__":
-    # simple_controller_test()
-    vr_manipulation_test()
-    # rotation_matrix_test()
-    # plot_test()
