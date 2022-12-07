@@ -1,9 +1,13 @@
+import copy
+
 import isaacgym
 from utils.utils import *
 from isaacgym import gymutil
 from isaacgym import gymapi, gymtorch
 import torch
 import json
+
+from vr_teleop import triad_openvr
 
 
 class JsonTypeEncoder(json.JSONEncoder):
@@ -36,6 +40,57 @@ class IsaacElement:
         self.num_envs = num_envs
         self.device = device
         self.asset_root = asset_root
+
+
+class ButtonPressedEventHandler:
+    def __init__(self):
+        self._curr = None
+        self._prev = None
+
+    def is_pressed(self, event_stream):
+        btn_pressed = False
+        self._curr = 0 if event_stream else 1
+
+        if self._prev is not None:
+            if (self._curr - self._prev) < 0:
+                btn_pressed = True
+        self._prev = self.clone(self._curr)
+        return btn_pressed
+
+    def clone(self, val):
+        return copy.deepcopy(val)
+
+
+class VRWrapper:
+    def __init__(self, device, rot_d=(0.0, 0.0, 0.0)):
+        assert len(rot_d) == 3 and isinstance(rot_d, tuple)
+        self.device = device
+        self.vr = triad_openvr.triad_openvr()
+        self.rot = euler_to_mat3d(deg2rad(rot_d[0]), deg2rad(rot_d[1]), deg2rad(rot_d[2]))
+
+        self.trk_btn = ButtonPressedEventHandler()
+        self.menu_btn = ButtonPressedEventHandler()
+
+    def get_controller_velocity(self):
+        d = self.vr.devices["controller_1"].get_controller_inputs()
+        lv = np.array([0.0, 0.0, 0.0])    # linear velocity of controller
+        av = np.array([0.0, 0.0, 0.0])    # angular velocity of controller
+
+        # button status
+        btn_status = {"gripper": False, "reset_pose": False}
+        if d['trigger']:
+            lv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
+            av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
+            # av = np.array([v for v in vr_teleop.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
+
+            lv = torch.matmul(self.rot, torch.tensor(lv).unsqueeze(0).T).T.squeeze(0).numpy()
+            av = torch.tensor(av).unsqueeze(0)
+            _q = mat_to_quat(self.rot.unsqueeze(0))
+            av = quat_apply(_q, av).squeeze(0).numpy()
+
+            btn_status["gripper"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
+            btn_status["reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
+        return lv, av, btn_status
 
 
 class VRElement:

@@ -1,4 +1,3 @@
-import socket
 from math import sqrt
 
 from objects.base import *
@@ -20,7 +19,7 @@ class SimVR:
         self.vr = triad_openvr.triad_openvr() if self.cfg.vr_on else None
         if self.cfg.vr_on:
             self.vr.print_discovered_objects()
-        self.rot = euler_to_mat3d(roll=deg2rad(0), pitch=deg2rad(179.99), yaw=deg2rad(0))
+        self.rot = euler_to_mat3d(roll=deg2rad(0.0), pitch=deg2rad(90.0), yaw=deg2rad(0.0))
 
         # initialize the isaac gym simulation
         self.gym = gymapi.acquire_gym()
