@@ -71,26 +71,35 @@ class VRWrapper:
         self.trk_btn = ButtonPressedEventHandler()
         self.menu_btn = ButtonPressedEventHandler()
 
-    def get_controller_velocity(self):
+    def get_controller_status(self):
         d = self.vr.devices["controller_1"].get_controller_inputs()
         lv = np.array([0.0, 0.0, 0.0])    # linear velocity of controller
         av = np.array([0.0, 0.0, 0.0])    # angular velocity of controller
+        pq = np.array([0.0, 0.0, 0.0, 1.0])    # pose quaternion
 
         # button status
-        btn_status = {"gripper": False, "reset_pose": False}
+        controller_status = {"lin_vel": lv, "ang_vel": av, "pose_quat": pq,
+                             "btn_gripper": False, "btn_reset_pose": False}
         if d['trigger']:
             lv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
             av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
-            # av = np.array([v for v in vr_teleop.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
+            pq = np.array([v for v in self.vr.devices["controller_1"].get_pose_quaternion()])         # absolute
 
             lv = torch.matmul(self.rot, torch.tensor(lv).unsqueeze(0).T).T.squeeze(0).numpy()
             av = torch.tensor(av).unsqueeze(0)
-            _q = mat_to_quat(self.rot.unsqueeze(0))
-            av = quat_apply(_q, av).squeeze(0).numpy()
+            _rq = mat_to_quat(self.rot.unsqueeze(0))
+            av = quat_apply(_rq, av).squeeze(0).numpy()
 
-            btn_status["gripper"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
-            btn_status["reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
-        return lv, av, btn_status
+            _pq = torch.tensor(pq[3:]).unsqueeze(0)
+            pq = _pq.squeeze(0).numpy()  # TODO
+            # pq = quat_mul(_rq, _pq).squeeze(0).numpy()
+
+            controller_status["lin_vel"] = lv
+            controller_status["ang_vel"] = av
+            controller_status["pose_quat"] = pq
+            controller_status["btn_gripper"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
+            controller_status["btn_reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
+        return controller_status
 
 
 class VRElement:

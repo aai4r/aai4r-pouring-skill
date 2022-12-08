@@ -1,4 +1,5 @@
 from math import sqrt
+import time
 
 from objects.base import *
 from objects.cube import Cube
@@ -14,12 +15,7 @@ from threading import Event, Thread
 
 class SimVR:
     def __init__(self, cfg):
-        # initialize VR device
         self.cfg = cfg
-        self.vr = triad_openvr.triad_openvr() if self.cfg.vr_on else None
-        if self.cfg.vr_on:
-            self.vr.print_discovered_objects()
-        self.rot = euler_to_mat3d(roll=deg2rad(0.0), pitch=deg2rad(90.0), yaw=deg2rad(0.0))
 
         # initialize the isaac gym simulation
         self.gym = gymapi.acquire_gym()
@@ -65,7 +61,7 @@ class SimVR:
 
         _isaac = IsaacElement(gym=self.gym, viewer=self.viewer, sim=self.sim, env=self.env, num_envs=self.num_envs,
                               device=self.device, asset_root=self.asset_root)
-        _vr = VRElement(vr=self.vr, rot=self.rot)
+        _vr = VRWrapper(device=self.device, rot_d=(0.0, 89.9, 0.0))
         self.obj = self.cfg.target_obj(isaac_elem=_isaac, vr_elem=_vr)
 
         if self.cfg.socket_open:

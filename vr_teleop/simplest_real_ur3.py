@@ -6,9 +6,15 @@ import numpy as np
 import rtde_control
 import rtde_receive
 from gripper.robotiq_gripper_control import RobotiqGripper
+import isaacgym
+from utils.utils import orientation_error
 
 
 def rad2deg(rad): return rad * (180.0 / np.pi)
+
+
+def quat_to_real_last(q_real_first):
+    return torch.cat((q_real_first[1:], q_real_first[0].unsqueeze(0)))     # [x, y, z, w]
 
 
 def gripper_test():
@@ -182,9 +188,26 @@ def orientation_check():
     print("e_x ", e_x, e_x.norm())
 
 
+def quat_orientation_check():
+    ref_axis_angle = torch.tensor([1.201, 1.219, 1.218])  # -90, 90, 180
+    target_axis_angle = torch.tensor([2.226, 0.016, 2.227])  # -90, 90, -90
+
+    # ref_axis_angle = torch.tensor([0.0, 0.0, 0.0])  # 0, 0, 0
+    # target_axis_angle = tr.quaternion_to_axis_angle(torch.tensor([0.5, 0.5, -0.5, 0.5]))  # 0, 0, 90
+
+
+    rq = quat_to_real_last(tr.axis_angle_to_quaternion(ref_axis_angle))
+    tq = quat_to_real_last(tr.axis_angle_to_quaternion(target_axis_angle))
+    eq = orientation_error(desired=tq.unsqueeze(0), current=rq.unsqueeze(0)).squeeze(0)
+    print("rq [x, y, z, w]: ", rq)
+    print("tq [x, y, z, w]: ", tq)
+    print("eq [x, y, z]: ", eq)
+
+
 if __name__ == "__main__":
+    quat_orientation_check()
     # real_ur3_socket_test()
     # real_ur3_rtde_test()
     # gripper_test()
-    orientation_check()
+    # orientation_check()
 

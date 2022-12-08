@@ -11,13 +11,17 @@ import rtde_receive
 from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripper
 
 from spirl.utils.general_utils import AttrDict
-from utils.utils import euler_to_mat3d
+from utils.utils import euler_to_mat3d, orientation_error
 from pytorch3d import transforms as tr
 from base import VRWrapper
 
 
 def rad2deg(rad): return rad * (180.0 / np.pi)
 def deg2rad(deg): return deg * (np.pi / 180.0)
+
+
+def quat_to_real_last(q_real_first):
+    return torch.cat((q_real_first[1:], q_real_first[0].unsqueeze(0)))     # [x, y, z, w]
 
 
 class RealUR3:
@@ -56,7 +60,7 @@ class RealUR3:
         self.Pyz = (self.yz_plane @ (self.yz_plane.T @ self.yz_plane).inverse()) @ self.yz_plane.T
 
     def init_vr(self):
-        self.vr = VRWrapper(device="cpu", rot_d=(90.0, -90.0, 0.0))
+        self.vr = VRWrapper(device="cpu", rot_d=(89.99, -89.99, 0.0))
 
     def limit_check(self, tcp_p):
         _q = tr.axis_angle_to_quaternion(torch.tensor(tcp_p[3:]))     # [w, x, y, z]
@@ -188,15 +192,12 @@ class RealUR3:
 
     def vr_handler(self):
         while True:
-            lv, av, btn_status = self.vr.get_controller_velocity()
-            # print("lv: ", lv)
-            # print("av: ", av)
-            if btn_status["gripper"]:
-                print("gripper toggle")
-            if btn_status["reset_pose"]:
-                print("reset_pose")
+            cont_status = self.vr.get_controller_velocity()
+            if cont_status["btn_gripper"]:
+                print(cont_status["pose_quat"])
 
     def run_vr_teleop(self):
+        print("Run VR teleoperation mode")
         try:
             # Move to initial joint position
             init_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
@@ -206,18 +207,36 @@ class RealUR3:
             # determine limit positions in each axis
             # [x, y, z, roll, pitch, yaw]
             self.set_velL(v=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            print_cnt = 0
             while True:
                 start_t = self.rtde_c.initPeriod()
                 actual_tcp_p = self.rtde_r.getActualTCPPose()
-                # print("actual_tcp_p: ", actual_tcp_p)
+                _tcp_q = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_p[3:]))
+                tcp_q = torch.cat((_tcp_q[1:], _tcp_q[0].unsqueeze(0)))
 
                 # get velocity command from VR
-                lv, av, btn_status = self.vr.get_controller_velocity()
-                if btn_status["reset_pose"]:
+                cont_status = self.vr.get_controller_velocity()
+                if cont_status["btn_reset_pose"]:
                     self.rtde_c.speedStop()
                     self.rtde_c.moveJ(init_joint)
                     continue
-                self.set_velL(v=list(lv) + list(av))
+
+                des_pose = [0.507, -0.064, 0.184, 1.155, 1.267, 1.23]
+                dj = self.rtde_c.getInverseKinematics(x=des_pose)
+                acc = 1.2
+                dt = 1.0 / 500
+                # self.rtde_c.speedJ(list(np.array(dj) * 0.001), acc, dt)
+                # self.rtde_c.waitPeriod(start_t)
+
+                if print_cnt % 10 == 0:
+                    print_cnt = 0
+                    print("ik q: ", dj)
+                    # print("tcp_q: ", tcp_q)
+                    # print("actual_tcp_p: ", actual_tcp_p)
+                print_cnt += 1
+                continue
+
+                self.set_velL(v=list(cont_status["lin_vel"]) + list(cont_status["ang_vel"]))
 
                 lim_flag = self.limit_check(tcp_p=actual_tcp_p)
                 if lim_flag.x_max or lim_flag.x_min: self.v_ax.x *= 0.0
@@ -228,11 +247,39 @@ class RealUR3:
                 if lim_flag.rz_max or lim_flag.rz_min: self.v_ax.rz *= 0.0
                 self.rtde_c.speedL(xd=list(self.v_ax.values()), acceleration=1.2)
                 self.rtde_c.waitPeriod(start_t)
+                print_cnt += 1
         finally:
             print("end of control... ")
             if not hasattr(self, "rtde_c"): return
             self.rtde_c.speedStop()
             self.rtde_c.stopScript()
+
+    def func_test(self):
+        init_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
+                      deg2rad(-150), deg2rad(-82), deg2rad(0)]
+        self.rtde_c.moveJ(init_joint)
+
+        try:
+            cnt = 0
+            j_spd = [0.0, 0.0, 0.0, 0.0, 0.0, 0.02]
+            for i in range(1000):
+                start_t = self.rtde_c.initPeriod()
+                self.rtde_c.speedJ(j_spd, 1.2, 1.0 / 500)
+                # self.rtde_c.speedL(xd=j_spd, acceleration=1.2)
+                if cnt % 100 == 0:
+                    print(i, j_spd)
+                    print("start_t ", start_t)
+                    cnt = 0
+                cnt += 1
+                self.rtde_c.waitPeriod(start_t)
+        finally:
+            print("prgram end")
+            self.rtde_c.speedStop()
+            self.rtde_c.stopScript()
+        # sec_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
+        #              deg2rad(-150), deg2rad(-82), deg2rad(90)]
+        # self.rtde_c.moveJ(sec_joint)
+        # self.rtde_c.moveJ(init_joint)
 
 
 if __name__ == "__main__":
@@ -240,3 +287,4 @@ if __name__ == "__main__":
     # u.vr_handler()
     # u.workspace_verify()
     u.run_vr_teleop()
+    # u.func_test()

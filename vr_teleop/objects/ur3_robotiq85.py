@@ -14,14 +14,13 @@ def compute_grasp_transforms(hand_rot, hand_pos, ur3_local_grasp_rot, ur3_local_
 
 class IsaacUR3(BaseObject):
     def __init__(self, isaac_elem, vr_elem):
-        self.vr = vr_elem.vr
-        self.rot = vr_elem.rot
-        self.trk_btn_trans = vr_elem.trk_btn_trans
-        self.trk_btn_toggle = vr_elem.trk_btn_toggle
+        self.vr = vr_elem
         super().__init__(isaac_elem)
 
         self.print_duration = 1000  # ms
         self.start_time = time.time()
+
+        self.grip_toggle = 1
 
         self.basis = quat_from_euler_xyz(torch.tensor(deg2rad(90), device=self.device),
                                          torch.tensor(deg2rad(0), device=self.device),
@@ -343,34 +342,19 @@ class IsaacUR3(BaseObject):
         return json_parsed
 
     def vr_handler(self, goal):
-        if not self.vr: return
-        d = self.vr.devices["controller_1"].get_controller_inputs()
-        if d['trigger']:
-            pv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
-            av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
-            # av = np.array([v for v in vr_teleop.devices["controller_1"].get_pose_quaternion()]) * 1.0        # absolute
+        cont_status = self.vr.get_controller_status()
 
-            pv = torch.matmul(self.rot, torch.tensor(pv).unsqueeze(0).T)
-            av = torch.tensor(av).unsqueeze(0)
-            _q = mat_to_quat(self.rot.unsqueeze(0))
-            av = quat_apply(_q, av)
+        # position
+        goal[:, :3] = torch.tensor(cont_status["lin_vel"], device=self.device)
 
-            goal[:, :3] = pv.T
-            _quat = quat_from_euler_xyz(roll=av[0, 0], pitch=av[0, 1], yaw=av[0, 2])
-            goal[:, 3:7] = _quat
-            # print("trigger is pushed, ", pv, av)
+        # orientation
+        rot = cont_status["ang_vel"]
+        _quat = quat_from_euler_xyz(rot[0], rot[1], rot[2])
+        goal[:, 3:7] = _quat
 
-            # trackpad button transition check and gripper manipulation
-            self.trk_btn_trans.append(0) if d["trackpad_pressed"] else self.trk_btn_trans.append(1)
-            if len(self.trk_btn_trans) > 2: self.trk_btn_trans.pop(0)
-
-            if len(self.trk_btn_trans) > 1:
-                a, b = self.trk_btn_trans
-                if (b - a) < 0:
-                    self.trk_btn_toggle = 0 if self.trk_btn_toggle else 1
-                    print("track pad button pushed, ", self.trk_btn_toggle)
-        goal[:, 7] = self.trk_btn_toggle
-        # return goal
+        # gripper action
+        if cont_status["btn_gripper"]: self.grip_toggle ^= 1
+        goal[:, 7] = self.grip_toggle
 
     def move(self):
         self.compute_obs()
