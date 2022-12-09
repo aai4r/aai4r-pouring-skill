@@ -215,7 +215,7 @@ class RealUR3:
                 tcp_q = torch.cat((_tcp_q[1:], _tcp_q[0].unsqueeze(0)))
 
                 # get velocity command from VR
-                cont_status = self.vr.get_controller_velocity()
+                cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
                     self.rtde_c.speedStop()
                     self.rtde_c.moveJ(init_joint)

@@ -79,7 +79,7 @@ class VRWrapper:
 
         # button status
         controller_status = {"lin_vel": lv, "ang_vel": av, "pose_quat": pq,
-                             "btn_gripper": False, "btn_reset_pose": False}
+                             "btn_trigger": False, "btn_gripper": False, "btn_reset_pose": False}
         if d['trigger']:
             lv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
             av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
@@ -91,12 +91,13 @@ class VRWrapper:
             av = quat_apply(_rq, av).squeeze(0).numpy()
 
             _pq = torch.tensor(pq[3:]).unsqueeze(0)
-            pq = _pq.squeeze(0).numpy()  # TODO
-            # pq = quat_mul(_rq, _pq).squeeze(0).numpy()
+            # pq = _pq.squeeze(0).numpy()  # TODO
+            pq = quat_mul(_rq, _pq).squeeze(0).numpy()
 
             controller_status["lin_vel"] = lv
             controller_status["ang_vel"] = av
             controller_status["pose_quat"] = pq
+            controller_status["btn_trigger"] = True
             controller_status["btn_gripper"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
             controller_status["btn_reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
         return controller_status

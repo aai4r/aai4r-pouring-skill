@@ -45,6 +45,8 @@ class SimVR:
             sim_params.physx.num_velocity_iterations = 1
             sim_params.physx.num_threads = self.args.num_threads = 4
             sim_params.physx.use_gpu = self.args.use_gpu
+            sim_params.up_axis = gymapi.UpAxis.UP_AXIS_Z
+            print("Up Axis!!  ", sim_params.up_axis)
 
         sim_params.use_gpu_pipeline = False
         if self.args.use_gpu_pipeline:
@@ -61,7 +63,7 @@ class SimVR:
 
         _isaac = IsaacElement(gym=self.gym, viewer=self.viewer, sim=self.sim, env=self.env, num_envs=self.num_envs,
                               device=self.device, asset_root=self.asset_root)
-        _vr = VRWrapper(device=self.device, rot_d=(0.0, 89.9, 0.0))
+        _vr = VRWrapper(device=self.device, rot_d=self.cfg.rot_d) if self.cfg.vr_on else None
         self.obj = self.cfg.target_obj(isaac_elem=_isaac, vr_elem=_vr)
 
         if self.cfg.socket_open:
@@ -72,6 +74,7 @@ class SimVR:
     def init_env(self):
         # add ground plane
         plane_params = gymapi.PlaneParams()
+        plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)    # Z-up
         self.gym.add_ground(self.sim, plane_params)
 
         # subscribe to input events. This allows input to be used to interact
@@ -81,8 +84,9 @@ class SimVR:
         # viewer camera setting
         # cam_pos = gymapi.Vec3(3.58, 1.58, 0.0)  # third person view
         # cam_pos = gymapi.Vec3(-0.202553, 0.890771, -0.211403)  # tele.op. view
-        cam_pos = gymapi.Vec3(0.223259, 0.694804, 0.573643)
-        cam_target = gymapi.Vec3(-0.2, 0.0, 0.0)
+        # cam_pos = gymapi.Vec3(0.223259, 0.694804, 0.573643)
+        cam_pos = gymapi.Vec3(0.5, 0.5, 0.5)
+        cam_target = gymapi.Vec3(-0.0, 0.0, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
         # set up the grid of environments
@@ -183,8 +187,9 @@ class SimVR:
 
 
 if __name__ == "__main__":
-    target_list = [Cube, IsaacUR3]
-    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=IsaacUR3)
+    target = IsaacUR3   # Cube or IsaacUR3
+    rot_dict = {Cube: (0.0, -89.9, 0.0), IsaacUR3: (0.0, 89.9, 0.0)}
+    cfg = AttrDict(vr_on=False, socket_open=True, target_obj=target, rot_d=rot_dict[target])
     sv = SimVR(cfg=cfg)
     sv.run()
 

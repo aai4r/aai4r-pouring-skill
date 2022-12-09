@@ -190,11 +190,11 @@ def orientation_check():
 
 def quat_orientation_check():
     ref_axis_angle = torch.tensor([1.201, 1.219, 1.218])  # -90, 90, 180
+    ref_axis_angle = torch.tensor([1.57, 0.0, 0.0])  # -90, 90, 180
     target_axis_angle = torch.tensor([2.226, 0.016, 2.227])  # -90, 90, -90
 
     # ref_axis_angle = torch.tensor([0.0, 0.0, 0.0])  # 0, 0, 0
     # target_axis_angle = tr.quaternion_to_axis_angle(torch.tensor([0.5, 0.5, -0.5, 0.5]))  # 0, 0, 90
-
 
     rq = quat_to_real_last(tr.axis_angle_to_quaternion(ref_axis_angle))
     tq = quat_to_real_last(tr.axis_angle_to_quaternion(target_axis_angle))

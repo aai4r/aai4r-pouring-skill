@@ -319,7 +319,7 @@
   <!-- Frame coincident with all-zeros TCP on UR controller -->
   <link name="tool0"/>
   <joint name="wrist_3_link-tool0_fixed_joint" type="fixed">
-    <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/> <!-- <origin rpy="-1.57079632679 0 0" xyz="0 0.0819 0"/> -->
+    <origin rpy="0 0 0" xyz="0 0 0"/> <!-- <origin rpy="-1.57079632679 0 0" xyz="0 0.0819 0"/> -->
     <parent link="ee_link"/>
     <child link="tool0"/>
   </joint>
@@ -351,7 +351,7 @@
     </inertial>
   </link>
   <joint name="robotiq_coupler_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0"/> <!--    <origin rpy="0 0 -1.57079632679" xyz="0 0 0.004"/>-->
+    <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/> <!--    <origin rpy="0 0 -1.57079632679" xyz="0 0 0.004"/>-->
     <parent link="tool0"/>
     <child link="robotiq_coupler"/>
   </joint>

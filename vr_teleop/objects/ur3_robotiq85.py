@@ -20,11 +20,21 @@ class IsaacUR3(BaseObject):
         self.print_duration = 1000  # ms
         self.start_time = time.time()
 
+        self.vr_q = torch.tensor([-0.0925,  0.7021, -0.6983,  0.1041], device=self.device)
         self.grip_toggle = 1
 
-        self.basis = quat_from_euler_xyz(torch.tensor(deg2rad(90), device=self.device),
-                                         torch.tensor(deg2rad(0), device=self.device),
-                                         torch.tensor(deg2rad(0), device=self.device)).unsqueeze(0)
+        self.basisX = to_torch([0.0, 0.0, 0.0])
+        self.basisR = to_torch([0.0, 0.0, 0.0, 1.0])
+
+        self.count = 0
+
+    def timer_count(self, due):
+        self.count += 1
+        assert isinstance(due, int)
+        if self.count % due == 0:
+            self.count = 0
+            return True
+        return False
 
     def _create(self):
         ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
@@ -43,7 +53,7 @@ class IsaacUR3(BaseObject):
         print("ur3 link dictionary: ", ur3_link_dict)
 
         self.ur3_default_dof_pos = to_torch(
-            [deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
+            [deg2rad(0.0), deg2rad(-90.0), deg2rad(-110.0), deg2rad(-160.0), deg2rad(-90.0), deg2rad(0.0),
              deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
         # self.ur3_default_dof_pos = to_torch(
         #     [deg2rad(-30.0), deg2rad(-60.0), deg2rad(80.0), deg2rad(-117.0), deg2rad(-90.0), deg2rad(-25.0),
@@ -78,9 +88,9 @@ class IsaacUR3(BaseObject):
         # correct the ur3 base
         rot = quat_mul(to_torch([ur3_start_pose.r.x, ur3_start_pose.r.y,
                                  ur3_start_pose.r.z, ur3_start_pose.r.w], device=self.device),
-                       quat_from_euler_xyz(torch.tensor(deg2rad(-90), device=self.device),
-                                           torch.tensor(deg2rad(180), device=self.device),
-                                           torch.tensor(deg2rad(0), device=self.device)))
+                       quat_from_euler_xyz(torch.tensor(deg2rad(0), device=self.device),  # -90
+                                           torch.tensor(deg2rad(0), device=self.device),  # 180
+                                           torch.tensor(deg2rad(180), device=self.device)))
         ur3_start_pose.r = gymapi.Quat(rot[0], rot[1], rot[2], rot[3])
         self.ur3_handle = self.gym.create_actor(self.env, ur3_asset, ur3_start_pose, "ur3", 0, 1)
         self.gym.set_actor_dof_properties(self.env, self.ur3_handle, ur3_dof_props)
@@ -105,7 +115,7 @@ class IsaacUR3(BaseObject):
         self.global_indices = torch.arange(self.num_envs * self.num_actors, dtype=torch.int32,
                                            device=self.device).view(self.num_envs, -1)
 
-        self.hand_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle, "ee_link")
+        self.hand_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle, "tool0")
         self.lfinger_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle,
                                                                     "robotiq_85_left_finger_tip_link")
         self.rfinger_handle = self.gym.find_actor_rigid_body_handle(self.env, self.ur3_handle,
@@ -117,11 +127,11 @@ class IsaacUR3(BaseObject):
 
         finger_pose = gymapi.Transform()
         finger_pose.p = (lfinger_pose.p + rfinger_pose.p) * 0.5
-        finger_pose.r = lfinger_pose.r
+        finger_pose.r = gymapi.Quat(0.707, 0.0, 0.0, 0.707)
 
         hand_pose_inv = hand_pose.inverse()
         grasp_pose_axis = 2  # z-axis
-        fwd_offset = 0.02
+        fwd_offset = 0.0225
         ur3_local_grasp_pose = hand_pose_inv * finger_pose
         ur3_local_grasp_pose.p += gymapi.Vec3(*get_axis_params(fwd_offset, grasp_pose_axis))
         self.ur3_local_grasp_pos = to_torch([ur3_local_grasp_pose.p.x, ur3_local_grasp_pose.p.y,
@@ -279,8 +289,6 @@ class IsaacUR3(BaseObject):
         hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
 
         self.ur3_ee_pos, self.ur3_ee_rot = hand_pos, hand_rot
-        # self.ur3_ee_pos = quat_apply(self.basis, hand_pos)
-        # self.ur3_ee_rot = quat_mul(self.basis, hand_rot)
 
         self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
             compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
@@ -347,10 +355,25 @@ class IsaacUR3(BaseObject):
         # position
         goal[:, :3] = torch.tensor(cont_status["lin_vel"], device=self.device)
 
-        # orientation
-        rot = cont_status["ang_vel"]
-        _quat = quat_from_euler_xyz(rot[0], rot[1], rot[2])
-        goal[:, 3:7] = _quat
+        # orientation (relative)
+        if cont_status["btn_trigger"]:
+            self.vr_q = torch.tensor(cont_status["pose_quat"], device=self.device)
+        s = 10.0
+        curr = self.ur3_grasp_rot
+        if self.timer_count(due=50):
+            print("ur3 pos ", self.ur3_grasp_pos)
+            print("ur3 rot ", curr)
+            print("dof: ", self.ur3_dof_pos)
+        dq = quat_mul(self.vr_q.unsqueeze(0), quat_conjugate(curr)).squeeze(0)
+        # dq = orientation_error(desired=self.vr_q.unsqueeze(0), current=curr).squeeze(0) * s
+        # goal[:, 3:7] = dq
+
+        # # orientation (absolute)
+        # des_q = goal[:, 3:7]
+        # curr = torch.tensor(cont_status["pose_quat"], device=self.device).unsqueeze(0)
+        # dq = quat_mul(des_q, quat_conjugate(curr))
+        # # dq = orientation_error(desired=rot, current=goal[:, 3:7])
+        # goal[:, 3:7] = quat_mul(des_q, dq)
 
         # gripper action
         if cont_status["btn_gripper"]: self.grip_toggle ^= 1
@@ -358,9 +381,14 @@ class IsaacUR3(BaseObject):
 
     def move(self):
         self.compute_obs()
+        if self.timer_count(due=50):
+            print("ur3 grasp pos ", self.ur3_grasp_pos)
+            print("ur3 ee pos ", self.ur3_ee_pos)
+            print("dof: ", self.ur3_dof_pos)
+
         goal = torch.zeros(1, 8, device=self.device)
         goal[:, -2:] = 1.0
-        self.vr_handler(goal=goal)
+        if self.vr: self.vr_handler(goal=goal)
 
         state = self.gym.get_actor_rigid_body_states(self.env, self.ur3_handle, gymapi.STATE_NONE)
 
@@ -384,8 +412,6 @@ class IsaacUR3(BaseObject):
 
         # self.gym.set_actor_rigid_body_states(self.env, self.ur3_handle, state, gymapi.STATE_ALL)
 
-        # ar_pos = [np.asarray(state['pose']['p'][0].tolist()), self.ur3_grasp_pos[0].cpu().numpy()]
-        # ar_rot = [np.asarray(state['pose']['r'][0].tolist()), self.ur3_grasp_rot[0].cpu().numpy()]
-        ar_pos = [np.asarray(state['pose']['p'][0].tolist()), self.ur3_ee_pos[0].cpu().numpy()]
-        ar_rot = [np.asarray(state['pose']['r'][0].tolist()), self.ur3_ee_rot[0].cpu().numpy()]
+        ar_pos = [self.basisX, self.ur3_ee_pos[0].cpu().numpy(), self.ur3_grasp_pos[0].cpu().numpy()]
+        ar_rot = [self.basisR, self.ur3_ee_rot[0].cpu().numpy(), self.ur3_grasp_rot[0].cpu().numpy()]
         self.draw_coord(pos=ar_pos, rot=ar_rot)
