@@ -257,10 +257,12 @@ class IsaacUR3(BaseObject):
             orn_err = orientation_error(quat_unit(goal_rot), self.ur3_grasp_rot)    # with quaternion normalize
         else:   # relative
             pos_err = goal_pos
-            unit_quat = torch.zeros_like(goal_rot, device=self.device, dtype=torch.float)
-            unit_quat[:, -1] = 1.0
-            orn_err = orientation_error(quat_unit(goal_rot), unit_quat)    # unit_quat
+            # unit_quat = torch.zeros_like(goal_rot, device=self.device, dtype=torch.float)
+            # unit_quat[:, -1] = 1.0
+            # orn_err = orientation_error(quat_unit(goal_rot), unit_quat)    # unit_quat
             # orn_err = orientation_error(quat_unit(goal_rot), self.ur3_grasp_rot)  # unit_quat
+            orn_err = orientation_error(quat_unit(goal_rot), self.ur3_grasp_rot)  # with quaternion normalize
+            # orn_err = torch.zeros_like(pos_err)
 
         dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
 
@@ -355,25 +357,16 @@ class IsaacUR3(BaseObject):
         # position
         goal[:, :3] = torch.tensor(cont_status["lin_vel"], device=self.device)
 
-        # orientation (relative)
+        # orientation
+        self.vr_q = self.ur3_grasp_rot
         if cont_status["btn_trigger"]:
             self.vr_q = torch.tensor(cont_status["pose_quat"], device=self.device)
-        s = 10.0
-        curr = self.ur3_grasp_rot
         if self.timer_count(due=50):
-            print("ur3 pos ", self.ur3_grasp_pos)
-            print("ur3 rot ", curr)
-            print("dof: ", self.ur3_dof_pos)
-        dq = quat_mul(self.vr_q.unsqueeze(0), quat_conjugate(curr)).squeeze(0)
-        # dq = orientation_error(desired=self.vr_q.unsqueeze(0), current=curr).squeeze(0) * s
-        # goal[:, 3:7] = dq
-
-        # # orientation (absolute)
-        # des_q = goal[:, 3:7]
-        # curr = torch.tensor(cont_status["pose_quat"], device=self.device).unsqueeze(0)
-        # dq = quat_mul(des_q, quat_conjugate(curr))
-        # # dq = orientation_error(desired=rot, current=goal[:, 3:7])
-        # goal[:, 3:7] = quat_mul(des_q, dq)
+            print(cont_status)
+            # print("ur3 grasp pos ", self.ur3_grasp_pos)
+            # print("ur3 rot ", curr)
+            # print("dof: ", self.ur3_dof_pos)
+        goal[:, 3:7] = self.vr_q
 
         # gripper action
         if cont_status["btn_gripper"]: self.grip_toggle ^= 1
@@ -381,16 +374,10 @@ class IsaacUR3(BaseObject):
 
     def move(self):
         self.compute_obs()
-        if self.timer_count(due=50):
-            print("ur3 grasp pos ", self.ur3_grasp_pos)
-            print("ur3 ee pos ", self.ur3_ee_pos)
-            print("dof: ", self.ur3_dof_pos)
-
         goal = torch.zeros(1, 8, device=self.device)
-        goal[:, -2:] = 1.0
+        goal[:, 3:7] = self.ur3_grasp_rot      # absolute orientation
+        goal[:, 7] = 1.0                       # gripper
         if self.vr: self.vr_handler(goal=goal)
-
-        state = self.gym.get_actor_rigid_body_states(self.env, self.ur3_handle, gymapi.STATE_NONE)
 
         _actions = self.solve(goal_pos=goal[:, :3], goal_rot=goal[:, 3:7], goal_grip=goal[:, 7], absolute=False)
         dt = 1 / 30
@@ -401,9 +388,9 @@ class IsaacUR3(BaseObject):
         actions[:, :6] = _actions[:, :6]
 
         # gripper angles
-        drv = _actions[:, -1]
-        actions[:, 6] = actions[:, 8] = actions[:, 9] = actions[:, 11] = drv
-        actions[:, 7] = actions[:, 11] = -1 * drv
+        drive = _actions[:, -1]
+        actions[:, 6] = actions[:, 8] = actions[:, 9] = actions[:, 11] = drive
+        actions[:, 7] = actions[:, 11] = -1 * drive
 
         targets = self.ur3_dof_pos + dt * actions * action_scale
         self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)

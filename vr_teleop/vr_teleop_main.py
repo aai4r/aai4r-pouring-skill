@@ -85,8 +85,8 @@ class SimVR:
         # cam_pos = gymapi.Vec3(3.58, 1.58, 0.0)  # third person view
         # cam_pos = gymapi.Vec3(-0.202553, 0.890771, -0.211403)  # tele.op. view
         # cam_pos = gymapi.Vec3(0.223259, 0.694804, 0.573643)
-        cam_pos = gymapi.Vec3(0.5, 0.5, 0.5)
-        cam_target = gymapi.Vec3(-0.0, 0.0, 0.0)
+        cam_pos = gymapi.Vec3(-0.8, 0.8, 1.0)
+        cam_target = gymapi.Vec3(1.0, 0.0, 0.0)
         self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
         # set up the grid of environments
@@ -188,8 +188,8 @@ class SimVR:
 
 if __name__ == "__main__":
     target = IsaacUR3   # Cube or IsaacUR3
-    rot_dict = {Cube: (0.0, -89.9, 0.0), IsaacUR3: (0.0, 89.9, 0.0)}
-    cfg = AttrDict(vr_on=False, socket_open=True, target_obj=target, rot_d=rot_dict[target])
+    rot_dict = {Cube: (-89.9, 0.0, 89.9), IsaacUR3: (-89.9, 0.0, 89.9)}
+    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target, rot_d=rot_dict[target])
     sv = SimVR(cfg=cfg)
     sv.run()
 

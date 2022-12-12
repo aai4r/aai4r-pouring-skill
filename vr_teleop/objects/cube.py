@@ -24,7 +24,7 @@ class Cube(BaseObject):
         cube_asset = self.gym.create_box(self.sim, 0.5, 0.5, 0.5, cube_asset_options)
 
         init_pose = gymapi.Transform()
-        init_pose.p = gymapi.Vec3(0.0, 0.25, 0.0)
+        init_pose.p = gymapi.Vec3(0.0, 0.0, 0.6)
         init_pose.r = gymapi.Quat(0, 0, 0, 1)
         self.cube_handle = self.gym.create_actor(self.env, cube_asset, init_pose, "cube", -1, 0)
 
@@ -37,7 +37,7 @@ class Cube(BaseObject):
         self.cube_initial_state = np.copy(self.gym.get_sim_rigid_body_states(self.sim, gymapi.STATE_ALL))
 
         # set viewer perspective setting
-        self.gym.viewer_camera_look_at(self.viewer, None, gymapi.Vec3(-3.58, 1.58, 0.0), gymapi.Vec3(0.0, 0.0, 0.0))
+        self.gym.viewer_camera_look_at(self.viewer, None, gymapi.Vec3(-3.58, 0.0, 1.0), gymapi.Vec3(0.0, 0.0, 0.0))
 
     def reset(self):
         self.gym.set_sim_rigid_body_states(self.sim, self.cube_initial_state, gymapi.STATE_ALL)

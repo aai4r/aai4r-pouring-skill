@@ -24,6 +24,19 @@ def quat_to_real_last(q_real_first):
     return torch.cat((q_real_first[1:], q_real_first[0].unsqueeze(0)))     # [x, y, z, w]
 
 
+class TimerCount:
+    def __init__(self, duration):
+        self.count = 0
+        self.duration = duration
+
+    def elapsed(self):
+        self.count += 1
+        if self.count % self.duration == 0:
+            self.count = 0
+            return True
+        return False
+
+
 class RealUR3:
     def __init__(self):
         self.init_vr()
@@ -45,6 +58,8 @@ class RealUR3:
         self.spd_R_limit = 0.1
         self.ap = 0.9   # low-pass filter
 
+        self.timer = TimerCount(duration=20)
+
         # for geometry calc.
         self.x_axis = torch.tensor([1.0, 0.0, 0.0])
         self.y_axis = torch.tensor([0.0, 1.0, 0.0])
@@ -60,7 +75,7 @@ class RealUR3:
         self.Pyz = (self.yz_plane @ (self.yz_plane.T @ self.yz_plane).inverse()) @ self.yz_plane.T
 
     def init_vr(self):
-        self.vr = VRWrapper(device="cpu", rot_d=(89.99, -89.99, 0.0))
+        self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
 
     def limit_check(self, tcp_p):
         _q = tr.axis_angle_to_quaternion(torch.tensor(tcp_p[3:]))     # [w, x, y, z]
@@ -192,9 +207,15 @@ class RealUR3:
 
     def vr_handler(self):
         while True:
-            cont_status = self.vr.get_controller_velocity()
+            cont_status = self.vr.get_controller_status()
             if cont_status["btn_gripper"]:
-                print(cont_status["pose_quat"])
+                pq = cont_status["pose_quat"]
+                pq = torch.tensor(pq)
+                pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))   # real first
+                aa = tr.quaternion_to_axis_angle(pq)
+
+                print("VR pose: ", pq)
+                print("Axis-angle: ", aa)
 
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
@@ -221,22 +242,35 @@ class RealUR3:
                     self.rtde_c.moveJ(init_joint)
                     continue
 
-                des_pose = [0.507, -0.064, 0.184, 1.155, 1.267, 1.23]
-                dj = self.rtde_c.getInverseKinematics(x=des_pose)
-                acc = 1.2
-                dt = 1.0 / 500
+                # des_pose = [0.507, -0.064, 0.184, 1.155, 1.267, 1.23]
+                # dj = self.rtde_c.getInverseKinematics(x=des_pose)
+                # acc = 1.2
+                # dt = 1.0 / 500
                 # self.rtde_c.speedJ(list(np.array(dj) * 0.001), acc, dt)
                 # self.rtde_c.waitPeriod(start_t)
 
-                if print_cnt % 10 == 0:
-                    print_cnt = 0
-                    print("ik q: ", dj)
-                    # print("tcp_q: ", tcp_q)
-                    # print("actual_tcp_p: ", actual_tcp_p)
-                print_cnt += 1
-                continue
+                # if print_cnt % 10 == 0:
+                #     print_cnt = 0
+                #     print("ik q: ", dj)
+                #     # print("tcp_q: ", tcp_q)
+                #     # print("actual_tcp_p: ", actual_tcp_p)
+                # print_cnt += 1
+                # continue
 
-                self.set_velL(v=list(cont_status["lin_vel"]) + list(cont_status["ang_vel"]))
+                rot = [0.0, 0.0, 0.0]
+                if cont_status["btn_trigger"]:
+                    pq = torch.tensor(cont_status["pose_quat"])
+                    pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))  # real first
+                    aa = tr.quaternion_to_axis_angle(pq)    # desired pose by VR
+                    rot = list((aa - torch.tensor(actual_tcp_p[3:])).numpy())
+                    if self.timer.elapsed():
+                        print("Desired AA: ", aa)
+                        print("Actual AA: ", actual_tcp_p[3:])
+                        print("diff: ", rot)
+                        print("----------------------------------")
+                self.set_velL(v=list(cont_status["lin_vel"]) + rot)
+
+                # self.set_velL(v=list(cont_status["lin_vel"]) + list(cont_status["ang_vel"]))
 
                 lim_flag = self.limit_check(tcp_p=actual_tcp_p)
                 if lim_flag.x_max or lim_flag.x_min: self.v_ax.x *= 0.0
@@ -247,7 +281,6 @@ class RealUR3:
                 if lim_flag.rz_max or lim_flag.rz_min: self.v_ax.rz *= 0.0
                 self.rtde_c.speedL(xd=list(self.v_ax.values()), acceleration=1.2)
                 self.rtde_c.waitPeriod(start_t)
-                print_cnt += 1
         finally:
             print("end of control... ")
             if not hasattr(self, "rtde_c"): return
