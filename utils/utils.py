@@ -1,9 +1,34 @@
+import time
+
 import numpy as np
 import torch
 from utils.torch_jit_utils import quat_conjugate, quat_mul
 from dataclasses import dataclass
 
 PI = np.pi
+
+
+class CustomTimer:
+    def __init__(self, duration_sec):
+        self.start = time.time()
+        self.last = time.time()
+        self._duration = duration_sec
+
+    @property
+    def elapsed(self):
+        return time.time() - self.start
+
+    @property
+    def timeover_passive(self):
+        return self.elapsed % self._duration >= 0.5 * self._duration
+
+    @property
+    def timeover_active(self):
+        curr = time.time()
+        if (curr - self.last) > self._duration:
+            self.last = curr
+            return True
+        return False
 
 
 def rad2deg(rad):

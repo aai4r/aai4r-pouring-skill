@@ -1,3 +1,5 @@
+from utils.utils import CustomTimer
+from spirl.utils.general_utils import AttrDict
 from .base import *
 import time
 
@@ -17,24 +19,33 @@ class IsaacUR3(BaseObject):
         self.vr = vr_elem
         super().__init__(isaac_elem)
 
-        self.print_duration = 1000  # ms
-        self.start_time = time.time()
-
         self.vr_q = torch.tensor([-0.0925,  0.7021, -0.6983,  0.1041], device=self.device)
         self.grip_toggle = 1
 
         self.basisX = to_torch([0.0, 0.0, 0.0])
         self.basisR = to_torch([0.0, 0.0, 0.0, 1.0])
 
-        self.count = 0
+        self.lim_ax = AttrDict(x_max=0.53, x_min=0.38,
+                               y_max=0.2, y_min=-0.2,
+                               z_max=0.3, z_min=0.07,
+                               rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
+                               ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
+                               rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
 
-    def timer_count(self, due):
-        self.count += 1
-        assert isinstance(due, int)
-        if self.count % due == 0:
-            self.count = 0
-            return True
-        return False
+        # for geometry calc.
+        self.x_axis = torch.tensor([1.0, 0.0, 0.0])
+        self.y_axis = torch.tensor([0.0, 1.0, 0.0])
+        self.z_axis = torch.tensor([0.0, 0.0, 1.0])
+
+        self.xy_plane = torch.stack([self.x_axis, self.y_axis], dim=1)
+        self.xz_plane = torch.stack([self.x_axis, self.z_axis], dim=1)
+        self.yz_plane = torch.stack([self.y_axis, self.z_axis], dim=1)
+
+        self.Pxy = (self.xy_plane @ (self.xy_plane.T @ self.xy_plane).inverse()) @ self.xy_plane.T
+        self.Pxz = (self.xz_plane @ (self.xz_plane.T @ self.xz_plane).inverse()) @ self.xz_plane.T
+        self.Pyz = (self.yz_plane @ (self.yz_plane.T @ self.yz_plane).inverse()) @ self.yz_plane.T
+
+        self.timer = CustomTimer(duration_sec=1.0)
 
     def _create(self):
         ur3_asset_file = "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
@@ -64,10 +75,13 @@ class IsaacUR3(BaseObject):
         self.ur3_zero_dof_pos = torch.zeros_like(self.ur3_default_dof_pos)
 
         # ur3 dof properties
+        self.DRIVE_MODE = gymapi.DOF_MODE_VEL       # DOF_MODE_POS
+        print("Drive mode: ", self.DRIVE_MODE)
         ur3_dof_props = self.gym.get_asset_dof_properties(ur3_asset)
-        ur3_dof_props["driveMode"].fill(gymapi.DOF_MODE_POS)
+        ur3_dof_props["driveMode"].fill(self.DRIVE_MODE)
+
         # ur3 joints
-        ur3_dof_props["stiffness"][:6].fill(300.0)
+        ur3_dof_props["stiffness"][:6].fill(300.0 if self.DRIVE_MODE == gymapi.DOF_MODE_POS else 0.0)
         ur3_dof_props["damping"][:6].fill(80.0)
 
         # robotiq 85 gripper
@@ -171,14 +185,27 @@ class IsaacUR3(BaseObject):
         self.max_grip_rad = torch.tensor(0.80285, device=self.device)
         self.angle_stroke_ratio = self.max_grip_rad / self.gripper_stroke
 
-        # jacobians
         _jacobian = self.gym.acquire_jacobian_tensor(self.sim, "ur3")
         jacobian = gymtorch.wrap_tensor(_jacobian).to(self.device)
 
-        # jacobian entries corresponding to franka hand
-        self.ur3_hand_index = ur3_link_dict["ee_link"]
+        self.ur3_hand_index = ur3_link_dict["tool0"]
         self.j_eef = jacobian[:, self.ur3_hand_index - 1, :]
         self.j_eef = self.j_eef[:, :, :6]  # up to UR3 joints
+
+    def set_dof_MODE_target_tensor_indexed(self):
+        robot_indices32 = self.global_indices[:1].flatten()
+        if self.DRIVE_MODE == gymapi.DOF_MODE_VEL:
+            self.gym.set_dof_velocity_target_tensor_indexed(self.sim,
+                                                            gymtorch.unwrap_tensor(self.ur3_dof_targets),
+                                                            gymtorch.unwrap_tensor(robot_indices32),
+                                                            len(robot_indices32))
+        elif self.DRIVE_MODE == gymapi.DOF_MODE_POS:
+            self.gym.set_dof_position_target_tensor_indexed(self.sim,
+                                                            gymtorch.unwrap_tensor(self.ur3_dof_targets),
+                                                            gymtorch.unwrap_tensor(robot_indices32),
+                                                            len(robot_indices32))
+        else:
+            raise NotImplementedError("NOT supported drive mode")
 
     def reset(self):
         print("ur3 reset!")
@@ -198,11 +225,8 @@ class IsaacUR3(BaseObject):
         self.ur3_dof_pos[id, 10] = -1. * self.ur3_dof_pos[id, 8]
         self.ur3_dof_pos[id, 11] = 1 * self.ur3_dof_pos[id, 8]
 
+        self.set_dof_MODE_target_tensor_indexed()
         robot_indices32 = self.global_indices[:1].flatten()
-        self.gym.set_dof_position_target_tensor_indexed(self.sim,
-                                                        gymtorch.unwrap_tensor(self.ur3_dof_targets),
-                                                        gymtorch.unwrap_tensor(robot_indices32),
-                                                        len(robot_indices32))
         self.gym.set_dof_state_tensor_indexed(self.sim,
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(robot_indices32), len(robot_indices32))
@@ -246,15 +270,15 @@ class IsaacUR3(BaseObject):
         return tensor_clamp(temp, to_torch(0.0, device=self.device), to_torch(self.gripper_stroke, device=self.device))
 
     def solve(self, goal_pos, goal_rot, goal_grip, absolute=False):
-        hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
-        hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
-
-        self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
-            compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
+        # hand_pos = self.rigid_body_states[:, self.hand_handle][:, 0:3]
+        # hand_rot = self.rigid_body_states[:, self.hand_handle][:, 3:7]
+        #
+        # self.ur3_grasp_rot[:], self.ur3_grasp_pos[:] = \
+        #     compute_grasp_transforms(hand_rot, hand_pos, self.ur3_local_grasp_rot, self.ur3_local_grasp_pos)
 
         if absolute:
             pos_err = goal_pos - self.ur3_grasp_pos
-            orn_err = orientation_error(quat_unit(goal_rot), self.ur3_grasp_rot)    # with quaternion normalize
+            orn_err = orientation_error(goal_rot, self.ur3_grasp_rot)    # with quaternion normalize
         else:   # relative
             pos_err = goal_pos
             # unit_quat = torch.zeros_like(goal_rot, device=self.device, dtype=torch.float)
@@ -355,14 +379,14 @@ class IsaacUR3(BaseObject):
         cont_status = self.vr.get_controller_status()
 
         # position
-        goal[:, :3] = torch.tensor(cont_status["lin_vel"], device=self.device)
+        goal[:, :3] += torch.tensor(cont_status["lin_vel"], device=self.device)
 
         # orientation
         self.vr_q = self.ur3_grasp_rot
         if cont_status["btn_trigger"]:
             self.vr_q = torch.tensor(cont_status["pose_quat"], device=self.device)
-        if self.timer_count(due=50):
-            print(cont_status)
+        # if self.timer.timeover_active:
+        #     print(cont_status)
             # print("ur3 grasp pos ", self.ur3_grasp_pos)
             # print("ur3 rot ", curr)
             # print("dof: ", self.ur3_dof_pos)
@@ -374,29 +398,47 @@ class IsaacUR3(BaseObject):
 
     def move(self):
         self.compute_obs()
+        # relX: [dx, dy, dz] + absR: [x, y, z, w] + absG: [g]
         goal = torch.zeros(1, 8, device=self.device)
-        goal[:, 3:7] = self.ur3_grasp_rot      # absolute orientation
+        # goal[:, :3] = torch.tensor([0.4, 0.0, 0.3], device=self.device)
+        # goal[:, 3:7] = torch.tensor([-0.5282, -0.2081, -0.6655, -0.4842], device=self.device)
+        goal[:, :3] = self.ur3_grasp_pos
+        goal[:, 3:7] = self.ur3_grasp_rot
         goal[:, 7] = 1.0                       # gripper
         if self.vr: self.vr_handler(goal=goal)
 
-        _actions = self.solve(goal_pos=goal[:, :3], goal_rot=goal[:, 3:7], goal_grip=goal[:, 7], absolute=False)
-        dt = 1 / 30
-        action_scale = 10.0
+        _goal_j = self.solve(goal_pos=goal[:, :3], goal_rot=goal[:, 3:7], goal_grip=goal[:, 7], absolute=True)
+        goal_j = torch.zeros_like(self.ur3_dof_pos)
+        goal_j[:, :6] = _goal_j[:, :6]
+        goal_j[:, 6] = goal_j[:, 8] = goal_j[:, 9] = goal_j[:, 11] = _goal_j[:, -1]
+        goal_j[:, 7] = goal_j[:, 11] = -1 * goal_j[:, -1]
+        diff_j = goal_j - self.ur3_dof_pos
+        # self.ur3_dof_targets = self.ur3_dof_targets + goal_j * (1/30)     # POS mode
+        self.ur3_dof_targets = goal_j
 
-        # joint angles
-        actions = torch.zeros_like(self.ur3_dof_pos)
-        actions[:, :6] = _actions[:, :6]
+        # # joint angles
+        # actions = torch.zeros_like(self.ur3_dof_pos)
+        # actions[:, :6] = _actions[:, :6]
 
-        # gripper angles
-        drive = _actions[:, -1]
-        actions[:, 6] = actions[:, 8] = actions[:, 9] = actions[:, 11] = drive
-        actions[:, 7] = actions[:, 11] = -1 * drive
+        # # gripper angles
+        # drive = _actions[:, -1]
+        # actions[:, 6] = actions[:, 8] = actions[:, 9] = actions[:, 11] = drive
+        # actions[:, 7] = actions[:, 11] = -1 * drive
 
-        targets = self.ur3_dof_pos + dt * actions * action_scale
-        self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
+        # self.ur3_dof_targets[0, 0] = deg2rad(10)
+        if self.timer.timeover_active:
+            print("---------------------------")
+            print("ur3 grasp pos ", self.ur3_grasp_pos)
+            print("ur3 grasp rot ", self.ur3_grasp_rot)
+            print("ur3 dof pos ", self.ur3_dof_pos)
+            print("ur3 dof targets: ", self.ur3_dof_targets)
+            print("diff_j: ", diff_j)
+        # targets = self.ur3_dof_pos + dt * actions * action_scale
+        # self.ur3_dof_targets = tensor_clamp(targets, self.ur3_dof_lower_limits, self.ur3_dof_upper_limits)
         # print("dof targets: ", self.ur3_dof_targets)
-        self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.ur3_dof_targets))
+        # self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self.ur3_dof_targets))
 
+        self.set_dof_MODE_target_tensor_indexed()
         # self.gym.set_actor_rigid_body_states(self.env, self.ur3_handle, state, gymapi.STATE_ALL)
 
         ar_pos = [self.basisX, self.ur3_ee_pos[0].cpu().numpy(), self.ur3_grasp_pos[0].cpu().numpy()]

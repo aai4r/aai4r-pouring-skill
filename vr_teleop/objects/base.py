@@ -1,4 +1,5 @@
 import copy
+import time
 
 import isaacgym
 from utils.utils import *
@@ -71,6 +72,7 @@ class VRWrapper:
 
         self.trk_btn = ButtonPressedEventHandler()
         self.menu_btn = ButtonPressedEventHandler()
+        self.prev_time = time.time()
 
     def get_controller_status(self):
         d = self.vr.devices["controller_1"].get_controller_inputs()
@@ -80,9 +82,11 @@ class VRWrapper:
 
         # button status
         controller_status = {"lin_vel": lv, "ang_vel": av, "pose_quat": pq,
-                             "btn_trigger": False, "btn_gripper": False, "btn_reset_pose": False}
+                             "btn_trigger": False, "btn_gripper": False, "btn_reset_pose": False,
+                             "dt": time.time() - self.prev_time}
+        self.prev_time = time.time()
         if d['trigger']:
-            lv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0
+            lv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0    # m/s
             av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
             pq = np.array([v for v in self.vr.devices["controller_1"].get_pose_quaternion()])         # absolute
 

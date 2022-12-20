@@ -205,9 +205,9 @@ def quat_orientation_check():
 
 
 if __name__ == "__main__":
-    quat_orientation_check()
+    # quat_orientation_check()
     # real_ur3_socket_test()
     # real_ur3_rtde_test()
-    # gripper_test()
+    gripper_test()
     # orientation_check()
 
