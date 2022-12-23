@@ -72,6 +72,7 @@ class VRWrapper:
 
         self.trk_btn = ButtonPressedEventHandler()
         self.menu_btn = ButtonPressedEventHandler()
+        self.mode_btn = ButtonPressedEventHandler()
         self.prev_time = time.time()
 
     def get_controller_status(self):
@@ -83,6 +84,7 @@ class VRWrapper:
         # button status
         controller_status = {"lin_vel": lv, "ang_vel": av, "pose_quat": pq,
                              "btn_trigger": False, "btn_gripper": False, "btn_reset_pose": False,
+                             "trk_x": None, "trk_y": None,
                              "dt": time.time() - self.prev_time}
         self.prev_time = time.time()
         if d['trigger']:
@@ -106,7 +108,12 @@ class VRWrapper:
             controller_status["ang_vel"] = av
             controller_status["pose_quat"] = pq
             controller_status["btn_trigger"] = True
-            controller_status["btn_gripper"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
+            controller_status["btn_trackpad"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
+            x, y = d["trackpad_x"], d["trackpad_y"]
+            controller_status["trk_x"] = x
+            controller_status["trk_y"] = y
+            controller_status["btn_gripper"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (y < -0.6)
+            controller_status["btn_control_mode"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (0.6 < y)
             controller_status["btn_reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
         return controller_status
 

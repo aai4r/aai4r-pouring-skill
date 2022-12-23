@@ -39,6 +39,16 @@ def deg2rad(deg):
     return deg * (PI / 180.0)
 
 
+def quaternion_real_first(q):
+    assert torch.is_tensor(q)
+    return torch.cat((q[-1].unsqueeze(0), q[:3]))   # [w, x, y, z], real first
+
+
+def quaternion_real_last(q):
+    assert torch.is_tensor(q)
+    return torch.cat((q[1:], q[0].unsqueeze(0)))  # [x, y, z, w], real last
+
+
 def euler_to_mat3d(roll, pitch, yaw):    # radian input
     rx = torch.tensor([[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]])
     ry = torch.tensor([[np.cos(pitch), 0, np.sin(pitch)], [0, 1, 0], [-np.sin(pitch), 0, np.cos(pitch)]])

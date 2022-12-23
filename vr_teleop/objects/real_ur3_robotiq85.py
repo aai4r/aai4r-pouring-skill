@@ -2,6 +2,8 @@ import os.path
 import time
 import sys
 
+import numpy as np
+
 from utils.torch_jit_utils import *
 import torch
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -11,19 +13,22 @@ import rtde_receive
 from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripper
 
 from spirl.utils.general_utils import AttrDict
-from utils.utils import euler_to_mat3d, orientation_error, rad2deg, deg2rad, CustomTimer
+from utils.utils import euler_to_mat3d, orientation_error, rad2deg, deg2rad, CustomTimer, \
+    quaternion_real_first, quaternion_real_last
 from pytorch3d import transforms as tr
 from base import VRWrapper
 
 
-def quat_to_real_last(q_real_first):
-    return torch.cat((q_real_first[1:], q_real_first[0].unsqueeze(0)))     # [x, y, z, w]
+def to_n_pi_pi(rad):     # [0, 2*pi] --> [-pi, pi]
+    if rad > 0:
+        return rad - (2 * np.pi) if rad >= np.pi else rad
+    else:
+        return rad + (2 * np.pi) if rad <= np.pi else rad
 
 
-class RealUR3:
-    def __init__(self):
-        self.init_vr()
-        self.HOST = "192.168.0.75"
+class BaseRTDE:
+    def __init__(self, HOST):
+        self.HOST = HOST
 
         self.rtde_c = rtde_control.RTDEControlInterface(self.HOST)
         self.rtde_r = rtde_receive.RTDEReceiveInterface(self.HOST)
@@ -31,25 +36,50 @@ class RealUR3:
         # gripper control
         self.gripper = RobotiqGripper(self.rtde_c)
         self.gripper.activate()
-        self.gripper.set_force(0)   # range: [0, 100]
+        self.gripper.set_force(0)  # range: [0, 100]
         self.gripper.set_speed(10)  # range: [0, 100]
         self.grip_on = False
 
-        self.default_control_params = AttrDict(speed=0.25, acceleration=1.2, blend=0.099)
-        self.lim_ax = AttrDict(x_max=0.53, x_min=0.38,
-                               y_max=0.2, y_min=-0.2,
-                               z_max=0.3, z_min=0.07,
-                               rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
-                               ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
-                               rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
+        self.default_control_params = AttrDict(speed=0.25, acceleration=1.2, blend=0.099, dt=1.0 / 500.0)
 
-        self.v_ax = AttrDict(x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0)   # desired velocity of each axis
-        self.spd_X_limit = 0.08
-        self.spd_R_limit = 0.1
-        self.ap = 0.9   # low-pass filter
+    @property
+    def dt(self):
+        return self.default_control_params.dt
 
-        self.timer = CustomTimer(duration_sec=0.5)
-        self.dt = 0.0
+    @property
+    def acc(self):
+        return self.default_control_params.acceleration
+
+
+class UR3ControlMode:
+    def __init__(self, init_mode="forward"):
+        self.cmodes = ["forward", "downward"]
+        self.CONTROL_MODE = init_mode
+        print("Initial control mode: ", self.CONTROL_MODE)
+
+        self._iposes = AttrDict()
+        self._limits = AttrDict()
+        self._rpy_base = AttrDict()
+
+        self._limits.forward = AttrDict(x_max=0.53, x_min=0.38,
+                                        y_max=0.2, y_min=-0.2,
+                                        z_max=0.3, z_min=0.07,
+                                        rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
+                                        ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
+                                        rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
+
+        self._limits.downward = AttrDict(x_max=0.47, x_min=0.21,
+                                         y_max=0.18, y_min=-0.18,
+                                         z_max=0.15, z_min=0.035,
+                                         rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
+                                         ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
+                                         rz_max=deg2rad(10.0), rz_min=deg2rad(-10.0))
+
+        self._iposes.forward = [deg2rad(0), deg2rad(-80), deg2rad(-115), deg2rad(-165), deg2rad(-90), deg2rad(0)]
+        self._iposes.downward = [deg2rad(4), deg2rad(-80), deg2rad(-115), deg2rad(-74), deg2rad(-270), deg2rad(180)]
+
+        self._rpy_base.forward = [deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)]
+        self._rpy_base.downward = [deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)]
 
         # for geometry calc.
         self.x_axis = torch.tensor([1.0, 0.0, 0.0])
@@ -64,6 +94,58 @@ class RealUR3:
         self.Pxy = (self.xy_plane @ (self.xy_plane.T @ self.xy_plane).inverse()) @ self.xy_plane.T
         self.Pxz = (self.xz_plane @ (self.xz_plane.T @ self.xz_plane).inverse()) @ self.xz_plane.T
         self.Pyz = (self.yz_plane @ (self.yz_plane.T @ self.yz_plane).inverse()) @ self.yz_plane.T
+
+    def axis_angle_to_euler(self, axis_angle, euler="XYZ"):
+        """
+        :param axis_angle: 3-dim axis_angle vector
+        :param euler: XYZ, ZYX, ZYZ, etc. specified by euler param
+        :return: e.g. roll, pitch, yaw by XYZ, yaw, pitch, roll by ZYX, and so on
+        """
+        mat = tr.axis_angle_to_matrix(axis_angle if torch.is_tensor(axis_angle) else torch.FloatTensor(axis_angle))
+        return tr.matrix_to_euler_angles(mat, euler)
+
+    def control_mode_change(self):
+        idx = self.cmodes.index(self.CONTROL_MODE)
+        self.CONTROL_MODE = self.cmodes[(idx + 1) % len(self.cmodes)]
+        print("CONTROL_MODE: {} --> {}".format(self.cmodes[idx], self.CONTROL_MODE))
+
+    @property
+    def iposes(self):
+        return self._iposes[self.CONTROL_MODE]
+
+    @property
+    def limits(self):
+        return self._limits[self.CONTROL_MODE]
+
+    @property
+    def rpy_base(self):
+        return self._rpy_base[self.CONTROL_MODE]
+
+    @rpy_base.setter
+    def rpy_base(self, rpy):
+        self._rpy_base[self.CONTROL_MODE] = rpy
+
+
+class RealUR3(BaseRTDE, UR3ControlMode):
+    def __init__(self):
+        self.init_vr()
+        BaseRTDE.__init__(self, HOST="192.168.0.75")
+        UR3ControlMode.__init__(self, init_mode="forward")
+
+        # fwd
+        self.lim_ax = AttrDict(x_max=0.53, x_min=0.38,
+                               y_max=0.2, y_min=-0.2,
+                               z_max=0.3, z_min=0.07,
+                               rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
+                               ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
+                               rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
+
+        self.v_ax = AttrDict(x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0)   # desired velocity of each axis
+        self.spd_X_limit = 0.08
+        self.spd_R_limit = 0.1
+        self.ap = 0.9   # low-pass filter
+
+        self.timer = CustomTimer(duration_sec=1.0)
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
@@ -182,49 +264,82 @@ class RealUR3:
         :param des_rot:
         :return: compete goal pose
         """
-        des_pos[0] = max(self.lim_ax.x_min, min(self.lim_ax.x_max, des_pos[0]))     # x
-        des_pos[1] = max(self.lim_ax.y_min, min(self.lim_ax.y_max, des_pos[1]))     # y
-        des_pos[2] = max(self.lim_ax.z_min, min(self.lim_ax.z_max, des_pos[2]))     # z
+        des_pos[0] = max(self.limits.x_min, min(self.limits.x_max, des_pos[0]))     # x
+        des_pos[1] = max(self.limits.y_min, min(self.limits.y_max, des_pos[1]))     # y
+        des_pos[2] = max(self.limits.z_min, min(self.limits.z_max, des_pos[2]))     # z
 
-        # TODO
-        _q = tr.axis_angle_to_quaternion(torch.tensor(des_rot))  # [w, x, y, z]
-        q = torch.cat((_q[1:], _q[0].unsqueeze(0)))  # [x, y, z, w], real last
+        _q = tr.axis_angle_to_quaternion(torch.FloatTensor(des_rot))  # VR_Q [w, x, y, z]
+        q = quaternion_real_last(q=_q)
 
         qx_axis = tf_vector(q, self.x_axis)  # refer TCP coordinate
         qy_axis = tf_vector(q, self.y_axis)
         qz_axis = tf_vector(q, self.z_axis)
 
-        # pitch
-        v_xz = self.Pxz @ qz_axis
-        dot_xz = (v_xz @ self.x_axis) / (v_xz.norm() * self.x_axis.norm())
-        rad_xz = torch.acos(dot_xz)
-        rad_xz *= 1.0 if v_xz[2] < 0 else -1.0
+        if self.CONTROL_MODE == "forward":
+            # pitch
+            z_xz = self.Pxz @ qz_axis   # projection to plane
+            dot_z_x = (z_xz @ self.x_axis) / (z_xz.norm() * self.x_axis.norm())
+            pitch = torch.acos(dot_z_x)
+            pitch *= 1.0 if z_xz[2] < 0 else -1.0
+            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
 
-        # yaw
-        v_xy = self.Pxy @ qz_axis
-        dot_xy = (v_xy @ self.x_axis) / (v_xy.norm() * self.x_axis.norm())
-        rad_xy = torch.acos(dot_xy)
-        rad_xy *= 1.0 if v_xy[1] > 0 else -1.0
+            # yaw
+            z_xy = self.Pxy @ qz_axis
+            dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
+            yaw = torch.acos(dot_z_x)
+            yaw *= 1.0 if z_xy[1] > 0 else -1.0
+            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
 
-        # roll
-        v_yz = self.Pyz @ qy_axis
-        dot_yz = (v_yz @ self.z_axis) / (v_yz.norm() * self.z_axis.norm())
-        rad_yz = torch.acos(dot_yz)
-        rad_yz *= 1.0 if v_yz[1] < 0 else -1.0
+            # TCP: roll --> Fixed: Pitch
+            y_yz = self.Pyz @ qy_axis
+            dot_y_z = (y_yz @ self.z_axis) / (y_yz.norm() * self.z_axis.norm())
+            roll = torch.acos(dot_y_z)
+            roll *= 1.0 if y_yz[1] > 0 else -1.0
+            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
 
-        # roll limit
-        if rad_yz >= self.lim_ax.rx_max and self.v_ax.rx > 0: lim_flag.rx_max = True
-        if rad_yz < self.lim_ax.rx_min and self.v_ax.rx < 0: lim_flag.rx_min = True
+            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))    # VR axis-angle --> quaternion --> rpy
+            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
 
-        # pitch limit
-        if rad_xz >= self.lim_ax.ry_max and self.v_ax.ry > 0: lim_flag.ry_max = True
-        if rad_xz < self.lim_ax.ry_min and self.v_ax.ry < 0: lim_flag.ry_min = True
+            # ZYX order
+            _yaw = yaw + self.rpy_base[2]
+            _pitch = roll + self.rpy_base[1]
+            _roll = pitch + self.rpy_base[0]
+        elif self.CONTROL_MODE == "downward":
+            # pitch
+            y_xz = self.Pxz @ qy_axis  # projection to plane
+            dot_y_x = (y_xz @ self.x_axis) / (y_xz.norm() * self.x_axis.norm())
+            pitch = torch.acos(dot_y_x)
+            pitch *= 1.0 if y_xz[2] < 0 else -1.0
+            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
 
-        # yaw limit
-        if rad_xy >= self.lim_ax.rz_max and self.v_ax.rz > 0: lim_flag.rz_max = True
-        if rad_xy < self.lim_ax.rz_min and self.v_ax.rz < 0: lim_flag.rz_min = True
+            # yaw
+            y_xy = self.Pxy @ qy_axis
+            dot_y_x = (y_xy @ self.x_axis) / (y_xy.norm() * self.x_axis.norm())
+            yaw = torch.acos(dot_y_x)
+            yaw *= 1.0 if y_xy[1] > 0 else -1.0
+            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
 
-        des_rot[0] = des_rot[0]
+            # TCP: roll --> Fixed: Pitch
+            z_yz = self.Pyz @ qz_axis
+            dot_z_nz = (z_yz @ -self.z_axis) / (z_yz.norm() * self.z_axis.norm())
+            roll = torch.acos(dot_z_nz)
+            roll *= 1.0 if z_yz[1] < 0 else -1.0
+            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
+
+            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
+            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
+
+            # ZYX order
+            _yaw = yaw + self.rpy_base[2]
+            _pitch = roll + self.rpy_base[1]
+            _roll = pitch + self.rpy_base[0]
+        else:
+            raise NotImplementedError
+
+        mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
+        des_aa = tr.matrix_to_axis_angle(mat)
+        des_rot = des_aa
+
         return list(des_pos) + list(des_rot)
 
     def set_velJ(self):
@@ -256,31 +371,47 @@ class RealUR3:
         val = int((float(val) / max_len) * 50.0 + 0.5)
         self.gripper.move(val)
 
+    def set_rpy_base(self, log=False):
+        actual_tcp_p = self.rtde_r.getActualTCPPose()  # [x, y, z, rx, ry, rz], axis-angle orientation
+        yaw, pitch, roll = self.axis_angle_to_euler(actual_tcp_p[3:], euler="ZYX")
+        self.rpy_base = [roll, pitch, yaw]
+        if log:
+            print("rpy_base ", self.rpy_base)
+            print("euler: ", list(map(rad2deg, [roll, pitch, yaw])))
+
     def vr_handler(self):
-        int_sec = 0.0
-        int_x = 0.0
+        # int_sec = 0.0
+        # int_x = 0.0
         while True:
             cont_status = self.vr.get_controller_status()
             if cont_status["btn_trigger"]:
                 pq = cont_status["pose_quat"]
-                pq = torch.tensor(pq)
-                pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))   # real first
+                # pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))   # real first
+                pq = quaternion_real_first(q=torch.tensor(pq))
                 aa = tr.quaternion_to_axis_angle(pq)
 
-                int_x += cont_status["lin_vel"][0] * cont_status["dt"]
-                int_sec += cont_status["dt"]
-                if int_sec >= 1.0:
-                    print("----------------------")
-                    print("(x) m/s: ", int_x)
-                    print("int_sec ", int_sec)
-                    int_sec = 0.0
-                    int_x = 0.0
-
+                if cont_status["btn_trackpad"]:
+                    print("btn_trackpad")
+                if cont_status["btn_control_mode"]:
+                    print("btn_control_mode")
                 if cont_status["btn_gripper"]:
-                    self.grip_on = not self.grip_on     # toggle
-                    grip_pos = 63 if self.grip_on else 100
-                    self.move_grip_to(pos_in_mm=grip_pos)
-                    print("gripper toggle")
+                    print("btn_gripper")
+
+                # int_x += cont_status["lin_vel"][0] * cont_status["dt"]
+                # # integral
+                # int_sec += cont_status["dt"]
+                # if int_sec >= 1.0:
+                #     print("----------------------")
+                #     print("(x) m/s: ", int_x)
+                #     print("int_sec ", int_sec)
+                #     int_sec = 0.0
+                #     int_x = 0.0
+
+                # if cont_status["btn_gripper"]:
+                #     self.grip_on = not self.grip_on     # toggle
+                #     grip_pos = 63 if self.grip_on else 100
+                #     self.move_grip_to(pos_in_mm=grip_pos)
+                #     print("gripper toggle")
 
                 # if self.timer.elapsed():
                 #     print("VR pose: ", pq)
@@ -291,61 +422,52 @@ class RealUR3:
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
         try:
-            # Move to initial joint position
-            # forward pose for pouring water
-            # init_joint = [deg2rad(0), deg2rad(-80), deg2rad(-115),
-            #               deg2rad(-165), deg2rad(-90), deg2rad(0)]
-            # downward pose for pick and place
-            init_joint = [deg2rad(4), deg2rad(-80), deg2rad(-115),
-                          deg2rad(-74), deg2rad(-270), deg2rad(180)]
-            self.rtde_c.moveJ(init_joint)
+            self.rtde_c.moveJ(self.iposes)
+            self.set_rpy_base()
 
-            # determine limit positions in each axis
-            # [x, y, z, roll, pitch, yaw]
-            self.set_velL(v=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
             while True:
                 start_t = self.rtde_c.initPeriod()
-                actual_tcp_p = self.rtde_r.getActualTCPPose()
-                actual_j = self.rtde_r.getActualQ()
-                _tcp_q = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_p[3:]))
-                tcp_q = torch.cat((_tcp_q[1:], _tcp_q[0].unsqueeze(0)))
 
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
                     self.rtde_c.speedStop()
-                    self.rtde_c.moveJ(init_joint)
+                    self.rtde_c.moveJ(self.iposes)
                     continue
 
                 rot = [0.0, 0.0, 0.0]
+                diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 if cont_status["btn_trigger"]:
                     if cont_status["btn_gripper"]:
                         self.grip_on = not self.grip_on  # toggle
                         grip_pos = 0 if self.grip_on else 100  # 63, 100
                         self.move_grip_to(pos_in_mm=grip_pos)
 
-                    pq = torch.tensor(cont_status["pose_quat"])
-                    pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))  # real first quaternion
-                    aa = tr.quaternion_to_axis_angle(pq)           # desired pose by VR
-                    rot = (aa - torch.tensor(actual_tcp_p[3:])).numpy()     # axis-angle
+                    if cont_status["btn_control_mode"]:
+                        self.control_mode_change()
+                        self.rtde_c.speedStop()
+                        self.rtde_c.moveJ(self.iposes)
+                        self.set_rpy_base(log=True)
 
-                    acc = 1.2
-                    dt = cont_status["dt"]  # 1.0 / 500
+                    vr_q = torch.tensor(cont_status["pose_quat"])
+                    vr_q = quaternion_real_first(q=vr_q)
+                    vr_a = tr.quaternion_to_axis_angle(vr_q)           # desired aa pose by VR
+
                     actual_tcp_p = self.rtde_r.getActualTCPPose()
                     actual_j = self.rtde_r.getActualQ()
 
                     d_pos = np.array(actual_tcp_p[:3]) + cont_status["lin_vel"]
-                    d_rot = np.array(actual_tcp_p[3:]) + rot
-                    goal_pose = list(d_pos) + list(d_rot)
-                    # TODO, goal pose limitation...
+                    d_rot = vr_a.numpy()
+                    goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)
 
-                    goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
-                    diff_j = np.array(goal_j) - np.array(actual_j)
-                    self.rtde_c.speedJ(list(diff_j * 0.5), acc, dt)
-                    self.rtde_c.waitPeriod(start_t)
+                    try:
+                        goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
+                        diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
+                    except ValueError:
+                        print("goal_pose: ", goal_pose)
 
                     if self.timer.timeover_active:
-                        print("Desired AA: ", aa, aa.norm())
+                        print("Desired AA: ", vr_q, vr_q.norm())
                         print("Actual AA: ", actual_tcp_p[3:])
                         print("diff: ", rot)
                         print("dt ", cont_status["dt"])
@@ -353,18 +475,8 @@ class RealUR3:
                         # print("des pose: ", des_pose)
                         # print("dj: ", dj)
                         print("----------------------------------")
-                else:
-                    self.set_velL(v=list([0.0, 0.0, 0.0]) + list([0.0, 0.0, 0.0]))  # cont_status["lin_vel"]
-                    # self.set_velL(v=list(cont_status["lin_vel"]) + list(cont_status["ang_vel"]))
 
-                lim_flag = self.limit_check(tcp_p=actual_tcp_p)
-                if lim_flag.x_max or lim_flag.x_min: self.v_ax.x *= 0.0
-                if lim_flag.y_max or lim_flag.y_min: self.v_ax.y *= 0.0
-                if lim_flag.z_max or lim_flag.z_min: self.v_ax.z *= 0.0
-                if lim_flag.rx_max or lim_flag.rx_min: self.v_ax.rx *= 0.0
-                if lim_flag.ry_max or lim_flag.ry_min: self.v_ax.ry *= 0.0
-                if lim_flag.rz_max or lim_flag.rz_min: self.v_ax.rz *= 0.0
-                self.rtde_c.speedL(xd=list(self.v_ax.values()), acceleration=1.2)
+                self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
                 self.rtde_c.waitPeriod(start_t)
         finally:
             print("end of control... ")
@@ -389,8 +501,6 @@ class RealUR3:
                 scale = 0.1
                 diff_j = np.array(goal_j) - np.array(actual_j)
                 self.rtde_c.speedJ(list(diff_j * scale), 1.2, 1.0 / 500)
-                # self.rtde_c.servoJ(q=goal_j, speed=0.1)
-                # self.rtde_c.speedL(xd=j_spd, acceleration=1.2)
                 if self.timer.elapsed():
                     print(i, j_spd)
                     # print("start_t ", start_t)
@@ -402,10 +512,6 @@ class RealUR3:
             print("prgram end")
             self.rtde_c.speedStop()
             self.rtde_c.stopScript()
-        # sec_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
-        #              deg2rad(-150), deg2rad(-82), deg2rad(90)]
-        # self.rtde_c.moveJ(sec_joint)
-        # self.rtde_c.moveJ(init_joint)
 
 
 if __name__ == "__main__":
