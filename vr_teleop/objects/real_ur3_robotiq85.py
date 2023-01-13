@@ -68,12 +68,12 @@ class UR3ControlMode:
                                         ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
                                         rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
 
-        self._limits.downward = AttrDict(x_max=0.47, x_min=0.21,
-                                         y_max=0.18, y_min=-0.18,
-                                         z_max=0.15, z_min=0.035,
-                                         rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
-                                         ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
-                                         rz_max=deg2rad(10.0), rz_min=deg2rad(-10.0))
+        self._limits.downward = AttrDict(x_max=0.45, x_min=0.18,
+                                         y_max=0.2, y_min=-0.2,
+                                         z_max=0.15, z_min=0.04,
+                                         rx_max=deg2rad(20.0), rx_min=deg2rad(-20.0),
+                                         ry_max=deg2rad(5.0), ry_min=deg2rad(-10.0),
+                                         rz_max=deg2rad(90.0), rz_min=deg2rad(-90.0))
 
         self._iposes.forward = [deg2rad(0), deg2rad(-80), deg2rad(-115), deg2rad(-165), deg2rad(-90), deg2rad(0)]
         self._iposes.downward = [deg2rad(4), deg2rad(-80), deg2rad(-115), deg2rad(-74), deg2rad(-270), deg2rad(180)]
@@ -130,7 +130,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def __init__(self):
         self.init_vr()
         BaseRTDE.__init__(self, HOST="192.168.0.75")
-        UR3ControlMode.__init__(self, init_mode="forward")
+        UR3ControlMode.__init__(self, init_mode="downward")
 
         # fwd
         self.lim_ax = AttrDict(x_max=0.53, x_min=0.38,
@@ -305,6 +305,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             _pitch = roll + self.rpy_base[1]
             _roll = pitch + self.rpy_base[0]
         elif self.CONTROL_MODE == "downward":
+            # TODO, set limits for downward mode
             # pitch
             y_xz = self.Pxz @ qy_axis  # projection to plane
             dot_y_x = (y_xz @ self.x_axis) / (y_xz.norm() * self.x_axis.norm())
@@ -336,6 +337,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         else:
             raise NotImplementedError
 
+        print("des_pos: ", des_pos)
+        print("des_rpy: ", roll, pitch, yaw)
         mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
         des_aa = tr.matrix_to_axis_angle(mat)
         des_rot = des_aa
