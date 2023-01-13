@@ -136,7 +136,7 @@ class UR3Pouring(BaseTask):
         # asset_options.vhacd_params.max_convex_hulls = 16
         # asset_options.vhacd_params.max_num_vertices_per_ch = 32
 
-        bottle_asset_file = "urdf/objects/bottle.urdf"
+        bottle_asset_file = "urdf/tasks/bottle.urdf"
         if "asset" in self.cfg["env"]:
             bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
 
@@ -155,7 +155,7 @@ class UR3Pouring(BaseTask):
         # asset_options.vhacd_params.max_num_vertices_per_ch = 64
         asset_options.use_mesh_materials = True
 
-        cup_asset_file = "urdf/objects/paper_cup.urdf"
+        cup_asset_file = "urdf/tasks/paper_cup.urdf"
         cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)
         return cup_asset
 

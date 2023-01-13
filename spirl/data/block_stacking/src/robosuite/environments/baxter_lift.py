@@ -86,7 +86,7 @@ class BaxterLift(BaxterEnv):
         # The sawyer robot has a pedestal, we want to align it with the table
         self.mujoco_arena.set_origin([0.45 + self.table_full_size[0] / 2, 0, 0])
 
-        # task includes arena, robot, and objects of interest
+        # task includes arena, robot, and tasks of interest
         self.model = TableTopTask(
             self.mujoco_arena,
             self.mujoco_robot,

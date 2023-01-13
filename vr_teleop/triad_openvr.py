@@ -194,7 +194,7 @@ class triad_openvr():
         self.vr = openvr.init(openvr.VRApplication_Other)
         self.vrsystem = openvr.VRSystem()
 
-        # Initializing object to hold indexes for various tracked objects
+        # Initializing object to hold indexes for various tracked tasks
         self.object_names = {"Tracking Reference":[],"HMD":[],"Controller":[],"Tracker":[]}
         self.devices = {}
         self.device_index_map = {}

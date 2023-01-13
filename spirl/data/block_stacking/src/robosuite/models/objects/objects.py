@@ -8,9 +8,9 @@ from spirl.data.block_stacking.src.robosuite.utils.mjcf_utils import string_to_a
 
 class MujocoObject:
     """
-    Base class for all objects.
+    Base class for all tasks.
 
-    We use Mujoco Objects to implement all objects that
+    We use Mujoco Objects to implement all tasks that
         1) may appear for multiple times in a task
         2) can be swapped between different tasks
 
@@ -26,7 +26,7 @@ class MujocoObject:
     def get_bottom_offset(self):
         """
         Returns vector from object center to object bottom
-        Helps us put objects on a surface
+        Helps us put tasks on a surface
 
         Returns:
             np.array: eg. np.array([0, 0, -2])
@@ -39,7 +39,7 @@ class MujocoObject:
     def get_top_offset(self):
         """
         Returns vector from object center to object top
-        Helps us put other objects on this object
+        Helps us put other tasks on this object
 
         Returns:
             np.array: eg. np.array([0, 0, 2])
@@ -56,7 +56,7 @@ class MujocoObject:
         a.get_horizontal_radius() + b.get_horizontal_radius() < d
         should mean that a, b has no contact
 
-        Helps us put objects programmatically without them flying away due to
+        Helps us put tasks programmatically without them flying away due to
         a huge initial contact force
 
         Returns:

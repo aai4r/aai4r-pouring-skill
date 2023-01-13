@@ -7,7 +7,7 @@ class TableTopTask(Task):
     Creates MJCF model of a tabletop task.
 
     A tabletop task consists of one robot interacting with a variable number of
-    objects placed on the tabletop. This class combines the robot, the table
+    tasks placed on the tabletop. This class combines the robot, the table
     arena, and the objetcts into a single MJCF model.
     """
 
@@ -16,7 +16,7 @@ class TableTopTask(Task):
         Args:
             mujoco_arena: MJCF model of robot workspace
             mujoco_robot: MJCF model of robot model
-            mujoco_objects: a list of MJCF models of physical objects
+            mujoco_objects: a list of MJCF models of physical tasks
             initializer: placement sampler to initialize object positions.
         """
         super().__init__()
@@ -44,7 +44,7 @@ class TableTopTask(Task):
         self.merge(mujoco_arena)
 
     def merge_objects(self, mujoco_objects):
-        """Adds physical objects to the MJCF model."""
+        """Adds physical tasks to the MJCF model."""
         self.mujoco_objects = mujoco_objects
         self.objects = []  # xml manifestation
         self.targets = []  # xml manifestation
@@ -63,7 +63,7 @@ class TableTopTask(Task):
             )
 
     def place_objects(self):
-        """Places objects randomly until no collisions or max iterations hit."""
+        """Places tasks randomly until no collisions or max iterations hit."""
         pos_arr, quat_arr = self.initializer.sample()
         for i in range(len(self.objects)):
             self.objects[i].set("pos", array_to_string(pos_arr[i]))

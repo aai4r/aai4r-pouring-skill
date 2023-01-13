@@ -104,7 +104,7 @@ class BaxterEnv(MujocoEnv):
             ] = self.gripper_left.init_qpos
 
     def _get_reference(self):
-        """Sets up references for robots, grippers, and objects."""
+        """Sets up references for robots, grippers, and tasks."""
         super()._get_reference()
 
         # indices for joints in qpos, qvel

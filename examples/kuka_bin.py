@@ -10,7 +10,7 @@ license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 Kuka bin perfromance test
 -------------------------------
-Test simulation perfromance and stability of the robotic arm dealing with a set of complex objects in a bin.
+Test simulation perfromance and stability of the robotic arm dealing with a set of complex tasks in a bin.
 """
 
 from __future__ import print_function, division, absolute_import
@@ -49,7 +49,7 @@ args = gymutil.parse_arguments(
     description="Kuka Bin Test",
     custom_parameters=[
         {"name": "--num_envs", "type": int, "default": 16, "help": "Number of environments to create"},
-        {"name": "--num_objects", "type": int, "default": 10, "help": "Number of objects in the bin"},
+        {"name": "--num_objects", "type": int, "default": 10, "help": "Number of tasks in the bin"},
         {"name": "--object_type", "type": int, "default": 0, "help": "Type of bjects to place in the bin: 0 - box, 1 - meat can, 2 - banana, 3 - mug, 4 - brick, 5 - random"}])
 
 num_envs = args.num_envs
@@ -120,7 +120,7 @@ object_pose = gymapi.Transform()
 
 table_asset = gym.create_box(sim, table_dims.x, table_dims.y, table_dims.z, asset_options)
 
-# load assets of objects in a bin
+# load assets of tasks in a bin
 asset_options.fix_base_link = False
 
 can_asset_file = "urdf/ycb/010_potted_meat_can/010_potted_meat_can.urdf"

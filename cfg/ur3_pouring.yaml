@@ -22,7 +22,7 @@ env:
   asset:
     assetRoot: "assets"
     assetFileNameUR3: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
-    assetFileNameBottle: "urdf/objects/bottle.urdf"
+    assetFileNameBottle: "urdf/tasks/bottle.urdf"
 
 sim:
   substeps: 1

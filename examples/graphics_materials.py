@@ -34,7 +34,7 @@ asset_descriptors = [
     AssetDesc("urdf/kinova_description/urdf/kinova.urdf", False),
     AssetDesc("urdf/anymal_b_simple_description/urdf/anymal.urdf", True),
     AssetDesc("urdf/kuka_allegro_description/kuka_allegro.urdf", False),
-    AssetDesc("urdf/objects/cube_multicolor.urdf", True),
+    AssetDesc("urdf/tasks/cube_multicolor.urdf", True),
 ]
 
 args = gymutil.parse_arguments()

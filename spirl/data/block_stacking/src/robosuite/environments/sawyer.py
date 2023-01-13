@@ -116,7 +116,7 @@ class SawyerEnv(MujocoEnv):
 
     def _get_reference(self):
         """
-        Sets up necessary reference for robots, grippers, and objects.
+        Sets up necessary reference for robots, grippers, and tasks.
         """
         super()._get_reference()
 

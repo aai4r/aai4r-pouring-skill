@@ -8,7 +8,7 @@ class BottleObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/bottle.xml"))
+        super().__init__(xml_path_completion("tasks/bottle.xml"))
 
 
 class CanObject(MujocoXMLObject):
@@ -17,7 +17,7 @@ class CanObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/can.xml"))
+        super().__init__(xml_path_completion("tasks/can.xml"))
 
 
 class LemonObject(MujocoXMLObject):
@@ -26,7 +26,7 @@ class LemonObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/lemon.xml"))
+        super().__init__(xml_path_completion("tasks/lemon.xml"))
 
 
 class MilkObject(MujocoXMLObject):
@@ -35,7 +35,7 @@ class MilkObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/milk.xml"))
+        super().__init__(xml_path_completion("tasks/milk.xml"))
 
 
 class BreadObject(MujocoXMLObject):
@@ -44,7 +44,7 @@ class BreadObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/bread.xml"))
+        super().__init__(xml_path_completion("tasks/bread.xml"))
 
 
 class CerealObject(MujocoXMLObject):
@@ -53,7 +53,7 @@ class CerealObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/cereal.xml"))
+        super().__init__(xml_path_completion("tasks/cereal.xml"))
 
 
 class SquareNutObject(MujocoXMLObject):
@@ -62,7 +62,7 @@ class SquareNutObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/square-nut.xml"))
+        super().__init__(xml_path_completion("tasks/square-nut.xml"))
 
 
 class RoundNutObject(MujocoXMLObject):
@@ -71,19 +71,19 @@ class RoundNutObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/round-nut.xml"))
+        super().__init__(xml_path_completion("tasks/round-nut.xml"))
 
 
 class MilkVisualObject(MujocoXMLObject):
     """
     Visual fiducial of milk carton (used in SawyerPickPlace).
 
-    Fiducial objects are not involved in collision physics.
+    Fiducial tasks are not involved in collision physics.
     They provide a point of reference to indicate a position.
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/milk-visual.xml"))
+        super().__init__(xml_path_completion("tasks/milk-visual.xml"))
 
 
 class BreadVisualObject(MujocoXMLObject):
@@ -92,7 +92,7 @@ class BreadVisualObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/bread-visual.xml"))
+        super().__init__(xml_path_completion("tasks/bread-visual.xml"))
 
 
 class CerealVisualObject(MujocoXMLObject):
@@ -101,7 +101,7 @@ class CerealVisualObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/cereal-visual.xml"))
+        super().__init__(xml_path_completion("tasks/cereal-visual.xml"))
 
 
 class CanVisualObject(MujocoXMLObject):
@@ -110,7 +110,7 @@ class CanVisualObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/can-visual.xml"))
+        super().__init__(xml_path_completion("tasks/can-visual.xml"))
 
 
 class PlateWithHoleObject(MujocoXMLObject):
@@ -119,4 +119,4 @@ class PlateWithHoleObject(MujocoXMLObject):
     """
 
     def __init__(self):
-        super().__init__(xml_path_completion("objects/plate-with-hole.xml"))
+        super().__init__(xml_path_completion("tasks/plate-with-hole.xml"))

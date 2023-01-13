@@ -61,7 +61,7 @@ class SawyerNutAssembly(SawyerEnv):
             reward_shaping (bool): if True, use dense rewards.
 
             placement_initializer (ObjectPositionSampler instance): if provided, will
-                be used to place objects on every reset, else a UniformRandomPegsSampler
+                be used to place tasks on every reset, else a UniformRandomPegsSampler
                 is used by default.
 
             single_object_mode (int): specifies which version of the task to do. Note that
@@ -181,7 +181,7 @@ class SawyerNutAssembly(SawyerEnv):
         # The sawyer robot has a pedestal, we want to align it with the table
         self.mujoco_arena.set_origin([.5, -0.15, 0])
 
-        # define mujoco objects
+        # define mujoco tasks
         self.ob_inits = [SquareNutObject, RoundNutObject]
         self.item_names = ["SquareNut", "RoundNut"]
         self.item_names_org = list(self.item_names)
@@ -196,7 +196,7 @@ class SawyerNutAssembly(SawyerEnv):
         self.mujoco_objects = OrderedDict(lst)
         self.n_objects = len(self.mujoco_objects)
 
-        # task includes arena, robot, and objects of interest
+        # task includes arena, robot, and tasks of interest
         self.model = NutAssemblyTask(
             self.mujoco_arena,
             self.mujoco_robot,
@@ -210,8 +210,8 @@ class SawyerNutAssembly(SawyerEnv):
 
     def clear_objects(self, obj):
         """
-        Clears objects with name @obj out of the task space. This is useful
-        for supporting task modes with single types of objects, as in
+        Clears tasks with name @obj out of the task space. This is useful
+        for supporting task modes with single types of tasks, as in
         @self.single_object_mode without changing the model definition.
         """
         for obj_name, obj_mjcf in self.mujoco_objects.items():
@@ -237,7 +237,7 @@ class SawyerNutAssembly(SawyerEnv):
                 geom_ids.append(self.sim.model.geom_name2id(obj_str + "-{}".format(j)))
             self.obj_geom_id[obj_str] = geom_ids
 
-        # information of objects
+        # information of tasks
         self.object_names = list(self.mujoco_objects.keys())
         self.object_site_ids = [
             self.sim.model.site_name2id(ob_name) for ob_name in self.object_names
@@ -257,13 +257,13 @@ class SawyerNutAssembly(SawyerEnv):
             self.sim.model._geom_name2id[k] for k in self.collision_check_geom_names
         ]
 
-        # keep track of which objects are on their corresponding pegs
+        # keep track of which tasks are on their corresponding pegs
         self.objects_on_pegs = np.zeros(len(self.ob_inits))
 
     def _reset_internal(self):
         super()._reset_internal()
 
-        # reset positions of objects, and move objects out of the scene depending on the mode
+        # reset positions of tasks, and move tasks out of the scene depending on the mode
         self.model.place_objects()
         if self.single_object_mode == 1:
             self.obj_to_use = (random.choice(self.item_names) + "{}").format(0)
@@ -294,7 +294,7 @@ class SawyerNutAssembly(SawyerEnv):
         lift_mult = 0.5
         hover_mult = 0.7
 
-        # filter out objects that are already on the correct pegs
+        # filter out tasks that are already on the correct pegs
         names_to_reach = []
         objs_to_reach = []
         geoms_to_grasp = []
@@ -312,7 +312,7 @@ class SawyerNutAssembly(SawyerEnv):
         ### reaching reward governed by distance to closest object ###
         r_reach = 0.
         if len(objs_to_reach):
-            # reaching reward via minimum distance to the handles of the objects (the last geom of each nut)
+            # reaching reward via minimum distance to the handles of the tasks (the last geom of each nut)
             geom_ids = [elem[-1] for elem in geoms_by_array]
             target_geom_pos = self.sim.data.geom_xpos[geom_ids]
             gripper_site_pos = self.sim.data.site_xpos[self.eef_site_id]
@@ -321,7 +321,7 @@ class SawyerNutAssembly(SawyerEnv):
             )
             r_reach = (1 - np.tanh(10.0 * min(dists))) * reach_mult
 
-        ### grasping reward for touching any objects of interest ###
+        ### grasping reward for touching any tasks of interest ###
         touch_left_finger = False
         touch_right_finger = False
         for i in range(self.sim.data.ncon):
@@ -481,7 +481,7 @@ class SawyerNutAssembly(SawyerEnv):
         Returns True if task has been completed.
         """
 
-        # remember objects that are on the correct pegs
+        # remember tasks that are on the correct pegs
         gripper_site_pos = self.sim.data.site_xpos[self.eef_site_id]
         for i in range(len(self.ob_inits)):
             obj_str = str(self.item_names[i]) + "0"
@@ -493,7 +493,7 @@ class SawyerNutAssembly(SawyerEnv):
         if self.single_object_mode > 0:
             return np.sum(self.objects_on_pegs) > 0  # need one object on peg
 
-        # returns True if all objects are on correct pegs
+        # returns True if all tasks are on correct pegs
         return np.sum(self.objects_on_pegs) == len(self.ob_inits)
 
     def _gripper_visualization(self):

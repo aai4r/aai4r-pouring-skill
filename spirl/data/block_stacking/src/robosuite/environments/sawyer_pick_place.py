@@ -68,13 +68,13 @@ class SawyerPickPlace(SawyerEnv):
             reward_shaping (bool): if True, use dense rewards.
 
             placement_initializer (ObjectPositionSampler instance): if provided, will
-                be used to place objects on every reset, else a UniformRandomSampler
+                be used to place tasks on every reset, else a UniformRandomSampler
                 is used by default.
 
             single_object_mode (int): specifies which version of the task to do. Note that
                 the observations change accordingly.
 
-                0: corresponds to the full task with all types of objects.
+                0: corresponds to the full task with all types of tasks.
 
                 1: corresponds to an easier task with only one type of object initialized
                    on the table with every reset. The type is randomized on every reset.
@@ -167,7 +167,7 @@ class SawyerPickPlace(SawyerEnv):
         # reward configuration
         self.reward_shaping = reward_shaping
 
-        # information of objects
+        # information of tasks
         self.object_names = list(self.mujoco_objects.keys())
         self.object_site_ids = [
             self.sim.model.site_name2id(ob_name) for ob_name in self.object_names
@@ -221,7 +221,7 @@ class SawyerPickPlace(SawyerEnv):
         self.mujoco_objects = OrderedDict(lst)
         self.n_objects = len(self.mujoco_objects)
 
-        # task includes arena, robot, and objects of interest
+        # task includes arena, robot, and tasks of interest
         self.model = PickPlaceTask(
             self.mujoco_arena,
             self.mujoco_robot,
@@ -235,8 +235,8 @@ class SawyerPickPlace(SawyerEnv):
 
     def clear_objects(self, obj):
         """
-        Clears objects with name @obj out of the task space. This is useful
-        for supporting task modes with single types of objects, as in
+        Clears tasks with name @obj out of the task space. This is useful
+        for supporting task modes with single types of tasks, as in
         @self.single_object_mode without changing the model definition.
         """
         for obj_name, obj_mjcf in self.mujoco_objects.items():
@@ -265,11 +265,11 @@ class SawyerPickPlace(SawyerEnv):
             self.obj_body_id[obj_str] = self.sim.model.body_name2id(obj_str)
             self.obj_geom_id[obj_str] = self.sim.model.geom_name2id(obj_str)
 
-        # for checking distance to / contact with objects we want to pick up
+        # for checking distance to / contact with tasks we want to pick up
         self.target_object_body_ids = list(map(int, self.obj_body_id.values()))
         self.contact_with_object_geom_ids = list(map(int, self.obj_geom_id.values()))
 
-        # keep track of which objects are in their corresponding bins
+        # keep track of which tasks are in their corresponding bins
         self.objects_in_bins = np.zeros(len(self.ob_inits))
 
         # target locations in bin for each object type
@@ -289,7 +289,7 @@ class SawyerPickPlace(SawyerEnv):
     def _reset_internal(self):
         super()._reset_internal()
 
-        # reset positions of objects, and move objects out of the scene depending on the mode
+        # reset positions of tasks, and move tasks out of the scene depending on the mode
         self.model.place_objects()
         if self.single_object_mode == 1:
             self.obj_to_use = (random.choice(self.item_names) + "{}").format(0)
@@ -320,7 +320,7 @@ class SawyerPickPlace(SawyerEnv):
         lift_mult = 0.5
         hover_mult = 0.7
 
-        # filter out objects that are already in the correct bins
+        # filter out tasks that are already in the correct bins
         objs_to_reach = []
         geoms_to_grasp = []
         target_bin_placements = []
@@ -344,7 +344,7 @@ class SawyerPickPlace(SawyerEnv):
             )
             r_reach = (1 - np.tanh(10.0 * min(dists))) * reach_mult
 
-        ### grasping reward for touching any objects of interest ###
+        ### grasping reward for touching any tasks of interest ###
         touch_left_finger = False
         touch_right_finger = False
         for i in range(self.sim.data.ncon):
@@ -377,7 +377,7 @@ class SawyerPickPlace(SawyerEnv):
         ### hover reward for getting object above bin ###
         r_hover = 0.
         if len(objs_to_reach):
-            # segment objects into left of the bins and above the bins
+            # segment tasks into left of the bins and above the bins
             object_xy_locs = self.sim.data.body_xpos[objs_to_reach][:, :2]
             y_check = (
                 np.abs(object_xy_locs[:, 1] - target_bin_placements[:, 1])
@@ -392,7 +392,7 @@ class SawyerPickPlace(SawyerEnv):
             dists = np.linalg.norm(
                 target_bin_placements[:, :2] - object_xy_locs, axis=1
             )
-            # objects to the left get r_lift added to hover reward, those on the right get max(r_lift) added (to encourage dropping)
+            # tasks to the left get r_lift added to hover reward, those on the right get max(r_lift) added (to encourage dropping)
             r_hover_all = np.zeros(len(objs_to_reach))
             r_hover_all[objects_above_bins] = lift_mult + (
                 1 - np.tanh(10.0 * dists[objects_above_bins])
@@ -491,7 +491,7 @@ class SawyerPickPlace(SawyerEnv):
                 object_state_keys.append("{}_to_eef_quat".format(obj_str))
 
             if self.single_object_mode == 1:
-                # Zero out other objects observations
+                # Zero out other tasks observations
                 for obj_str, obj_mjcf in self.mujoco_objects.items():
                     if obj_str == self.obj_to_use:
                         continue
@@ -524,7 +524,7 @@ class SawyerPickPlace(SawyerEnv):
         Returns True if task has been completed.
         """
 
-        # remember objects that are in the correct bins
+        # remember tasks that are in the correct bins
         gripper_site_pos = self.sim.data.site_xpos[self.eef_site_id]
         for i in range(len(self.ob_inits)):
             obj_str = str(self.item_names[i]) + "0"
@@ -539,7 +539,7 @@ class SawyerPickPlace(SawyerEnv):
         if self.single_object_mode == 1 or self.single_object_mode == 2:
             return np.sum(self.objects_in_bins) > 0
 
-        # returns True if all objects are in correct bins
+        # returns True if all tasks are in correct bins
         return np.sum(self.objects_in_bins) == len(self.ob_inits)
 
     def _gripper_visualization(self):

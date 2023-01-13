@@ -57,7 +57,7 @@ class SawyerStack(SawyerEnv):
             reward_shaping (bool): if True, use dense rewards.
 
             placement_initializer (ObjectPositionSampler instance): if provided, will
-                be used to place objects on every reset, else a UniformRandomSampler
+                be used to place tasks on every reset, else a UniformRandomSampler
                 is used by default.
 
             gripper_visualization (bool): True if using gripper visualization.
@@ -137,7 +137,7 @@ class SawyerStack(SawyerEnv):
         # reward configuration
         self.reward_shaping = reward_shaping
 
-        # information of objects
+        # information of tasks
         # self.object_names = [o['object_name'] for o in self.object_metadata]
         self.object_names = list(self.mujoco_objects.keys())
         self.object_site_ids = [
@@ -170,7 +170,7 @@ class SawyerStack(SawyerEnv):
         # The sawyer robot has a pedestal, we want to align it with the table
         self.mujoco_arena.set_origin([0.16 + self.table_full_size[0] / 2, 0, 0])
 
-        # initialize objects of interest
+        # initialize tasks of interest
         cubeA = BoxObject(
             size_min=[0.02, 0.02, 0.02], size_max=[0.02, 0.02, 0.02], rgba=[1, 0, 0, 1]
         )
@@ -182,7 +182,7 @@ class SawyerStack(SawyerEnv):
         self.mujoco_objects = OrderedDict([("cubeA", cubeA), ("cubeB", cubeB)])
         self.n_objects = len(self.mujoco_objects)
 
-        # task includes arena, robot, and objects of interest
+        # task includes arena, robot, and tasks of interest
         self.model = TableTopTask(
             self.mujoco_arena,
             self.mujoco_robot,
@@ -215,7 +215,7 @@ class SawyerStack(SawyerEnv):
         """
         super()._reset_internal()
 
-        # reset positions of objects
+        # reset positions of tasks
         self.model.place_objects()
 
         # reset joint positions

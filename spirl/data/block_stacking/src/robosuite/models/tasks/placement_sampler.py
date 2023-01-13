@@ -27,14 +27,14 @@ class ObjectPositionSampler:
         Args:
             object_index: index of the current object being sampled
         Returns:
-            xpos((float * 3) * n_obj): x,y,z position of the objects in world frame
-            xquat((float * 4) * n_obj): quaternion of the objects
+            xpos((float * 3) * n_obj): x,y,z position of the tasks in world frame
+            xquat((float * 4) * n_obj): quaternion of the tasks
         """
         raise NotImplementedError
 
 
 class UniformRandomSampler(ObjectPositionSampler):
-    """Places all objects within the table uniformly random."""
+    """Places all tasks within the table uniformly random."""
 
     def __init__(
         self,
@@ -45,9 +45,9 @@ class UniformRandomSampler(ObjectPositionSampler):
     ):
         """
         Args:
-            x_range(float * 2): override the x_range used to uniformly place objects
+            x_range(float * 2): override the x_range used to uniformly place tasks
                     if None, default to x-range of table
-            y_range(float * 2): override the y_range used to uniformly place objects
+            y_range(float * 2): override the y_range used to uniformly place tasks
                     if None default to y-range of table
             x_range and y_range are both with respect to (0,0) = center of table.
             ensure_object_boundary_in_range:
@@ -111,7 +111,7 @@ class UniformRandomSampler(ObjectPositionSampler):
             for i in range(5000):  # 1000 retries
                 object_x = self.sample_x(horizontal_radius)
                 object_y = self.sample_y(horizontal_radius)
-                # objects cannot overlap
+                # tasks cannot overlap
                 location_valid = True
                 for x, y, r in placed_objects:
                     if (
@@ -139,13 +139,13 @@ class UniformRandomSampler(ObjectPositionSampler):
 
                 # bad luck, reroll
             if not success:
-                raise RandomizationError("Cannot place all objects on the desk")
+                raise RandomizationError("Cannot place all tasks on the desk")
             index += 1
         return pos_arr, quat_arr
 
 
 class UniformRandomPegsSampler(ObjectPositionSampler):
-    """Places all objects on top of the table uniformly random."""
+    """Places all tasks on top of the table uniformly random."""
 
     def __init__(
         self,
@@ -157,9 +157,9 @@ class UniformRandomPegsSampler(ObjectPositionSampler):
     ):
         """
         Args:
-            x_range(float * 2): override the x_range used to uniformly place objects
+            x_range(float * 2): override the x_range used to uniformly place tasks
                     if None, default to x-range of table
-            y_range(float * 2): override the y_range used to uniformly place objects
+            y_range(float * 2): override the y_range used to uniformly place tasks
                     if None default to y-range of table
             x_range and y_range are both with respect to (0,0) = center of table.
             ensure_object_boundary_in_range:
@@ -244,7 +244,7 @@ class UniformRandomPegsSampler(ObjectPositionSampler):
                 object_x = self.sample_x(horizontal_radius, x_range=x_range)
                 object_y = self.sample_y(horizontal_radius, y_range=y_range)
                 object_z = self.sample_z(0.01)
-                # objects cannot overlap
+                # tasks cannot overlap
                 location_valid = True
                 pos = (
                     self.table_top_offset
@@ -273,7 +273,7 @@ class UniformRandomPegsSampler(ObjectPositionSampler):
 
                 # bad luck, reroll
             if not success:
-                raise RandomizationError("Cannot place all objects on the desk")
+                raise RandomizationError("Cannot place all tasks on the desk")
 
         return pos_arr, quat_arr
 

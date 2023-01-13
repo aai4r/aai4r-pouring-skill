@@ -1,8 +1,5 @@
 import os.path
-import time
 import sys
-
-import numpy as np
 
 from utils.torch_jit_utils import *
 import torch
@@ -15,8 +12,11 @@ from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripper
 from spirl.utils.general_utils import AttrDict
 from utils.utils import euler_to_mat3d, orientation_error, rad2deg, deg2rad, CustomTimer, \
     quaternion_real_first, quaternion_real_last
+
 from pytorch3d import transforms as tr
 from base import VRWrapper
+
+from rollout_manager import RolloutManager, RobotState
 
 
 def to_n_pi_pi(rad):     # [0, 2*pi] --> [-pi, pi]
@@ -130,7 +130,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def __init__(self):
         self.init_vr()
         BaseRTDE.__init__(self, HOST="192.168.0.75")
-        UR3ControlMode.__init__(self, init_mode="downward")
+        UR3ControlMode.__init__(self, init_mode="forward")
 
         # fwd
         self.lim_ax = AttrDict(x_max=0.53, x_min=0.38,
@@ -146,6 +146,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.ap = 0.9   # low-pass filter
 
         self.timer = CustomTimer(duration_sec=1.0)
+
+        self.rollout = RolloutManager()
+        self.collect_demo = True
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
@@ -337,8 +340,6 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         else:
             raise NotImplementedError
 
-        print("des_pos: ", des_pos)
-        print("des_rpy: ", roll, pitch, yaw)
         mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
         des_aa = tr.matrix_to_axis_angle(mat)
         des_rot = des_aa
@@ -366,6 +367,15 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.v_ax.rx = _rx * self.ap + self.v_ax.rx * (1.0 - self.ap)
         self.v_ax.ry = _ry * self.ap + self.v_ax.ry * (1.0 - self.ap)
         self.v_ax.rz = _rz * self.ap + self.v_ax.rz * (1.0 - self.ap)
+
+    def move_grip_on_off_toggle(self):
+        self.grip_on = not self.grip_on  # toggle
+        grip_pos = 0 if self.grip_on else 100
+        self.move_grip_to(pos_in_mm=grip_pos)
+
+    def move_grip_on_off(self, grip_action):
+        grip_pos = 0 if grip_action else 100
+        self.move_grip_to(pos_in_mm=grip_pos)
 
     def move_grip_to(self, pos_in_mm):
         assert self.gripper
@@ -422,11 +432,29 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("lin_vel: ", cont_status["lin_vel"])
                 #     print("dt: ", cont_status["dt"])
 
+    def play_demo(self):
+        # go to initial state in joint space
+        init_state, _ = self.rollout.get(0)
+        self.rtde_c.moveJ(init_state.joint)
+
+        # loop for playing demo
+        for idx in range(1, self.rollout.len()):
+            state, action = self.rollout.get(index=idx)
+            goal_j = self.rtde_c.getInverseKinematics(x=action)
+            actual_j = self.rtde_r.getActualQ()
+            diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
+            if state.gripper ^ self.grip_on:
+                self.move_grip_on_off_toggle()
+            self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
+
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
         try:
             self.rtde_c.moveJ(self.iposes)
             self.set_rpy_base()
+            if self.collect_demo: self.rollout.append(state=RobotState(joint=self.rtde_r.getActualQ(),
+                                                                       gripper=self.grip_on),
+                                                      action=None)
 
             while True:
                 start_t = self.rtde_c.initPeriod()
@@ -436,15 +464,14 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 if cont_status["btn_reset_pose"]:
                     self.rtde_c.speedStop()
                     self.rtde_c.moveJ(self.iposes)
+                    self.play_demo()
                     continue
 
                 rot = [0.0, 0.0, 0.0]
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 if cont_status["btn_trigger"]:
                     if cont_status["btn_gripper"]:
-                        self.grip_on = not self.grip_on  # toggle
-                        grip_pos = 0 if self.grip_on else 100  # 63, 100
-                        self.move_grip_to(pos_in_mm=grip_pos)
+                        self.move_grip_on_off_toggle()
 
                     if cont_status["btn_control_mode"]:
                         self.control_mode_change()
@@ -461,7 +488,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                     d_pos = np.array(actual_tcp_p[:3]) + cont_status["lin_vel"]
                     d_rot = vr_a.numpy()
-                    goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)
+                    goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
+                    if self.collect_demo: self.rollout.append(state=RobotState(joint=actual_j, gripper=self.grip_on),
+                                                              action=goal_pose)
 
                     try:
                         goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)

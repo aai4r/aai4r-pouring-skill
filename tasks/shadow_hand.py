@@ -67,7 +67,7 @@ class ShadowHand(BaseTask):
         self.ignore_z = (self.object_type == "pen")
 
         self.asset_files_dict = {
-            "block": "urdf/objects/cube_multicolor.urdf",
+            "block": "urdf/tasks/cube_multicolor.urdf",
             "egg": "mjcf/open_ai_assets/hand/egg.xml",
             "pen": "mjcf/open_ai_assets/hand/pen.xml"
         }

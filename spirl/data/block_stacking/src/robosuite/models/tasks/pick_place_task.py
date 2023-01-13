@@ -10,9 +10,9 @@ class PickPlaceTask(Task):
     """
     Creates MJCF model of a pick-and-place task.
 
-    A pick-and-place task consists of one robot picking objects from a bin
+    A pick-and-place task consists of one robot picking tasks from a bin
     and placing them into another bin. This class combines the robot, the
-    arena, and the objects into a single MJCF model of the task.
+    arena, and the tasks into a single MJCF model of the task.
     """
 
     def __init__(self, mujoco_arena, mujoco_robot, mujoco_objects, visual_objects):
@@ -20,10 +20,10 @@ class PickPlaceTask(Task):
         Args:
             mujoco_arena: MJCF model of robot workspace
             mujoco_robot: MJCF model of robot model
-            mujoco_objects: a list of MJCF models of physical objects
-            visual_objects: a list of MJCF models of visual objects. Visual
-                objects are excluded from physical computation, we use them to
-                indicate the target destinations of the objects.
+            mujoco_objects: a list of MJCF models of physical tasks
+            visual_objects: a list of MJCF models of visual tasks. Visual
+                tasks are excluded from physical computation, we use them to
+                indicate the target destinations of the tasks.
         """
         super().__init__()
 
@@ -51,7 +51,7 @@ class PickPlaceTask(Task):
         self.merge(mujoco_arena)
 
     def merge_objects(self, mujoco_objects):
-        """Adds physical objects to the MJCF model."""
+        """Adds physical tasks to the MJCF model."""
         self.n_objects = len(mujoco_objects)
         self.mujoco_objects = mujoco_objects
         self.objects = []  # xml manifestation
@@ -69,7 +69,7 @@ class PickPlaceTask(Task):
             )
 
     def merge_visual(self, mujoco_objects):
-        """Adds visual objects to the MJCF model."""
+        """Adds visual tasks to the MJCF model."""
         self.visual_obj_mjcf = []
         for obj_name, obj_mjcf in mujoco_objects.items():
             self.merge_asset(obj_mjcf)
@@ -86,11 +86,11 @@ class PickPlaceTask(Task):
         return [1, 0, 0, 0]
 
     def place_objects(self):
-        """Places objects randomly until no collisions or max iterations hit."""
+        """Places tasks randomly until no collisions or max iterations hit."""
         placed_objects = []
         index = 0
 
-        # place objects by rejection sampling
+        # place tasks by rejection sampling
         for _, obj_mjcf in self.mujoco_objects.items():
             horizontal_radius = obj_mjcf.get_horizontal_radius()
             bottom_offset = obj_mjcf.get_bottom_offset()
@@ -101,7 +101,7 @@ class PickPlaceTask(Task):
                 object_x = np.random.uniform(high=bin_x_half, low=-bin_x_half)
                 object_y = np.random.uniform(high=bin_y_half, low=-bin_y_half)
 
-                # make sure objects do not overlap
+                # make sure tasks do not overlap
                 object_xy = np.array([object_x, object_y, 0])
                 pos = self.bin_offset - bottom_offset + object_xy
                 location_valid = True
@@ -122,13 +122,13 @@ class PickPlaceTask(Task):
                     success = True
                     break
 
-            # raise error if all objects cannot be placed after maximum retries
+            # raise error if all tasks cannot be placed after maximum retries
             if not success:
-                raise RandomizationError("Cannot place all objects in the bins")
+                raise RandomizationError("Cannot place all tasks in the bins")
             index += 1
 
     def place_visual(self):
-        """Places visual objects randomly until no collisions or max iterations hit."""
+        """Places visual tasks randomly until no collisions or max iterations hit."""
         index = 0
         bin_pos = string_to_array(self.bin2_body.get("pos"))
         bin_size = self.bin_size

@@ -35,7 +35,7 @@ class BlockStackEnv(FastResetMujocoEnv, BaseEnvironment):
 
     def __init__(self, hp):
         self._hp = self._default_hparams().overwrite(hp)
-        self._blocks = []   # list of block objects
+        self._blocks = []   # list of block tasks
 
         self.table_full_size = self._hp.table_size
         self.robot_pos = [0, 0, 0]
@@ -70,7 +70,7 @@ class BlockStackEnv(FastResetMujocoEnv, BaseEnvironment):
 
         super().__init__()
 
-        self._prev_block_pos = [copy.deepcopy(b.pos) for b in self._blocks]  # list of prev block objects (for relative reward computation)
+        self._prev_block_pos = [copy.deepcopy(b.pos) for b in self._blocks]  # list of prev block tasks (for relative reward computation)
         self._prev_gripper_pos = copy.deepcopy(self.gripper_pos)
         #self.sim.model.opt.timestep = 0.002 * 2  # this could be used to improve efficiency by increasing sim step size
 
@@ -211,7 +211,7 @@ class BlockStackEnv(FastResetMujocoEnv, BaseEnvironment):
         # reset position of gripper
         self._place_gripper()
 
-        # reset positions of objects
+        # reset positions of tasks
         [b.reset() for b in self._blocks]
         self._place_objects()
 
@@ -360,7 +360,7 @@ class BlockStackEnv(FastResetMujocoEnv, BaseEnvironment):
 
     def _place_objects(self):
         """
-        Randomly places objects in the scene without overlap.
+        Randomly places tasks in the scene without overlap.
         """
         if self._hp.dimension == 2:
             minx = self.arena_pos[0]
@@ -740,7 +740,7 @@ class BlockStackEnv(FastResetMujocoEnv, BaseEnvironment):
                 wall_body.append(geom_obj)
                 self.model.worldbody.append(wall_body)
 
-        # adding objects
+        # adding tasks
         self._blocks = []
         for ix in range(self._hp.n_blocks):
             item_color = color_dict

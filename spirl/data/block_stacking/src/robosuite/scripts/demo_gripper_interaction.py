@@ -1,7 +1,7 @@
 """Gripper interaction demo.
 
 This script illustrates the process of importing grippers into a scene and making it interact
-with the objects with actuators. It also shows how to procedurally generate a scene with the
+with the tasks with actuators. It also shows how to procedurally generate a scene with the
 APIs of the MJCF utility functions.
 
 Example:

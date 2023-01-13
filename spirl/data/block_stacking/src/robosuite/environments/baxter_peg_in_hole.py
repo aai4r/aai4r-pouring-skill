@@ -37,7 +37,7 @@ class BaxterPegInHole(BaxterEnv):
         Inherits the Baxter environment; refer to other parameters described there.
         """
 
-        # initialize objects of interest
+        # initialize tasks of interest
         self.hole = PlateWithHoleObject()
 
         cylinder_radius = np.random.uniform(0.015, 0.03)

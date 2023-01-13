@@ -230,7 +230,7 @@ while True:
                 # clamp depth image to 10 meters to make output image human friendly
                 depth_image[depth_image < -10] = -10
 
-                # flip the direction so near-objects are light and far objects are dark
+                # flip the direction so near-tasks are light and far tasks are dark
                 normalized_depth = -255.0*(depth_image/np.min(depth_image + 1e-4))
 
                 # Convert to a pillow image and write it to disk

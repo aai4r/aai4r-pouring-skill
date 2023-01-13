@@ -102,7 +102,7 @@ class MirobotCube(BaseTask):
 
         asset_root = "../assets"
         mirobot_asset_file = "urdf/mirobot_description/mirobot.urdf"
-        cube_asset_file = "urdf/objects/cube.urdf"
+        cube_asset_file = "urdf/tasks/cube.urdf"
 
         if "asset" in self.cfg["env"]:
             asset_root = self.cfg["env"]["asset"].get("assetRoot", asset_root)

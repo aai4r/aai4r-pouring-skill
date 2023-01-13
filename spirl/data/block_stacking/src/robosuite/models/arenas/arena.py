@@ -9,7 +9,7 @@ class Arena(MujocoXML):
     """Base arena class."""
 
     def set_origin(self, offset):
-        """Applies a constant offset to all objects."""
+        """Applies a constant offset to all tasks."""
         offset = np.array(offset)
         for node in self.worldbody.findall("./*[@pos]"):
             cur_pos = string_to_array(node.get("pos"))
