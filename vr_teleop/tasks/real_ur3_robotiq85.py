@@ -104,7 +104,7 @@ class UR3ControlMode:
         mat = tr.axis_angle_to_matrix(axis_angle if torch.is_tensor(axis_angle) else torch.FloatTensor(axis_angle))
         return tr.matrix_to_euler_angles(mat, euler)
 
-    def control_mode_change(self):
+    def switching_control_mode(self):
         idx = self.cmodes.index(self.CONTROL_MODE)
         self.CONTROL_MODE = self.cmodes[(idx + 1) % len(self.cmodes)]
         print("CONTROL_MODE: {} --> {}".format(self.cmodes[idx], self.CONTROL_MODE))
@@ -258,6 +258,12 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if not hasattr(self, "rtde_c"): return
             self.rtde_c.speedStop()
             self.rtde_c.stopScript()
+
+    def switching_control_mode(self):
+        super().switching_control_mode()
+        self.rtde_c.speedStop()
+        self.rtde_c.moveJ(self.iposes)
+        self.set_rpy_base(log=True)
 
     def goal_pose(self, des_pos, des_rot):
         """
@@ -440,11 +446,13 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         # loop for playing demo
         for idx in range(1, self.rollout.len()):
             state, action = self.rollout.get(index=idx)
+            if state.control_mode != self.CONTROL_MODE:
+                self.switching_control_mode()
+            if state.gripper ^ self.grip_on:
+                self.move_grip_on_off_toggle()
             goal_j = self.rtde_c.getInverseKinematics(x=action)
             actual_j = self.rtde_r.getActualQ()
             diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
-            if state.gripper ^ self.grip_on:
-                self.move_grip_on_off_toggle()
             self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
 
     def run_vr_teleop(self):
@@ -452,9 +460,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         try:
             self.rtde_c.moveJ(self.iposes)
             self.set_rpy_base()
-            if self.collect_demo: self.rollout.append(state=RobotState(joint=self.rtde_r.getActualQ(),
-                                                                       gripper=self.grip_on),
-                                                      action=None)
+            if self.collect_demo:
+                _state = RobotState(joint=self.rtde_r.getActualQ(), gripper=self.grip_on, control_mode=self.CONTROL_MODE)
+                self.rollout.append(state=_state, action=None)
 
             while True:
                 start_t = self.rtde_c.initPeriod()
@@ -470,14 +478,11 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 rot = [0.0, 0.0, 0.0]
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 if cont_status["btn_trigger"]:
+                    if cont_status["btn_control_mode"]:
+                        self.switching_control_mode()
+
                     if cont_status["btn_gripper"]:
                         self.move_grip_on_off_toggle()
-
-                    if cont_status["btn_control_mode"]:
-                        self.control_mode_change()
-                        self.rtde_c.speedStop()
-                        self.rtde_c.moveJ(self.iposes)
-                        self.set_rpy_base(log=True)
 
                     vr_q = torch.tensor(cont_status["pose_quat"])
                     vr_q = quaternion_real_first(q=vr_q)
@@ -489,14 +494,13 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     d_pos = np.array(actual_tcp_p[:3]) + cont_status["lin_vel"]
                     d_rot = vr_a.numpy()
                     goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
-                    if self.collect_demo: self.rollout.append(state=RobotState(joint=actual_j, gripper=self.grip_on),
-                                                              action=goal_pose)
 
-                    try:
-                        goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
-                        diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
-                    except ValueError:
-                        print("goal_pose: ", goal_pose)
+                    if self.collect_demo:
+                        _state = RobotState(joint=actual_j, gripper=self.grip_on, control_mode=self.CONTROL_MODE)
+                        self.rollout.append(state=_state, action=goal_pose)
+
+                    goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
+                    diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
 
                     if self.timer.timeover_active:
                         print("Desired AA: ", vr_q, vr_q.norm())
@@ -510,6 +514,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                 self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
                 self.rtde_c.waitPeriod(start_t)
+        except ValueError:
+            print("Value Error... ")
         finally:
             print("end of control... ")
             if not hasattr(self, "rtde_c"): return

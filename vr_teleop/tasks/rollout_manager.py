@@ -11,7 +11,7 @@ Rollout / demonstration dataset management
 class RobotState:
     joint: float = None
     gripper: bool = None
-    # manipulation mode
+    control_mode: str = None
 
 
 class RolloutManager:
@@ -34,13 +34,19 @@ class RolloutManager:
         return len(self._states)
 
     def reset(self):
-        self._init_state = None
         self._states = []
         self._actions = []
 
-    def save_to(self):
+    def show_current_rollout_info(self):
+        print("====================================")
+        print("Current rollout dataset info.")
+        print("Rollout length: ", self.len())
+        sample_state, sample_action = self.get(0)
+        print("")
+
+    def save_to_file(self):
         pass
 
-    def load_from(self):
+    def load_from_file(self):
         pass
 
