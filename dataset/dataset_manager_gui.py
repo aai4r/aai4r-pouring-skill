@@ -12,7 +12,7 @@ from PIL import Image, ImageQt
 from spirl.utils.general_utils import AttrDict
 
 #UI파일 연결 단, UI파일은 Python 코드 파일과 같은 디렉토리에 위치해야한다.
-form_class = uic.loadUiType("dataset_manager.ui")[0]
+form_class = uic.loadUiType("dataset_manager_gui.ui")[0]
 R, G, B = 0, 1, 2
 
 

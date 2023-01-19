@@ -54,6 +54,7 @@ class BaseRTDE:
 class UR3ControlMode:
     def __init__(self, init_mode="forward"):
         self.cmodes = ["forward", "downward"]
+        self.cmodes_d = {st: i for i, st in enumerate(self.cmodes)}
         self.CONTROL_MODE = init_mode
         print("Initial control mode: ", self.CONTROL_MODE)
 
@@ -390,6 +391,14 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         val = int((float(val) / max_len) * 50.0 + 0.5)
         self.gripper.move(val)
 
+    def grip_one_hot_state(self):
+        return [int(self.grip_on is True), int(self.grip_on is False)]
+
+    def cont_mode_one_hot_state(self):
+        cm_one_hot = [0] * len(self.cmodes)
+        cm_one_hot[self.cmodes_d[self.CONTROL_MODE]] = 1
+        return cm_one_hot
+
     def set_rpy_base(self, log=False):
         actual_tcp_p = self.rtde_r.getActualTCPPose()  # [x, y, z, rx, ry, rz], axis-angle orientation
         yaw, pitch, roll = self.axis_angle_to_euler(actual_tcp_p[3:], euler="ZYX")
@@ -438,14 +447,21 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("lin_vel: ", cont_status["lin_vel"])
                 #     print("dt: ", cont_status["dt"])
 
+    def record_frame(self, action):
+        state = RobotState(joint=self.rtde_r.getActualQ(),
+                           gripper=self.grip_one_hot_state(),
+                           control_mode=self.cont_mode_one_hot_state())
+        info = {"gripper": self.grip_on, "control_mode": self.CONTROL_MODE}
+        self.rollout.append(state=state, action=action, info=info)
+
     def play_demo(self):
         # go to initial state in joint space
-        init_state, _ = self.rollout.get(0)
+        init_state, _, _ = self.rollout.get(0)
         self.rtde_c.moveJ(init_state.joint)
 
         # loop for playing demo
         for idx in range(1, self.rollout.len()):
-            state, action = self.rollout.get(index=idx)
+            state, action, info = self.rollout.get(index=idx)
             if state.control_mode != self.CONTROL_MODE:
                 self.switching_control_mode()
             if state.gripper ^ self.grip_on:
@@ -460,9 +476,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         try:
             self.rtde_c.moveJ(self.iposes)
             self.set_rpy_base()
-            if self.collect_demo:
-                _state = RobotState(joint=self.rtde_r.getActualQ(), gripper=self.grip_on, control_mode=self.CONTROL_MODE)
-                self.rollout.append(state=_state, action=None)
+            if self.collect_demo: self.record_frame(action=self.rtde_r.getActualTCPPose())
 
             while True:
                 start_t = self.rtde_c.initPeriod()
@@ -472,7 +486,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 if cont_status["btn_reset_pose"]:
                     self.rtde_c.speedStop()
                     self.rtde_c.moveJ(self.iposes)
-                    self.play_demo()
+                    # self.play_demo()
+                    self.rollout.show_current_rollout_info()
+                    self.rollout.reset()
                     continue
 
                 rot = [0.0, 0.0, 0.0]
@@ -495,9 +511,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     d_rot = vr_a.numpy()
                     goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
 
-                    if self.collect_demo:
-                        _state = RobotState(joint=actual_j, gripper=self.grip_on, control_mode=self.CONTROL_MODE)
-                        self.rollout.append(state=_state, action=goal_pose)
+                    if self.collect_demo: self.record_frame(action=goal_pose)
 
                     goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
                     diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
