@@ -195,7 +195,7 @@ class DemoUR3Pouring(BaseTask):
         asset_options.vhacd_params.max_convex_hulls = 128
         asset_options.vhacd_params.max_num_vertices_per_ch = 64
 
-        # asset_file_path = "urdf/tasks/background_plane.urdf"
+        # asset_file_path = "urdf/objects/background_plane.urdf"
         # bg_asset = self.gym.load_asset(self.sim, self.asset_root, asset_file_path, asset_options)
         bg_asset = self.gym.create_box(self.sim, 0.001, 3.2, 1.0, asset_options)
         return bg_asset
@@ -218,7 +218,7 @@ class DemoUR3Pouring(BaseTask):
         # asset_options.vhacd_params.max_convex_hulls = 16
         # asset_options.vhacd_params.max_num_vertices_per_ch = 32
 
-        bottle_asset_file = "urdf/tasks/bottle.urdf"
+        bottle_asset_file = "urdf/objects/bottle.urdf"
         if "asset" in self.cfg["env"]:
             bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
 
@@ -236,7 +236,7 @@ class DemoUR3Pouring(BaseTask):
         # asset_options.vhacd_params.max_convex_hulls = 128
         # asset_options.vhacd_params.max_num_vertices_per_ch = 32
 
-        bottle_asset_file = "urdf/tasks/gourd_bottle.urdf"
+        bottle_asset_file = "urdf/objects/gourd_bottle.urdf"
         if "asset" in self.cfg["env"]:
             bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
 
@@ -258,7 +258,7 @@ class DemoUR3Pouring(BaseTask):
         # asset_options.disable_gravity = True
 
         target_cup_asset_name = "paper_cup_broad.urdf"      # paper_cup.urdf, paper_cup_broad.urdf
-        cup_asset_file = "urdf/tasks/" + target_cup_asset_name
+        cup_asset_file = "urdf/objects/" + target_cup_asset_name
         cup_asset = self.gym.load_asset(self.sim, self.asset_root, cup_asset_file, asset_options)
 
         cup_prop_dict = {

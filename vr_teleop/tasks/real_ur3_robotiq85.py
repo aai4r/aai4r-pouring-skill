@@ -148,7 +148,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
         self.timer = CustomTimer(duration_sec=1.0)
 
-        self.rollout = RolloutManager()
+        self.rollout = RolloutManager(task_name="bottle_grasp")
         self.collect_demo = True
 
     def init_vr(self):
@@ -394,10 +394,18 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def grip_one_hot_state(self):
         return [int(self.grip_on is True), int(self.grip_on is False)]
 
+    def grip_to_bool(self, grip_one_hot):
+        idx = [i for i, e in enumerate(grip_one_hot) if round(e) != 0]
+        return True if idx == 0 else False
+
     def cont_mode_one_hot_state(self):
         cm_one_hot = [0] * len(self.cmodes)
         cm_one_hot[self.cmodes_d[self.CONTROL_MODE]] = 1
         return cm_one_hot
+
+    def cont_mode_to_str(self, cm_one_hot):
+        idx = [i for i, e in enumerate(cm_one_hot) if round(e) != 0]
+        return self.cmodes[idx[0]]
 
     def set_rpy_base(self, log=False):
         actual_tcp_p = self.rtde_r.getActualTCPPose()  # [x, y, z, rx, ry, rz], axis-angle orientation
@@ -447,36 +455,40 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("lin_vel: ", cont_status["lin_vel"])
                 #     print("dt: ", cont_status["dt"])
 
-    def record_frame(self, action):
+    def record_frame(self, action, done):
         state = RobotState(joint=self.rtde_r.getActualQ(),
                            gripper=self.grip_one_hot_state(),
                            control_mode=self.cont_mode_one_hot_state())
         info = {"gripper": self.grip_on, "control_mode": self.CONTROL_MODE}
-        self.rollout.append(state=state, action=action, info=info)
+        self.rollout.append(state=state, action=action, done=done, info=info)
 
     def play_demo(self):
         # go to initial state in joint space
-        init_state, _, _ = self.rollout.get(0)
+        init_state, _, _, _ = self.rollout.get(0)
         self.rtde_c.moveJ(init_state.joint)
 
         # loop for playing demo
         for idx in range(1, self.rollout.len()):
-            state, action, info = self.rollout.get(index=idx)
-            if state.control_mode != self.CONTROL_MODE:
+            start_t = self.rtde_c.initPeriod()
+            state, action, done, info = self.rollout.get(index=idx)
+
+            if self.cont_mode_to_str(state.control_mode) != self.CONTROL_MODE:
                 self.switching_control_mode()
-            if state.gripper ^ self.grip_on:
+            if self.grip_to_bool(state.gripper) ^ self.grip_on:
                 self.move_grip_on_off_toggle()
+
             goal_j = self.rtde_c.getInverseKinematics(x=action)
             actual_j = self.rtde_r.getActualQ()
             diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
             self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
+            self.rtde_c.waitPeriod(start_t)
 
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
         try:
             self.rtde_c.moveJ(self.iposes)
             self.set_rpy_base()
-            if self.collect_demo: self.record_frame(action=self.rtde_r.getActualTCPPose())
+            if self.collect_demo: self.record_frame(action=self.rtde_r.getActualTCPPose(), done=0)
 
             while True:
                 start_t = self.rtde_c.initPeriod()
@@ -484,10 +496,12 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
+                    self.record_frame(action=self.rtde_r.getActualTCPPose(), done=1)
                     self.rtde_c.speedStop()
                     self.rtde_c.moveJ(self.iposes)
                     # self.play_demo()
                     self.rollout.show_current_rollout_info()
+                    self.rollout.save_to_file()
                     self.rollout.reset()
                     continue
 
@@ -511,7 +525,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     d_rot = vr_a.numpy()
                     goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
 
-                    if self.collect_demo: self.record_frame(action=goal_pose)
+                    if self.collect_demo: self.record_frame(action=goal_pose, done=0)
 
                     goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
                     diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
@@ -537,6 +551,26 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             print("speed stop.. ")
             self.rtde_c.stopScript()
             print("script stop.. ")
+
+    def replay_mode(self):
+        # self.rollout.load_from_file()
+        # self.rollout.show_current_rollout_info()
+        # return
+        # TODO, can successfully save and load the demonstration
+        # TODO, and replay was successful in runtime
+
+        # TODO, but cannot reproduce that from file...
+        # TODO, have to compare (dataset itself, control env.)
+
+        self.rtde_c.moveJ(self.iposes)
+        self.set_rpy_base()
+        while True:
+            cont_status = self.vr.get_controller_status()
+            if cont_status["btn_reset_pose"]:
+                print("reset & replay")
+                self.rollout.load_from_file()
+                self.rollout.show_current_rollout_info()
+                self.play_demo()
 
     def func_test(self):
         init_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
@@ -570,5 +604,5 @@ if __name__ == "__main__":
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    u.run_vr_teleop()
-    # u.func_test()
+    # u.run_vr_teleop()
+    u.replay_mode()

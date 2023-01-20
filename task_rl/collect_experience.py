@@ -69,11 +69,11 @@ def task_demonstration(task):
     if torch.cuda.device_count() > 1:
         args.task = task_list[task]['task']
         args.device = args.sim_device_type
-        args.compute_device_id = 0
-        args.device_id = 0
-        args.graphics_device_id = 0
-        args.rl_device = 'cuda:0'
-        args.sim_device = 'cuda:0'
+        args.compute_device_id = 1
+        args.device_id = 1
+        args.graphics_device_id = 1
+        args.rl_device = 'cuda:1'
+        args.sim_device = 'cuda:1'
         args.headless = False
         args.test = True
 
