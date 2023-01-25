@@ -148,7 +148,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
         self.timer = CustomTimer(duration_sec=1.0)
 
-        self.rollout = RolloutManager(task_name="bottle_grasp")
+        self.rollout = RolloutManager(task_name="pouring_skill")
         self.collect_demo = True
 
     def init_vr(self):
@@ -560,17 +560,17 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             cont_status = self.vr.get_controller_status()
             if cont_status["btn_reset_pose"]:
                 print("reset & replay")
-                self.rollout.load_from_file(batch_idx=1, rollout_idx=7)
+                self.rollout.load_from_file(batch_idx=1, rollout_idx=6)
                 self.rollout.show_current_rollout_info()
                 self.play_demo()
 
     def func_test(self):
-        # self.rollout.load_from_file(batch_idx=1, rollout_idx=5)
-        # self.rollout.show_current_rollout_info()
-        # for i in range(self.rollout.len()):
-        #     state, action, done, info = self.rollout.get(index=i)
-        #     print(state, self.grip_to_bool(state.gripper), self.cont_mode_to_str(state.control_mode))
-        # return
+        self.rollout.load_from_file(batch_idx=1, rollout_idx=6)
+        self.rollout.show_current_rollout_info()
+        for i in range(self.rollout.len()):
+            state, action, done, info = self.rollout.get(index=i)
+            print(state, self.grip_to_bool(state.gripper), self.cont_mode_to_str(state.control_mode))
+        return
         init_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
                       deg2rad(-150), deg2rad(-82), deg2rad(0)]
         self.rtde_c.moveJ(init_joint)
@@ -602,6 +602,6 @@ if __name__ == "__main__":
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    u.run_vr_teleop()
+    # u.run_vr_teleop()
     # u.replay_mode()
-    # u.func_test()
+    u.func_test()

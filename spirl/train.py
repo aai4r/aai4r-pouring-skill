@@ -100,7 +100,7 @@ class ModelTrainer(BaseTrainer):
             'adam_beta': 0.9,       # beta1 param in Adam
             'top_of_n_eval': 1,     # number of samples used at eval time
             'top_comp_metric': None,    # metric that is used for comparison at eval time (e.g. 'mse')
-            'logging_target': 'wandb',
+            'logging_target': '',
         })
         return default_dict
 
@@ -398,13 +398,13 @@ def save_config(conf_path, exp_conf_path):
 def set_run_params():
     # for debugging
     os.environ["EXP_DIR"] = "../experiments"
-    os.environ["DATA_DIR"] = "../data"
+    os.environ["DATA_DIR"] = "../dataset"
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    task_name = "pouring_water_img"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
+    task_name = "pouring_skill"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
     mode = "hierarchical_cl"
 
     # config path & params
@@ -414,6 +414,13 @@ def set_run_params():
 
 
 if __name__ == '__main__':
+    # _dir = '../dataset/pouring_skill'
+    # for root, dirs, files in os.walk(_dir):
+    #     print("root: ", root)
+    #     print("dirs: ", dirs)
+    #     print("files: ", files)
+    #
+    # exit()
     set_run_params()    # comment out if run outside
     args = get_args()
     ModelTrainer(args=args)

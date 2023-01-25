@@ -97,6 +97,8 @@ class RolloutManager(BatchRolloutFolder):
         save_path = self.get_final_save_path(self.batch_index)
 
         f = h5py.File(save_path, "w")
+        f.create_dataset("traj_per_file", data=1)
+
         traj = f.create_group("traj0")
         traj.create_dataset("states", data=np_episode_dict.states)
         traj.create_dataset("actions", data=np_episode_dict.actions)
