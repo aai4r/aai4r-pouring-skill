@@ -349,7 +349,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
         mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
         des_aa = tr.matrix_to_axis_angle(mat)
-        des_rot = des_aa
+        des_rot = des_aa.tolist()
 
         return list(des_pos) + list(des_rot)
 
@@ -395,8 +395,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         return [int(self.grip_on is True), int(self.grip_on is False)]
 
     def grip_to_bool(self, grip_one_hot):
-        idx = [i for i, e in enumerate(grip_one_hot) if round(e) != 0]
-        return True if idx == 0 else False
+        assert sum(grip_one_hot) == 1.0
+        return True if grip_one_hot[0] == 1.0 else False
 
     def cont_mode_one_hot_state(self):
         cm_one_hot = [0] * len(self.cmodes)
@@ -459,7 +459,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         state = RobotState(joint=self.rtde_r.getActualQ(),
                            gripper=self.grip_one_hot_state(),
                            control_mode=self.cont_mode_one_hot_state())
-        info = {"gripper": self.grip_on, "control_mode": self.CONTROL_MODE}
+        info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         self.rollout.append(state=state, action=action, done=done, info=info)
 
     def play_demo(self):
@@ -482,6 +482,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
             self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
             self.rtde_c.waitPeriod(start_t)
+        self.rtde_c.speedStop()
 
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
@@ -553,26 +554,23 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             print("script stop.. ")
 
     def replay_mode(self):
-        # self.rollout.load_from_file()
-        # self.rollout.show_current_rollout_info()
-        # return
-        # TODO, can successfully save and load the demonstration
-        # TODO, and replay was successful in runtime
-
-        # TODO, but cannot reproduce that from file...
-        # TODO, have to compare (dataset itself, control env.)
-
         self.rtde_c.moveJ(self.iposes)
         self.set_rpy_base()
         while True:
             cont_status = self.vr.get_controller_status()
             if cont_status["btn_reset_pose"]:
                 print("reset & replay")
-                self.rollout.load_from_file()
+                self.rollout.load_from_file(batch_idx=1, rollout_idx=7)
                 self.rollout.show_current_rollout_info()
                 self.play_demo()
 
     def func_test(self):
+        # self.rollout.load_from_file(batch_idx=1, rollout_idx=5)
+        # self.rollout.show_current_rollout_info()
+        # for i in range(self.rollout.len()):
+        #     state, action, done, info = self.rollout.get(index=i)
+        #     print(state, self.grip_to_bool(state.gripper), self.cont_mode_to_str(state.control_mode))
+        # return
         init_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
                       deg2rad(-150), deg2rad(-82), deg2rad(0)]
         self.rtde_c.moveJ(init_joint)
@@ -604,5 +602,6 @@ if __name__ == "__main__":
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    # u.run_vr_teleop()
-    u.replay_mode()
+    u.run_vr_teleop()
+    # u.replay_mode()
+    # u.func_test()

@@ -53,7 +53,7 @@ class RolloutManager(BatchRolloutFolder):
         self._states.append(state)
         self._actions.append(action)
         self._dones.append(done)
-        self._info.append(str(info))
+        self._info.append(info)
 
     def get(self, index):
         assert 0 <= index < self.len()
@@ -76,7 +76,7 @@ class RolloutManager(BatchRolloutFolder):
         np_rollout.states = np.array(_st)
         np_rollout.actions = np.array(self._actions)
         np_rollout.dones = np.array(self._dones)
-        np_rollout.info = np.array(self._info)
+        np_rollout.info = self._info    # raw data (dict str)
         return np_rollout
 
     def show_current_rollout_info(self):
@@ -100,7 +100,7 @@ class RolloutManager(BatchRolloutFolder):
         traj = f.create_group("traj0")
         traj.create_dataset("states", data=np_episode_dict.states)
         traj.create_dataset("actions", data=np_episode_dict.actions)
-        traj.create_dataset("info", data="np_episode_dict.info")    # TODO
+        traj.create_dataset("info", data=np_episode_dict.info)
 
         terminals = np_episode_dict.dones
         if np.sum(terminals) == 0: terminals[-1] = True
@@ -111,9 +111,9 @@ class RolloutManager(BatchRolloutFolder):
         f.close()
         print("save to ", save_path)
 
-    def load_from_file(self):
+    def load_from_file(self, batch_idx, rollout_idx):
         self.reset()
-        load_path = self.get_final_load_path(batch_index=self.batch_index, rollout_num=self.rollout_idx)
+        load_path = self.get_final_load_path(batch_index=batch_idx, rollout_num=rollout_idx)
         with h5py.File(load_path, 'r') as f:
             key = 'traj{}'.format(0)
             print("f: ", f[key])
@@ -131,7 +131,6 @@ class RolloutManager(BatchRolloutFolder):
                     self._dones = f[key + '/' + name][()].astype(np.float32).tolist()
                 elif name == 'info':
                     temp = f[key + '/' + name][()]
-                    print("info temp ", temp, type(temp))
                     self._info = f[key + '/' + name][()]
                 else:
                     raise ValueError("{}: Unexpected rollout element...".format(name))
