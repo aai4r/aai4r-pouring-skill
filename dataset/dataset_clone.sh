@@ -53,14 +53,18 @@ echo $batch_list
 src_batch="batch1"
 src_rollout="rollout_6.h5"
 src=$task_dir/$src_batch/$src_rollout
-n_rollouts=200
+n_rollouts=300
 
 for batch in $batch_list
 do
   for i in $(seq 0 1 $n_rollouts)
   do
     dst=$task_dir/$batch/"rollout_"$i".h5"
-    cp $src $dst
+    if [ -f "$dst" ]; then
+      echo "$dst exists"
+    else
+      cp $src $dst
+    fi
   done
   echo "$batch complete!"
 done

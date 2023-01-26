@@ -409,18 +409,11 @@ def set_run_params():
 
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
-    sys.argv.append("--val_data_size={}".format(140))    # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
+    sys.argv.append("--val_data_size={}".format(90))    # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
     # sys.argv.append("--resume={}".format('300'))     # latest or number..
 
 
 if __name__ == '__main__':
-    # _dir = '../dataset/pouring_skill'
-    # for root, dirs, files in os.walk(_dir):
-    #     print("root: ", root)
-    #     print("dirs: ", dirs)
-    #     print("files: ", files)
-    #
-    # exit()
     set_run_params()    # comment out if run outside
     args = get_args()
     ModelTrainer(args=args)

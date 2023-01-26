@@ -4,7 +4,7 @@ from spirl.models.closed_loop_spirl_mdl import ClSPiRLMdl
 from spirl.components.logger import Logger
 from spirl.utils.general_utils import AttrDict
 from spirl.components.evaluator import TopOfNSequenceEvaluator
-from spirl.components.data_loader import GlobalSplitVideoDataset
+from spirl.rl.envs.real_ur3 import data_spec
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -20,15 +20,6 @@ configuration = {
 }
 configuration = AttrDict(configuration)
 
-data_spec = AttrDict(
-    dataset_class=GlobalSplitVideoDataset,
-    n_actions=6,
-    state_dim=10,
-    split=AttrDict(train=0.9, val=0.1, test=0.0),
-    env_name="pouring_skill",
-    res=128,
-    crop_rand_subseq=True,
-)
 data_spec.max_seq_len = 280
 
 model_config = AttrDict(
