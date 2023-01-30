@@ -10,7 +10,6 @@ env:
 
   aggregateMode: 3
 
-  actionScale: 30.0
   dofVelocityScale: 0.1
   distRewardScale: 0.5
   rotRewardScale: 0.02
@@ -18,7 +17,10 @@ env:
   actionPenaltyScale: 0.01
   rand_init_pos_scale: 1.5
 
-  action_noise: True
+# action definition
+  drive_mode: EFFORT  # {POS, VEL, EFFORT}
+  actionScale: 30.0
+  action_noise: False
   action_noise_scale: 0.2
 
   cam_width: 150

@@ -6,7 +6,6 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import sys
-import os
 import operator
 from copy import deepcopy
 import random
@@ -17,6 +16,7 @@ from isaacgym.gymutil import get_property_setter_map, get_property_getter_map, g
 import numpy as np
 import torch
 
+from utils.torch_jit_utils import quat_apply, to_torch
 from spirl.utils.general_utils import AttrDict
 
 
@@ -46,15 +46,6 @@ class BaseTask:
         self.num_actions = cfg["env"]["numActions"]
 
         self.control_freq_inv = cfg["env"].get("controlFrequencyInv", 1)
-
-        self.interaction_mode = cfg["env"]["interaction_mode"]
-        self.pause = False
-        self.btn_pause_que = []
-
-        # VR Teleoperation
-        self.teleoperation_mode = cfg["env"]["teleoperation_mode"]
-        self.trk_btn_trans = []
-        self.trk_btn_toggle = 1
 
         # optimization flags for pytorch JIT
         torch._C._jit_set_profiling_mode(False)
@@ -103,9 +94,6 @@ class BaseTask:
                 self.viewer, gymapi.KEY_ESCAPE, "QUIT")
             self.gym.subscribe_viewer_keyboard_event(
                 self.viewer, gymapi.KEY_V, "toggle_viewer_sync")
-
-            if self.interaction_mode:
-                self.gym.subscribe_viewer_mouse_event(self.viewer, gymapi.MOUSE_LEFT_BUTTON, "mouse_left")
 
             # set the camera position based on up axis
             sim_params = self.gym.get_sim_params(self.sim)
@@ -428,6 +416,20 @@ class BaseTask:
 
     def post_physics_step(self):
         raise NotImplementedError
+
+    def draw_coord(self, env, poses, rots, scale=0.2):     # args type: numpy arrays
+        self.gym.clear_lines(self.viewer)
+        for pos, rot in zip(poses, rots):
+            # pos = torch.tensor(p, device=self.device, dtype=torch.float32)
+            # rot = torch.tensor(r, device=self.device, dtype=torch.float32)
+            px = (pos + quat_apply(rot, to_torch([1, 0, 0], device=self.device, dtype=torch.float32) * scale)).cpu().numpy()
+            py = (pos + quat_apply(rot, to_torch([0, 1, 0], device=self.device, dtype=torch.float32) * scale)).cpu().numpy()
+            pz = (pos + quat_apply(rot, to_torch([0, 0, 1], device=self.device, dtype=torch.float32) * scale)).cpu().numpy()
+
+            p0 = pos.cpu().numpy()
+            self.gym.add_lines(self.viewer, env, 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]], [0.85, 0.1, 0.1])
+            self.gym.add_lines(self.viewer, env, 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]], [0.1, 0.85, 0.1])
+            self.gym.add_lines(self.viewer, env, 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]], [0.1, 0.1, 0.85])
 
 
 def get_attr_val_from_sample(sample, offset, prop, attr):
