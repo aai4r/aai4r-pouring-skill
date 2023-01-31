@@ -14,9 +14,9 @@ from utils.utils import euler_to_mat3d, orientation_error, rad2deg, deg2rad, Cus
     quaternion_real_first, quaternion_real_last
 
 from pytorch3d import transforms as tr
-from base import VRWrapper
+from vr_teleop.tasks.base import VRWrapper
 
-from rollout_manager import RolloutManager, RobotState
+from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState
 
 
 def to_n_pi_pi(rad):     # [0, 2*pi] --> [-pi, pi]
@@ -41,6 +41,56 @@ class BaseRTDE:
         self.grip_on = False
 
         self.default_control_params = AttrDict(speed=0.25, acceleration=1.2, blend=0.099, dt=1.0 / 500.0)
+
+    def init_period(self):
+        return self.rtde_c.initPeriod()
+
+    def wait_period(self, t):
+        self.rtde_c.waitPeriod(t)
+
+    def get_actual_tcp_pose(self):
+        return self.rtde_r.getActualTCPPose()
+
+    def get_actual_q(self):
+        return self.rtde_r.getActualQ()
+
+    def get_inverse_kinematics(self, tcp_pose):
+        return self.rtde_c.getInverseKinematics(x=tcp_pose)
+
+    def speed_j(self, des_j, acc, dt):
+        self.rtde_c.speedJ(des_j, acc, dt)
+
+    def speed_stop(self):
+        self.rtde_c.speedStop()
+
+    def move_j(self, joint):
+        self.rtde_c.moveJ(joint)
+
+    def stop_script(self):
+        self.rtde_c.stopScript()
+
+    def move_grip_on_off_toggle(self):
+        self.grip_on = not self.grip_on  # toggle
+        grip_pos = 0 if self.grip_on else 100
+        self.move_grip_to(pos_in_mm=grip_pos)
+
+    def move_grip_on_off(self, grip_action):
+        grip_pos = 0 if grip_action else 100
+        self.move_grip_to(pos_in_mm=grip_pos)
+
+    def move_grip_to(self, pos_in_mm):
+        assert self.gripper
+        max_len = 85.0
+        val = min(max(int(pos_in_mm), 0), max_len)  # [0, 50] --> [0/50, 50/50]
+        val = int((float(val) / max_len) * 50.0 + 0.5)
+        self.gripper.move(val)
+
+    def grip_one_hot_state(self):
+        return [int(self.grip_on is True), int(self.grip_on is False)]
+
+    def grip_to_bool(self, grip_one_hot):
+        assert sum(grip_one_hot) == 1.0
+        return True if grip_one_hot[0] == 1.0 else False
 
     @property
     def dt(self):
@@ -95,6 +145,15 @@ class UR3ControlMode:
         self.Pxy = (self.xy_plane @ (self.xy_plane.T @ self.xy_plane).inverse()) @ self.xy_plane.T
         self.Pxz = (self.xz_plane @ (self.xz_plane.T @ self.xz_plane).inverse()) @ self.xz_plane.T
         self.Pyz = (self.yz_plane @ (self.yz_plane.T @ self.yz_plane).inverse()) @ self.yz_plane.T
+
+    def cont_mode_one_hot_state(self):
+        cm_one_hot = [0] * len(self.cmodes)
+        cm_one_hot[self.cmodes_d[self.CONTROL_MODE]] = 1
+        return cm_one_hot
+
+    def cont_mode_to_str(self, cm_one_hot):
+        idx = [i for i, e in enumerate(cm_one_hot) if round(e) != 0]
+        return self.cmodes[idx[0]]
 
     def axis_angle_to_euler(self, axis_angle, euler="XYZ"):
         """
@@ -212,8 +271,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             # Move to initial joint position
             init_joint = [deg2rad(8.5), deg2rad(-110), deg2rad(-115),
                           deg2rad(-135), deg2rad(-82), deg2rad(0)]
-            self.rtde_c.moveJ(init_joint)
-            init_tcp_p = self.rtde_r.getActualTCPPose()
+            self.move_j(init_joint)
+            init_tcp_p = self.get_actual_tcp_pose()
 
             # determine limit positions in each axis
             # [x, y, z, roll, pitch, yaw]
@@ -225,7 +284,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 self.set_velL(vel=list(_vel.values()))
 
                 while True:
-                    actual_tcp_p = self.rtde_r.getActualTCPPose()
+                    actual_tcp_p = self.get_actual_tcp_pose()
                     # print("actual_tcp_p: ", actual_tcp_p)
 
                     lim_flag = self.limit_check(tcp_p=actual_tcp_p)
@@ -257,13 +316,13 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         finally:
             print("end of control... ")
             if not hasattr(self, "rtde_c"): return
-            self.rtde_c.speedStop()
-            self.rtde_c.stopScript()
+            self.speed_stop()
+            self.stop_script()
 
     def switching_control_mode(self):
         super().switching_control_mode()
-        self.rtde_c.speedStop()
-        self.rtde_c.moveJ(self.iposes)
+        self.speed_stop()
+        self.move_j(self.iposes)
         self.set_rpy_base(log=True)
 
     def goal_pose(self, des_pos, des_rot):
@@ -375,40 +434,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.v_ax.ry = _ry * self.ap + self.v_ax.ry * (1.0 - self.ap)
         self.v_ax.rz = _rz * self.ap + self.v_ax.rz * (1.0 - self.ap)
 
-    def move_grip_on_off_toggle(self):
-        self.grip_on = not self.grip_on  # toggle
-        grip_pos = 0 if self.grip_on else 100
-        self.move_grip_to(pos_in_mm=grip_pos)
-
-    def move_grip_on_off(self, grip_action):
-        grip_pos = 0 if grip_action else 100
-        self.move_grip_to(pos_in_mm=grip_pos)
-
-    def move_grip_to(self, pos_in_mm):
-        assert self.gripper
-        max_len = 85.0
-        val = min(max(int(pos_in_mm), 0), max_len)  # [0, 50] --> [0/50, 50/50]
-        val = int((float(val) / max_len) * 50.0 + 0.5)
-        self.gripper.move(val)
-
-    def grip_one_hot_state(self):
-        return [int(self.grip_on is True), int(self.grip_on is False)]
-
-    def grip_to_bool(self, grip_one_hot):
-        assert sum(grip_one_hot) == 1.0
-        return True if grip_one_hot[0] == 1.0 else False
-
-    def cont_mode_one_hot_state(self):
-        cm_one_hot = [0] * len(self.cmodes)
-        cm_one_hot[self.cmodes_d[self.CONTROL_MODE]] = 1
-        return cm_one_hot
-
-    def cont_mode_to_str(self, cm_one_hot):
-        idx = [i for i, e in enumerate(cm_one_hot) if round(e) != 0]
-        return self.cmodes[idx[0]]
-
     def set_rpy_base(self, log=False):
-        actual_tcp_p = self.rtde_r.getActualTCPPose()  # [x, y, z, rx, ry, rz], axis-angle orientation
+        actual_tcp_p = self.get_actual_tcp_pose()  # [x, y, z, rx, ry, rz], axis-angle orientation
         yaw, pitch, roll = self.axis_angle_to_euler(actual_tcp_p[3:], euler="ZYX")
         self.rpy_base = [roll, pitch, yaw]
         if log:
@@ -456,7 +483,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("dt: ", cont_status["dt"])
 
     def record_frame(self, action, done):
-        state = RobotState(joint=self.rtde_r.getActualQ(),
+        state = RobotState(joint=self.get_actual_q(),
                            gripper=self.grip_one_hot_state(),
                            control_mode=self.cont_mode_one_hot_state())
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
@@ -465,11 +492,11 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def play_demo(self):
         # go to initial state in joint space
         init_state, _, _, _ = self.rollout.get(0)
-        self.rtde_c.moveJ(init_state.joint)
+        self.move_j(init_state.joint)
 
         # loop for playing demo
         for idx in range(1, self.rollout.len()):
-            start_t = self.rtde_c.initPeriod()
+            start_t = self.init_period()
             state, action, done, info = self.rollout.get(index=idx)
 
             if self.cont_mode_to_str(state.control_mode) != self.CONTROL_MODE:
@@ -477,33 +504,33 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if self.grip_to_bool(state.gripper) ^ self.grip_on:
                 self.move_grip_on_off_toggle()
 
-            goal_j = self.rtde_c.getInverseKinematics(x=action)
-            actual_j = self.rtde_r.getActualQ()
+            goal_j = self.get_inverse_kinematics(tcp_pose=action)
+            actual_j = self.get_actual_q()
             diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
-            self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
-            self.rtde_c.waitPeriod(start_t)
-        self.rtde_c.speedStop()
+            self.speed_j(list(diff_j), self.acc, self.dt)
+            self.wait_period(start_t)
+        self.speed_stop()
 
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
         try:
-            self.rtde_c.moveJ(self.iposes)
+            self.move_j(self.iposes)
             self.set_rpy_base()
-            if self.collect_demo: self.record_frame(action=self.rtde_r.getActualTCPPose(), done=0)
+            if self.collect_demo: self.record_frame(action=self.get_actual_tcp_pose(), done=0)
 
             while True:
-                start_t = self.rtde_c.initPeriod()
+                start_t = self.init_period()
 
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
-                    self.record_frame(action=self.rtde_r.getActualTCPPose(), done=1)
-                    self.rtde_c.speedStop()
-                    self.rtde_c.moveJ(self.iposes)
+                    self.record_frame(action=self.get_actual_tcp_pose(), done=1)
+                    self.speed_stop()
+                    self.move_j(self.iposes)
                     # self.play_demo()
-                    self.rollout.show_current_rollout_info()
-                    self.rollout.save_to_file()
-                    self.rollout.reset()
+                    # self.rollout.show_current_rollout_info()
+                    # self.rollout.save_to_file()
+                    # self.rollout.reset()
                     continue
 
                 rot = [0.0, 0.0, 0.0]
@@ -519,8 +546,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     vr_q = quaternion_real_first(q=vr_q)
                     vr_a = tr.quaternion_to_axis_angle(vr_q)           # desired aa pose by VR
 
-                    actual_tcp_p = self.rtde_r.getActualTCPPose()
-                    actual_j = self.rtde_r.getActualQ()
+                    actual_tcp_p = self.get_actual_tcp_pose()
+                    actual_j = self.get_actual_q()
 
                     d_pos = np.array(actual_tcp_p[:3]) + cont_status["lin_vel"]
                     d_rot = vr_a.numpy()
@@ -528,7 +555,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                     if self.collect_demo: self.record_frame(action=goal_pose, done=0)
 
-                    goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
+                    goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
                     diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
 
                     if self.timer.timeover_active:
@@ -541,20 +568,20 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                         # print("dj: ", dj)
                         print("----------------------------------")
 
-                self.rtde_c.speedJ(list(diff_j), self.acc, self.dt)
-                self.rtde_c.waitPeriod(start_t)
+                self.speed_j(list(diff_j), self.acc, self.dt)
+                self.wait_period(start_t)
         except ValueError:
             print("Value Error... ")
         finally:
             print("end of control... ")
             if not hasattr(self, "rtde_c"): return
-            self.rtde_c.speedStop()
+            self.speed_stop()
             print("speed stop.. ")
-            self.rtde_c.stopScript()
+            self.stop_script()
             print("script stop.. ")
 
     def replay_mode(self):
-        self.rtde_c.moveJ(self.iposes)
+        self.move_j(self.iposes)
         self.set_rpy_base()
         while True:
             cont_status = self.vr.get_controller_status()
@@ -569,39 +596,39 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.rollout.show_current_rollout_info()
         for i in range(self.rollout.len()):
             state, action, done, info = self.rollout.get(index=i)
-            print(state, self.grip_to_bool(state.gripper), self.cont_mode_to_str(state.control_mode))
+            print(state, self.grip_to_bool(state.gripper), self.cont_mode_to_str(state.control_mode), action)
         return
         init_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
                       deg2rad(-150), deg2rad(-82), deg2rad(0)]
-        self.rtde_c.moveJ(init_joint)
+        self.move_j(init_joint)
         goal_pose = [0.59, 0.065, 0.154, 1.02, 1.353, 1.481]
 
         try:
             j_spd = [0.0, 0.0, 0.0, 0.0, 0.0, 0.02]
             for i in range(1000):
-                start_t = self.rtde_c.initPeriod()
-                goal_j = self.rtde_c.getInverseKinematics(x=goal_pose)
-                actual_j = self.rtde_r.getActualQ()
+                start_t = self.init_period()
+                goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
+                actual_j = self.get_actual_q()
                 scale = 0.1
                 diff_j = np.array(goal_j) - np.array(actual_j)
-                self.rtde_c.speedJ(list(diff_j * scale), 1.2, 1.0 / 500)
+                self.speed_j(list(diff_j * scale), 1.2, 1.0 / 500)
                 if self.timer.elapsed():
                     print(i, j_spd)
                     # print("start_t ", start_t)
                     print("actual_j: ", actual_j)
                     print("goal_j: ", goal_j)
                     print("diff_j: ", diff_j * scale)
-                self.rtde_c.waitPeriod(start_t)
+                self.wait_period(start_t)
         finally:
             print("prgram end")
-            self.rtde_c.speedStop()
-            self.rtde_c.stopScript()
+            self.speed_stop()
+            self.stop_script()
 
 
 if __name__ == "__main__":
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    # u.run_vr_teleop()
+    u.run_vr_teleop()
     # u.replay_mode()
-    u.func_test()
+    # u.func_test()

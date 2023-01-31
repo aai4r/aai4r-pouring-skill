@@ -210,6 +210,7 @@ class RLTrainer:
                 while True:  # keep producing rollouts until we get a valid one
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     n_total += 1
+                    if n_total % 10 == 0: print("n_total: ", n_total)
         # print("Rewards: {:d} / {:d} = {:.3f}%".format(n_success, n_total, float(n_success) / n_total * 100))
 
     def collect_rollouts(self):

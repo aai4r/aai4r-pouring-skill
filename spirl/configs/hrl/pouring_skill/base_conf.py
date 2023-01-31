@@ -65,6 +65,7 @@ ll_model_params = AttrDict(
     state_cond_pred=False,
     weights_dir="weights",
     aux_pred_dim=len([]),         # C, 0 or 9
+    state_cond=False,
 )
 
 # LL Agent
