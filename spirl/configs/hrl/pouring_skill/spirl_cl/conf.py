@@ -11,6 +11,7 @@ ll_policy_params = AttrDict(
     policy_model_params=ll_model_params,
     policy_model_checkpoint=os.path.join(os.environ["EXP_DIR"],
                                          "skill_prior_learning/pouring_skill/hierarchical_cl"),
+    policy_model_epoch='30',  # default: latest
 )
 ll_policy_params.update(ll_model_params)
 

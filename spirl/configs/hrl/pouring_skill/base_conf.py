@@ -1,8 +1,6 @@
 import os
 import copy
 import torch
-from init_conf import project_home_path
-from task_rl.config import load_cfg
 
 from spirl.utils.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent

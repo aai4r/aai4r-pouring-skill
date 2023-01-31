@@ -169,6 +169,93 @@ class UR3ControlMode:
         self.CONTROL_MODE = self.cmodes[(idx + 1) % len(self.cmodes)]
         print("CONTROL_MODE: {} --> {}".format(self.cmodes[idx], self.CONTROL_MODE))
 
+    def goal_pose(self, des_pos, des_rot):
+        """
+        * Limiting desired position and rotation to working space
+        * Input should be numpy array
+        :param des_pos:
+        :param des_rot:
+        :return: compete goal pose
+        """
+        des_pos[0] = max(self.limits.x_min, min(self.limits.x_max, des_pos[0]))     # x
+        des_pos[1] = max(self.limits.y_min, min(self.limits.y_max, des_pos[1]))     # y
+        des_pos[2] = max(self.limits.z_min, min(self.limits.z_max, des_pos[2]))     # z
+
+        _q = tr.axis_angle_to_quaternion(torch.FloatTensor(des_rot))  # VR_Q [w, x, y, z]
+        q = quaternion_real_last(q=_q)
+
+        qx_axis = tf_vector(q, self.x_axis)  # refer TCP coordinate
+        qy_axis = tf_vector(q, self.y_axis)
+        qz_axis = tf_vector(q, self.z_axis)
+
+        if self.CONTROL_MODE == "forward":
+            # pitch
+            z_xz = self.Pxz @ qz_axis   # projection to plane
+            dot_z_x = (z_xz @ self.x_axis) / (z_xz.norm() * self.x_axis.norm())
+            pitch = torch.acos(dot_z_x)
+            pitch *= 1.0 if z_xz[2] < 0 else -1.0
+            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
+
+            # yaw
+            z_xy = self.Pxy @ qz_axis
+            dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
+            yaw = torch.acos(dot_z_x)
+            yaw *= 1.0 if z_xy[1] > 0 else -1.0
+            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
+
+            # TCP: roll --> Fixed: Pitch
+            y_yz = self.Pyz @ qy_axis
+            dot_y_z = (y_yz @ self.z_axis) / (y_yz.norm() * self.z_axis.norm())
+            roll = torch.acos(dot_y_z)
+            roll *= 1.0 if y_yz[1] > 0 else -1.0
+            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
+
+            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))    # VR axis-angle --> quaternion --> rpy
+            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
+
+            # ZYX order
+            _yaw = yaw + self.rpy_base[2]
+            _pitch = roll + self.rpy_base[1]
+            _roll = pitch + self.rpy_base[0]
+        elif self.CONTROL_MODE == "downward":
+            # TODO, set limits for downward mode
+            # pitch
+            y_xz = self.Pxz @ qy_axis  # projection to plane
+            dot_y_x = (y_xz @ self.x_axis) / (y_xz.norm() * self.x_axis.norm())
+            pitch = torch.acos(dot_y_x)
+            pitch *= 1.0 if y_xz[2] < 0 else -1.0
+            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
+
+            # yaw
+            y_xy = self.Pxy @ qy_axis
+            dot_y_x = (y_xy @ self.x_axis) / (y_xy.norm() * self.x_axis.norm())
+            yaw = torch.acos(dot_y_x)
+            yaw *= 1.0 if y_xy[1] > 0 else -1.0
+            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
+
+            # TCP: roll --> Fixed: Pitch
+            z_yz = self.Pyz @ qz_axis
+            dot_z_nz = (z_yz @ -self.z_axis) / (z_yz.norm() * self.z_axis.norm())
+            roll = torch.acos(dot_z_nz)
+            roll *= 1.0 if z_yz[1] < 0 else -1.0
+            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
+
+            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
+            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
+
+            # ZYX order
+            _yaw = yaw + self.rpy_base[2]
+            _pitch = roll + self.rpy_base[1]
+            _roll = pitch + self.rpy_base[0]
+        else:
+            raise NotImplementedError
+
+        mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
+        des_aa = tr.matrix_to_axis_angle(mat)
+        des_rot = des_aa.tolist()
+
+        return list(des_pos) + list(des_rot)
+
     @property
     def iposes(self):
         return self._iposes[self.CONTROL_MODE]
@@ -324,93 +411,6 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.speed_stop()
         self.move_j(self.iposes)
         self.set_rpy_base(log=True)
-
-    def goal_pose(self, des_pos, des_rot):
-        """
-        * Limiting desired position and rotation to working space
-        * Input should be numpy array
-        :param des_pos:
-        :param des_rot:
-        :return: compete goal pose
-        """
-        des_pos[0] = max(self.limits.x_min, min(self.limits.x_max, des_pos[0]))     # x
-        des_pos[1] = max(self.limits.y_min, min(self.limits.y_max, des_pos[1]))     # y
-        des_pos[2] = max(self.limits.z_min, min(self.limits.z_max, des_pos[2]))     # z
-
-        _q = tr.axis_angle_to_quaternion(torch.FloatTensor(des_rot))  # VR_Q [w, x, y, z]
-        q = quaternion_real_last(q=_q)
-
-        qx_axis = tf_vector(q, self.x_axis)  # refer TCP coordinate
-        qy_axis = tf_vector(q, self.y_axis)
-        qz_axis = tf_vector(q, self.z_axis)
-
-        if self.CONTROL_MODE == "forward":
-            # pitch
-            z_xz = self.Pxz @ qz_axis   # projection to plane
-            dot_z_x = (z_xz @ self.x_axis) / (z_xz.norm() * self.x_axis.norm())
-            pitch = torch.acos(dot_z_x)
-            pitch *= 1.0 if z_xz[2] < 0 else -1.0
-            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
-
-            # yaw
-            z_xy = self.Pxy @ qz_axis
-            dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
-            yaw = torch.acos(dot_z_x)
-            yaw *= 1.0 if z_xy[1] > 0 else -1.0
-            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
-
-            # TCP: roll --> Fixed: Pitch
-            y_yz = self.Pyz @ qy_axis
-            dot_y_z = (y_yz @ self.z_axis) / (y_yz.norm() * self.z_axis.norm())
-            roll = torch.acos(dot_y_z)
-            roll *= 1.0 if y_yz[1] > 0 else -1.0
-            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
-
-            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))    # VR axis-angle --> quaternion --> rpy
-            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
-
-            # ZYX order
-            _yaw = yaw + self.rpy_base[2]
-            _pitch = roll + self.rpy_base[1]
-            _roll = pitch + self.rpy_base[0]
-        elif self.CONTROL_MODE == "downward":
-            # TODO, set limits for downward mode
-            # pitch
-            y_xz = self.Pxz @ qy_axis  # projection to plane
-            dot_y_x = (y_xz @ self.x_axis) / (y_xz.norm() * self.x_axis.norm())
-            pitch = torch.acos(dot_y_x)
-            pitch *= 1.0 if y_xz[2] < 0 else -1.0
-            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
-
-            # yaw
-            y_xy = self.Pxy @ qy_axis
-            dot_y_x = (y_xy @ self.x_axis) / (y_xy.norm() * self.x_axis.norm())
-            yaw = torch.acos(dot_y_x)
-            yaw *= 1.0 if y_xy[1] > 0 else -1.0
-            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
-
-            # TCP: roll --> Fixed: Pitch
-            z_yz = self.Pyz @ qz_axis
-            dot_z_nz = (z_yz @ -self.z_axis) / (z_yz.norm() * self.z_axis.norm())
-            roll = torch.acos(dot_z_nz)
-            roll *= 1.0 if z_yz[1] < 0 else -1.0
-            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
-
-            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
-            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
-
-            # ZYX order
-            _yaw = yaw + self.rpy_base[2]
-            _pitch = roll + self.rpy_base[1]
-            _roll = pitch + self.rpy_base[0]
-        else:
-            raise NotImplementedError
-
-        mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
-        des_aa = tr.matrix_to_axis_angle(mat)
-        des_rot = des_aa.tolist()
-
-        return list(des_pos) + list(des_rot)
 
     def set_velJ(self):
         pass
@@ -629,6 +629,6 @@ if __name__ == "__main__":
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    u.run_vr_teleop()
-    # u.replay_mode()
+    # u.run_vr_teleop()
+    u.replay_mode()
     # u.func_test()

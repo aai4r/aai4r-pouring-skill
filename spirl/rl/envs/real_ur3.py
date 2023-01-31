@@ -10,8 +10,8 @@ import numpy as np
 
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
-    n_actions=6,
     state_dim=10,
+    n_actions=6,
     split=AttrDict(train=0.9, val=0.1, test=0.0),
     env_name="pouring_skill",
     res=128,
@@ -53,7 +53,8 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
             if cont_status["btn_trigger"]:
                 print("VR trigger on!")
                 actual_q = self.get_actual_q()
-                goal_q = self.get_inverse_kinematics(tcp_pose=action)
+                goal_pose = self.goal_pose(des_pos=action[:3], des_rot=action[3:])
+                goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
                 diff_q = (np.array(goal_q) - np.array(actual_q)) * 0.5
                 self.speed_j(list(diff_q), self.acc, self.dt)
                 self.wait_period(start_t)
