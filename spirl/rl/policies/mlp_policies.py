@@ -6,8 +6,8 @@ from spirl.modules.mdn import MDN, GMM
 from spirl.modules.subnetworks import Predictor, HybridConvMLPEncoder, Encoder
 from spirl.modules.variational_inference import MultivariateGaussian
 from spirl.rl.components.policy import Policy
-from spirl.utils.general_utils import ParamDict, AttrDict
-from spirl.utils.pytorch_utils import RemoveSpatial
+from spirl.utility.general_utils import ParamDict, AttrDict
+from spirl.utility.pytorch_utils import RemoveSpatial
 
 
 class MLPPolicy(Policy):

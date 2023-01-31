@@ -1,4 +1,4 @@
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.data.kitchen.src.kitchen_data_loader import D4RLSequenceSplitDataset
 
 

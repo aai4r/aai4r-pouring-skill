@@ -1,3 +1,4 @@
+from utils.torch_jit_utils import *
 import matplotlib; matplotlib.use('Agg')
 import torch
 import os
@@ -8,21 +9,20 @@ from shutil import copy
 import datetime
 import imp
 from tensorboardX import SummaryWriter
-import numpy as np
 import random
 from torch import autograd
 from torch.optim import Adam, RMSprop, SGD
 from functools import partial
 
 from spirl.components.data_loader import RandomVideoDataset
-from spirl.utils.general_utils import RecursiveAverageMeter, map_dict
+from spirl.utility.general_utils import RecursiveAverageMeter, map_dict
 from spirl.components.checkpointer import CheckpointHandler, save_cmd, save_git, get_config_path
-from spirl.utils.general_utils import dummy_context, AttrDict, get_clipped_optimizer, \
+from spirl.utility.general_utils import dummy_context, AttrDict, get_clipped_optimizer, \
                                                         AverageMeter, ParamDict
-from spirl.utils.pytorch_utils import LossSpikeHook, NanGradHook, NoneGradHook, \
+from spirl.utility.pytorch_utils import LossSpikeHook, NanGradHook, NoneGradHook, \
                                                         DataParallelWrapper, RAdam
 from spirl.components.trainer_base import BaseTrainer
-from spirl.utils.wandb import WandBLogger
+from spirl.utility.wandb import WandBLogger
 from spirl.components.params import get_args
 
 WANDB_PROJECT_NAME = 'spirl_project'

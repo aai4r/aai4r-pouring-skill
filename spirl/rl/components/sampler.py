@@ -3,7 +3,7 @@ import numpy as np
 import contextlib
 from collections import deque
 
-from spirl.utils.general_utils import listdict2dictlist, AttrDict, ParamDict, obj2np
+from spirl.utility.general_utils import listdict2dictlist, AttrDict, ParamDict, obj2np
 from spirl.modules.variational_inference import MultivariateGaussian
 from spirl.rl.utils.reward_fcns import sparse_threshold
 

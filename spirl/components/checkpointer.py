@@ -5,7 +5,7 @@ import sys
 
 import numpy as np
 import torch
-from spirl.utils.general_utils import str2int
+from spirl.utility.general_utils import str2int
 
 
 class CheckpointHandler:

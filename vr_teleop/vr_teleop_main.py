@@ -4,7 +4,7 @@ import time
 from tasks.base import *
 from tasks.cube import Cube
 from tasks.ur3_robotiq85 import IsaacUR3
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from utils.torch_jit_utils import *
 
 import triad_openvr

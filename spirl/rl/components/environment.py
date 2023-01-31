@@ -5,8 +5,8 @@ import numpy as np
 from torchvision.transforms import Resize
 from PIL import Image
 
-from spirl.utils.general_utils import ParamDict, AttrDict, map_recursive
-from spirl.utils.pytorch_utils import ar2ten, ten2ar
+from spirl.utility.general_utils import ParamDict, AttrDict, map_recursive
+from spirl.utility.pytorch_utils import ar2ten, ten2ar
 
 
 class BaseEnvironment:

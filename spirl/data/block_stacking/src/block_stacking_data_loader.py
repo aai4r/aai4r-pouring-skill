@@ -1,6 +1,6 @@
 import os
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.components.data_loader import GlobalSplitVideoDataset, GlobalSplitStateSequenceDataset
 
 

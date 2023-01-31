@@ -1,5 +1,5 @@
 from utils.utils import CustomTimer
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from .base import *
 import time
 

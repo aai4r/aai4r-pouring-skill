@@ -1,5 +1,5 @@
 from spirl.rl.components.environment import BaseEnvironment
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.components.data_loader import GlobalSplitVideoDataset
 
 from vr_teleop.tasks.real_ur3_robotiq85 import BaseRTDE, UR3ControlMode
@@ -11,7 +11,7 @@ import numpy as np
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
     state_dim=10,
-    n_actions=6,
+    n_actions=8,
     split=AttrDict(train=0.9, val=0.1, test=0.0),
     env_name="pouring_skill",
     res=128,

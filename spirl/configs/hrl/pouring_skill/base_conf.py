@@ -2,7 +2,7 @@ import os
 import copy
 import torch
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
 from spirl.rl.policies.mlp_policies import MLPPolicy
 from spirl.rl.components.critic import MLPCritic

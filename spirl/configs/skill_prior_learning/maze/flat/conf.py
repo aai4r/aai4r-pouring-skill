@@ -1,7 +1,7 @@
 import os
 
 from spirl.models.bc_mdl import ImageBCMdl
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.configs.default_data_configs.maze import data_spec
 from spirl.components.evaluator import DummyEvaluator
 from spirl.components.logger import Logger

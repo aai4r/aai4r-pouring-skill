@@ -12,7 +12,7 @@ from tqdm import tqdm
 from collections import defaultdict
 
 from task_rl.utils.rollout_utils import RolloutSaverIsaac
-from spirl.utils.general_utils import AttrDict, ParamDict, pretty_print, AverageTimer, timing
+from spirl.utility.general_utils import AttrDict, ParamDict, pretty_print, AverageTimer, timing
 from spirl.train import get_exp_dir, make_path, set_seeds, save_config, datetime_str, save_checkpoint
 from spirl.rl.utils.mpi import update_with_mpi_config, set_shutdown_hooks, mpi_gather_experience, mpi_sum
 from spirl.components.checkpointer import get_config_path, save_cmd, save_git, CheckpointHandler

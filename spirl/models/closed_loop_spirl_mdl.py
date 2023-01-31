@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 
-from spirl.utils.general_utils import batch_apply, ParamDict
-from spirl.utils.pytorch_utils import get_constant_parameter, ResizeSpatial, RemoveSpatial
+from spirl.utility.general_utils import batch_apply, ParamDict
+from spirl.utility.pytorch_utils import get_constant_parameter, ResizeSpatial, RemoveSpatial
 from spirl.models.skill_prior_mdl import SkillPriorMdl, ImageSkillPriorMdl
 from spirl.modules.subnetworks import Predictor, BaseProcessingLSTM, Encoder, PreTrainEncoder
 from spirl.modules.variational_inference import MultivariateGaussian

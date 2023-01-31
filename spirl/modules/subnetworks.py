@@ -14,10 +14,10 @@ from spirl.modules.recurrent_modules import BaseProcessingLSTM, \
 from spirl.modules.variational_inference import Gaussian
 from spirl.modules.variational_inference import SequentialGaussian_SharedPQ
 from spirl.modules.variational_inference import UnitGaussian
-from spirl.utils.general_utils import SkipInputSequential, GetIntermediatesSequential, \
+from spirl.utility.general_utils import SkipInputSequential, GetIntermediatesSequential, \
     remove_spatial, batchwise_index, batch_apply, map_recursive, apply_linear, ParamDict
-from spirl.utils.pytorch_utils import like, AttrDictPredictor, batchwise_assign, make_one_hot, mask_out
-from spirl.utils.general_utils import broadcast_final, AttrDict
+from spirl.utility.pytorch_utils import like, AttrDictPredictor, batchwise_assign, make_one_hot, mask_out
+from spirl.utility.general_utils import broadcast_final, AttrDict
 from torch import Tensor
 from torchvision import models, transforms
 from spirl.components.checkpointer import freeze_modules, freeze_model_until

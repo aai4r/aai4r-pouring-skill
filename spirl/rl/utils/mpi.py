@@ -6,7 +6,7 @@ import sys
 import numpy as np
 import torch
 
-from spirl.utils.general_utils import AttrDict, joinListDictList
+from spirl.utility.general_utils import AttrDict, joinListDictList
 
 
 def update_with_mpi_config(conf):

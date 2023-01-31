@@ -3,8 +3,8 @@ import inspect
 import numpy as np
 import torch
 
-from spirl.utils.general_utils import flatten_dict, prefix_dict
-from spirl.utils.vis_utils import plot_graph
+from spirl.utility.general_utils import flatten_dict, prefix_dict
+from spirl.utility.vis_utils import plot_graph
 
 
 class WandBLogger:

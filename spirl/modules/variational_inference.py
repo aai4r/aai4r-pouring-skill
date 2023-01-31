@@ -4,8 +4,8 @@ import numpy as np
 
 from torch.distributions.multivariate_normal import MultivariateNormal
 
-from spirl.utils.pytorch_utils import ten2ar
-from spirl.utils.general_utils import batch_apply
+from spirl.utility.pytorch_utils import ten2ar
+from spirl.utility.general_utils import batch_apply
 
 
 class Gaussian:

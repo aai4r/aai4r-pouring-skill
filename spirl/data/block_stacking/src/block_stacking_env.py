@@ -7,7 +7,7 @@ from spirl.data.block_stacking.src.robosuite.utils.mjcf_utils import new_joint, 
 
 from spirl.rl.components.environment import BaseEnvironment
 from spirl.rl.utils.robosuite_utils import FastResetMujocoEnv
-from spirl.utils.general_utils import AttrDict, ParamDict
+from spirl.utility.general_utils import AttrDict, ParamDict
 from spirl.data.block_stacking.src.utils.utils import lookat_to_quat, convert_quat
 from spirl.data.block_stacking.src.utils.block import Block
 from spirl.data.block_stacking.src.utils.block_placement_helper import PlacementGenerator

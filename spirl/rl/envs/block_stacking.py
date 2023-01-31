@@ -1,7 +1,7 @@
 import numpy as np
 
 from spirl.rl.components.environment import GymEnv
-from spirl.utils.general_utils import AttrDict, ParamDict
+from spirl.utility.general_utils import AttrDict, ParamDict
 from spirl.data.block_stacking.src.block_stacking_env import BlockStackEnv as UnwrappedBlockStackEnv
 from spirl.data.block_stacking.src.block_stacking_env import HighStackBlockStackEnv, SparseHighStackBlockStackEnv
 from spirl.data.block_stacking.src.block_task_generator import FixedSizeSingleTowerBlockTaskGenerator

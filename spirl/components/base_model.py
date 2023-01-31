@@ -3,9 +3,9 @@ from contextlib import contextmanager
 import torch
 import torch.nn as nn
 
-from spirl.utils.general_utils import ParamDict
-from spirl.utils.pytorch_utils import Updater
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import ParamDict
+from spirl.utility.pytorch_utils import Updater
+from spirl.utility.general_utils import AttrDict
 
 
 class BaseModel(nn.Module):

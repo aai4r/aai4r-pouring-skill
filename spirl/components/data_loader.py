@@ -7,9 +7,9 @@ import numpy as np
 import torch.utils.data as data
 import itertools
 
-from spirl.utils.general_utils import AttrDict, map_dict, maybe_retrieve, shuffle_with_seed
-from spirl.utils.pytorch_utils import RepeatedDataLoader
-from spirl.utils.video_utils import resize_video
+from spirl.utility.general_utils import AttrDict, map_dict, maybe_retrieve, shuffle_with_seed
+from spirl.utility.pytorch_utils import RepeatedDataLoader
+from spirl.utility.video_utils import resize_video
 
 
 class Dataset(data.Dataset):

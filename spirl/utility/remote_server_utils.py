@@ -1,6 +1,6 @@
 import ftplib
 import os
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 
 def download_model_weights(params):

@@ -5,11 +5,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-from spirl.utils.pytorch_utils import DataParallelWrapper, RAdam
+from spirl.utility.pytorch_utils import DataParallelWrapper, RAdam
 from spirl.modules.variational_inference import MultivariateGaussian, Gaussian
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.modules.losses import KLDivLoss, NLL
-from spirl.utils.pytorch_utils import _gather
+from spirl.utility.pytorch_utils import _gather
 
 
 class Model(nn.Module):

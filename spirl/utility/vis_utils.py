@@ -4,7 +4,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import cv2
 
-from spirl.utils.pytorch_utils import pad_seq, stack_with_separator
+from spirl.utility.pytorch_utils import pad_seq, stack_with_separator
 
 
 def fig2img(fig):

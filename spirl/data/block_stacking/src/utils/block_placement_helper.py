@@ -2,7 +2,7 @@ import numpy as np
 from random import Random
 from math import pi, sin, cos, sqrt
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 
 DEFAULT_SIDE = 0.1

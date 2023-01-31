@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.distributions import Categorical
 
 from spirl.modules.variational_inference import MultivariateGaussian
-from spirl.utils.pytorch_utils import ten2ar
+from spirl.utility.pytorch_utils import ten2ar
 
 
 class MDN(nn.Module):
@@ -108,8 +108,8 @@ class GMM:
 
 if __name__ == "__main__":
     ### VISUALIZE
-    # from spirl.utils.pytorch_utils import ten2ar
-    from spirl.utils.general_utils import split_along_axis
+    # from spirl.utility.pytorch_utils import ten2ar
+    from spirl.utility.general_utils import split_along_axis
     # import numpy as np
     from matplotlib import pyplot as plt
     from matplotlib.patches import Ellipse
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     ### TRAIN
     import numpy as np
     import matplotlib.pyplot as plt
-    from spirl.utils.general_utils import AttrDict
+    from spirl.utility.general_utils import AttrDict
     from spirl.modules.layers import LayerBuilderParams
     from spirl.modules.subnetworks import Predictor
 

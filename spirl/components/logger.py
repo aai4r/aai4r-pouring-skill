@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from tensorboardX import SummaryWriter
 
-from spirl.utils.vis_utils import plot_graph
+from spirl.utility.vis_utils import plot_graph
 
 
 class Logger:

@@ -4,7 +4,7 @@ import numpy as np
 import itertools
 
 from spirl.components.data_loader import Dataset
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 
 class D4RLSequenceSplitDataset(Dataset):

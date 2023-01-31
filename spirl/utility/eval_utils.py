@@ -3,8 +3,8 @@ from math import exp
 import numpy as np
 import torch
 import torch.nn.functional as F
-from spirl.utils.general_utils import get_dim_inds
-from spirl.utils.pytorch_utils import ten2ar, ar2ten
+from spirl.utility.general_utils import get_dim_inds
+from spirl.utility.pytorch_utils import ten2ar, ar2ten
 from torch.autograd import Variable
 
 

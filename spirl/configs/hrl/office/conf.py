@@ -1,7 +1,7 @@
 import os
 import copy
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
 from spirl.rl.components.critic import MLPCritic
 from spirl.rl.envs.office import OfficeEnv

@@ -2,10 +2,10 @@ import os
 
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.models.skill_prior_mdl import SkillSpaceLogger
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
 from spirl.components.evaluator import TopOfNSequenceEvaluator
-from spirl.utils.remote_server_utils import WeightNaming
+from spirl.utility.remote_server_utils import WeightNaming
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 

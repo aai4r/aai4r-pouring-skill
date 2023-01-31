@@ -9,7 +9,7 @@ from gym.spaces import Space
 from task_rl.ExpertRolloutStorage import ExpertRolloutStorage
 
 from task_rl.utils.rollout_utils import RolloutSaverIsaac
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 
 class ExpertManager:

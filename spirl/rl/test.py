@@ -13,7 +13,7 @@ from tensorboardX import SummaryWriter
 from spirl.rl.components.params import get_args
 from spirl.train import set_seeds, make_path, datetime_str, save_config, get_exp_dir, save_checkpoint
 from spirl.components.checkpointer import CheckpointHandler, save_cmd, save_git, get_config_path
-from spirl.utils.general_utils import AttrDict, ParamDict, AverageTimer, timing, pretty_print
+from spirl.utility.general_utils import AttrDict, ParamDict, AverageTimer, timing, pretty_print
 from spirl.rl.utils.mpi import update_with_mpi_config, set_shutdown_hooks, mpi_sum, mpi_gather_experience
 from spirl.rl.utils.wandb import WandBLogger
 from spirl.rl.utils.rollout_utils import RolloutRepository

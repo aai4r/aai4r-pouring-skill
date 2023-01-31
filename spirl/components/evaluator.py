@@ -4,9 +4,9 @@ import numpy as np
 import torch
 from skimage.io import imsave
 
-from spirl.utils.eval_utils import ssim, psnr, mse
-from spirl.utils.general_utils import batchwise_index, AttrDict, timed, dict_concat
-from spirl.utils.vis_utils import make_gif_strip
+from spirl.utility.eval_utils import ssim, psnr, mse
+from spirl.utility.general_utils import batchwise_index, AttrDict, timed, dict_concat
+from spirl.utility.vis_utils import make_gif_strip
 
 
 class TopOfNEvaluator:

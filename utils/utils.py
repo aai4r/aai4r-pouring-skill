@@ -1,9 +1,10 @@
 import time
 
 import numpy as np
-import torch
-from utils.torch_jit_utils import quat_conjugate, quat_mul
+# import torch
+# from utility.torch_jit_utils import quat_conjugate, quat_mul
 from dataclasses import dataclass
+from isaacgym.torch_utils import *
 
 PI = np.pi
 
@@ -99,8 +100,6 @@ def orientation_error(desired, current):
     q_r = quat_mul(desired, cc)
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)
 
-
-from isaacgym.torch_utils import *
 
 
 @dataclass

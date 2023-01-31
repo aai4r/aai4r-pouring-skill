@@ -11,8 +11,8 @@ from torch.optim.optimizer import Optimizer
 from torch.nn.modules import BatchNorm1d, BatchNorm2d, BatchNorm3d
 from torch.nn.functional import interpolate
 
-from spirl.utils.general_utils import batchwise_assign, map_dict, AttrDict, AverageMeter, map_recursive, remove_spatial
-from spirl.utils import ndim
+from spirl.utility.general_utils import batchwise_assign, map_dict, AttrDict, AverageMeter, map_recursive, remove_spatial
+from spirl.utility import ndim
 
 
 class LossSpikeHook:

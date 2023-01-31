@@ -4,9 +4,9 @@ from funcsigs import signature
 from spirl.modules.layers import BaseProcessingNet, FCBlock
 from spirl.modules.losses import L2Loss
 from spirl.modules.variational_inference import stack
-from spirl.utils.general_utils import AttrDict, batchwise_assign, map_dict, \
+from spirl.utility.general_utils import AttrDict, batchwise_assign, map_dict, \
     concat_inputs, listdict2dictlist, subdict
-from spirl.utils.general_utils import broadcast_final
+from spirl.utility.general_utils import broadcast_final
 
 
 # Note: this post has an example custom implementation of LSTM from which we can derive a ConvLSTM/TreeLSTM

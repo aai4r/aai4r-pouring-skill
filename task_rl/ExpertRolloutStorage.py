@@ -8,7 +8,7 @@ import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, SubsetRandomSampler
 
 from task_rl.utils.rollout_utils import RolloutSaverIsaac
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 dtype_to_byte = {torch.float32: 4, torch.float: 4, torch.uint8: 1}
 

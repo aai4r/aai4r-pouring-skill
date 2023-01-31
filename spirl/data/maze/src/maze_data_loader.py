@@ -3,8 +3,8 @@ import gym
 import numpy as np
 
 from spirl.components.data_loader import Dataset
-from spirl.utils.general_utils import AttrDict
-from spirl.utils.video_utils import resize_video
+from spirl.utility.general_utils import AttrDict
+from spirl.utility.video_utils import resize_video
 
 
 class MazeStateSequenceDataset(Dataset):

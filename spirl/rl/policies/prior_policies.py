@@ -8,8 +8,8 @@ from spirl.modules.variational_inference import MultivariateGaussian, mc_kl_dive
 from spirl.rl.components.agent import BaseAgent
 from spirl.rl.components.policy import Policy
 from spirl.rl.policies.mlp_policies import SplitObsMLPPolicy, MLPPolicy, HybridConvMLPPolicy
-from spirl.utils.general_utils import AttrDict, ParamDict
-from spirl.utils.pytorch_utils import no_batchnorm_update
+from spirl.utility.general_utils import AttrDict, ParamDict
+from spirl.utility.pytorch_utils import no_batchnorm_update
 
 
 class PriorInitializedPolicy(Policy):

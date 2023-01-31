@@ -1,7 +1,7 @@
 import torch
 from torch.nn import BCEWithLogitsLoss
 
-from spirl.utils.general_utils import AttrDict, get_dim_inds
+from spirl.utility.general_utils import AttrDict, get_dim_inds
 from spirl.modules.variational_inference import Gaussian
 
 

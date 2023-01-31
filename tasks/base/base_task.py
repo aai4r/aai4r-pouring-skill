@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 from utils.torch_jit_utils import quat_apply, to_torch
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 
 # Base class for RL tasks

@@ -1,4 +1,4 @@
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from task_rl.data.isaacgym.src.isaacgym_data_loader import IsaacGymSequenceDataLoader
 from spirl.components.data_loader import GlobalSplitVideoDataset
 

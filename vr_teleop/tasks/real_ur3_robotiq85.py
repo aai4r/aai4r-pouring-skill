@@ -1,15 +1,9 @@
-import os.path
-import sys
-
 from utils.torch_jit_utils import *
-import torch
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-
 import rtde_control
 import rtde_receive
 from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripper
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from utils.utils import euler_to_mat3d, orientation_error, rad2deg, deg2rad, CustomTimer, \
     quaternion_real_first, quaternion_real_last
 
@@ -38,7 +32,8 @@ class BaseRTDE:
         self.gripper.activate()
         self.gripper.set_force(0)  # range: [0, 100]
         self.gripper.set_speed(10)  # range: [0, 100]
-        self.grip_on = False
+        self.grip_on = None
+        self.move_grip_on_off(grip_action=False)
 
         self.default_control_params = AttrDict(speed=0.25, acceleration=1.2, blend=0.099, dt=1.0 / 500.0)
 
@@ -75,8 +70,12 @@ class BaseRTDE:
         self.move_grip_to(pos_in_mm=grip_pos)
 
     def move_grip_on_off(self, grip_action):
+        assert type(grip_action) == bool
+        if self.grip_on is not None:
+            if grip_action == self.grip_on: return
         grip_pos = 0 if grip_action else 100
         self.move_grip_to(pos_in_mm=grip_pos)
+        self.grip_on = grip_action
 
     def move_grip_to(self, pos_in_mm):
         assert self.gripper
@@ -88,7 +87,8 @@ class BaseRTDE:
     def grip_one_hot_state(self):
         return [int(self.grip_on is True), int(self.grip_on is False)]
 
-    def grip_to_bool(self, grip_one_hot):
+    @staticmethod
+    def grip_onehot_to_bool(grip_one_hot):
         assert sum(grip_one_hot) == 1.0
         return True if grip_one_hot[0] == 1.0 else False
 
@@ -482,11 +482,12 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("lin_vel: ", cont_status["lin_vel"])
                 #     print("dt: ", cont_status["dt"])
 
-    def record_frame(self, action, done):
+    def record_frame(self, action_q, action_grip, done):
         state = RobotState(joint=self.get_actual_q(),
                            gripper=self.grip_one_hot_state(),
                            control_mode=self.cont_mode_one_hot_state())
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
+        action = action_q + action_grip
         self.rollout.append(state=state, action=action, done=done, info=info)
 
     def play_demo(self):
@@ -501,10 +502,11 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
             if self.cont_mode_to_str(state.control_mode) != self.CONTROL_MODE:
                 self.switching_control_mode()
-            if self.grip_to_bool(state.gripper) ^ self.grip_on:
-                self.move_grip_on_off_toggle()
 
-            goal_j = self.get_inverse_kinematics(tcp_pose=action)
+            action_q, action_grip = action[:6], action[6:]
+            self.move_grip_on_off(self.grip_onehot_to_bool(action_grip))
+
+            goal_j = self.get_inverse_kinematics(tcp_pose=action_q)
             actual_j = self.get_actual_q()
             diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
             self.speed_j(list(diff_j), self.acc, self.dt)
@@ -516,7 +518,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         try:
             self.move_j(self.iposes)
             self.set_rpy_base()
-            if self.collect_demo: self.record_frame(action=self.get_actual_tcp_pose(), done=0)
+            if self.collect_demo: self.record_frame(action_q=self.get_actual_tcp_pose(),
+                                                    action_grip=self.grip_one_hot_state(),
+                                                    done=0)
 
             while True:
                 start_t = self.init_period()
@@ -524,13 +528,15 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
-                    self.record_frame(action=self.get_actual_tcp_pose(), done=1)
+                    self.record_frame(action_q=self.get_actual_tcp_pose(),
+                                      action_grip=self.grip_one_hot_state(),
+                                      done=1)
                     self.speed_stop()
                     self.move_j(self.iposes)
                     # self.play_demo()
-                    # self.rollout.show_current_rollout_info()
-                    # self.rollout.save_to_file()
-                    # self.rollout.reset()
+                    self.rollout.show_rollout_summary()
+                    self.rollout.save_to_file()
+                    self.rollout.reset()
                     continue
 
                 rot = [0.0, 0.0, 0.0]
@@ -553,7 +559,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     d_rot = vr_a.numpy()
                     goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
 
-                    if self.collect_demo: self.record_frame(action=goal_pose, done=0)
+                    if self.collect_demo: self.record_frame(action_q=goal_pose,
+                                                            action_grip=self.grip_one_hot_state(),
+                                                            done=0)
 
                     goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
                     diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
@@ -580,23 +588,23 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             self.stop_script()
             print("script stop.. ")
 
-    def replay_mode(self):
+    def replay_mode(self, batch_idx, rollout_idx):
         self.move_j(self.iposes)
         self.set_rpy_base()
         while True:
             cont_status = self.vr.get_controller_status()
             if cont_status["btn_reset_pose"]:
                 print("reset & replay")
-                self.rollout.load_from_file(batch_idx=1, rollout_idx=6)
-                self.rollout.show_current_rollout_info()
+                self.rollout.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
+                self.rollout.show_rollout_summary()
                 self.play_demo()
 
     def func_test(self):
         self.rollout.load_from_file(batch_idx=1, rollout_idx=6)
-        self.rollout.show_current_rollout_info()
+        self.rollout.show_rollout_summary()
         for i in range(self.rollout.len()):
             state, action, done, info = self.rollout.get(index=i)
-            print(state, self.grip_to_bool(state.gripper), self.cont_mode_to_str(state.control_mode), action)
+            print(state, self.grip_onehot_to_bool(state.gripper), self.cont_mode_to_str(state.control_mode), action)
         return
         init_joint = [deg2rad(8.5), deg2rad(-102), deg2rad(-108),
                       deg2rad(-150), deg2rad(-82), deg2rad(0)]
@@ -630,5 +638,5 @@ if __name__ == "__main__":
     # u.vr_handler()
     # u.workspace_verify()
     # u.run_vr_teleop()
-    u.replay_mode()
+    u.replay_mode(batch_idx=1, rollout_idx=7)
     # u.func_test()

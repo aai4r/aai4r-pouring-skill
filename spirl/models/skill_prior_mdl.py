@@ -15,10 +15,10 @@ from spirl.components.checkpointer import load_by_key, freeze_modules, freeze_mo
 from spirl.modules.losses import KLDivLoss, NLL
 from spirl.modules.subnetworks import BaseProcessingLSTM, Predictor, Encoder, PreTrainEncoder
 from spirl.modules.recurrent_modules import RecurrentPredictor
-from spirl.utils.general_utils import AttrDict, ParamDict, split_along_axis, get_clipped_optimizer
-from spirl.utils.pytorch_utils import map2np, ten2ar, RemoveSpatial, ResizeSpatial, map2torch, find_tensor, \
+from spirl.utility.general_utils import AttrDict, ParamDict, split_along_axis, get_clipped_optimizer
+from spirl.utility.pytorch_utils import map2np, ten2ar, RemoveSpatial, ResizeSpatial, map2torch, find_tensor, \
                                         TensorModule, RAdam
-from spirl.utils.vis_utils import fig2img
+from spirl.utility.vis_utils import fig2img
 from spirl.modules.variational_inference import ProbabilisticModel, Gaussian, MultivariateGaussian, get_fixed_prior, \
                                                 mc_kl_divergence
 from spirl.modules.layers import LayerBuilderParams

@@ -2,7 +2,7 @@ import os
 
 from spirl.models.skill_prior_mdl import ImageSkillPriorMdl
 from spirl.data.block_stacking.src.block_stacking_logger import SkillSpaceBlockStackLogger
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.configs.default_data_configs.block_stacking import data_spec
 from spirl.components.evaluator import TopOfNSequenceEvaluator
 

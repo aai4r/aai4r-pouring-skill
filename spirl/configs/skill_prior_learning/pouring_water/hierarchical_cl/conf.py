@@ -2,7 +2,7 @@ import os
 
 from spirl.models.closed_loop_spirl_mdl import ClSPiRLMdl
 from spirl.components.logger import Logger
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec
 from spirl.components.evaluator import TopOfNSequenceEvaluator
 

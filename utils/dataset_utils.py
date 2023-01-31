@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 plt.ion()
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 np.set_printoptions(precision=3)
 
 import sys

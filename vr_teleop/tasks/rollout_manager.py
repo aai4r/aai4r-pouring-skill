@@ -6,7 +6,7 @@ import numpy as np
 import dataclasses
 from dataclasses import dataclass
 from dataset.rollout_dataset import BatchRolloutFolder
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 """
 written by twkim
@@ -79,7 +79,7 @@ class RolloutManager(BatchRolloutFolder):
         np_rollout.info = self._info    # raw data (dict str)
         return np_rollout
 
-    def show_current_rollout_info(self):
+    def show_rollout_summary(self):
         print("====================================")
         print("Current rollout dataset info.")
         print("Rollout length: ", self.len())
@@ -137,4 +137,14 @@ class RolloutManager(BatchRolloutFolder):
                 else:
                     raise ValueError("{}: Unexpected rollout element...".format(name))
         print("Load complete!")
+
+
+if __name__ == "__main__":
+    # test code for rollout file check
+    task = "pouring_skill"
+    roll = RolloutManager(task_name=task)
+    roll.load_from_file(batch_idx=1, rollout_idx=6)
+    for i in range(roll.len()):
+        state, action, done, info = roll.get(i)
+        print("state: ", state)
 

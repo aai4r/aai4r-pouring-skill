@@ -2,7 +2,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 
-from spirl.utils.general_utils import ParamDict, AttrDict, nan_hook
+from spirl.utility.general_utils import ParamDict, AttrDict, nan_hook
 
 
 class Policy(nn.Module):

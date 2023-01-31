@@ -4,8 +4,8 @@ import pickle
 import os
 import copy
 
-from spirl.utils.general_utils import AttrDict, RecursiveAverageMeter, ParamDict
-from spirl.utils.remote_server_utils import WeightNaming
+from spirl.utility.general_utils import AttrDict, RecursiveAverageMeter, ParamDict
+from spirl.utility.remote_server_utils import WeightNaming
 
 
 class ReplayBuffer:

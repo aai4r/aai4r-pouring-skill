@@ -3,8 +3,8 @@ import numpy as np
 from spirl.components.logger import Logger
 from spirl.models.skill_prior_mdl import SkillSpaceLogger
 from spirl.data.block_stacking.src.block_stacking_env import BlockStackEnv
-from spirl.utils.general_utils import AttrDict
-from spirl.utils.vis_utils import add_caption_to_img
+from spirl.utility.general_utils import AttrDict
+from spirl.utility.vis_utils import add_caption_to_img
 from spirl.data.block_stacking.src.block_task_generator import FixedSizeSingleTowerBlockTaskGenerator
 
 

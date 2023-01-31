@@ -1,7 +1,7 @@
 from collections import deque
 import numpy as np
 
-from spirl.utils.general_utils import ParamDict
+from spirl.utility.general_utils import ParamDict
 
 
 class BlockTaskGenerator:

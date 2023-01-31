@@ -2,7 +2,7 @@ import numpy as np
 from collections import deque
 import copy
 
-from spirl.utils.general_utils import AttrDict, split_along_axis
+from spirl.utility.general_utils import AttrDict, split_along_axis
 from spirl.data.block_stacking.src.utils.utils import quat2euler
 from spirl.data.block_stacking.src.block_stacking_env import BlockStackEnv
 

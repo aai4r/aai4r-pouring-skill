@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 
-from spirl.utils.general_utils import AttrDict, ParamDict
-from spirl.utils.pytorch_utils import no_batchnorm_update, ar2ten, ten2ar
+from spirl.utility.general_utils import AttrDict, ParamDict
+from spirl.utility.pytorch_utils import no_batchnorm_update, ar2ten, ten2ar
 from spirl.rl.components.agent import BaseAgent
 from spirl.rl.components.policy import Policy
 from spirl.modules.variational_inference import MultivariateGaussian

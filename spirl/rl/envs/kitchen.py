@@ -2,8 +2,8 @@ import numpy as np
 from collections import defaultdict
 import d4rl
 
-from spirl.utils.general_utils import AttrDict
-from spirl.utils.general_utils import ParamDict
+from spirl.utility.general_utils import AttrDict
+from spirl.utility.general_utils import ParamDict
 from spirl.rl.components.environment import GymEnv
 
 

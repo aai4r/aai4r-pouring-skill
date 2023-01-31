@@ -1,6 +1,6 @@
 import os
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 from spirl.data.block_stacking.src.demo_gen.block_stacking_demo_agent import BlockStackingDemoAgent
 from spirl.data.block_stacking.src.block_stacking_env import BlockStackEnv

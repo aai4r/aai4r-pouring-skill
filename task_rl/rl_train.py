@@ -14,7 +14,7 @@ from task_rl.task_rl_trainer import SkillRLTrainer
 from spirl.rl.components.params import get_args
 from utils.config import parse_sim_params
 from tasks.base.vec_task import VecTaskPython
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 
 
 import os

@@ -8,11 +8,11 @@ import time
 import cv2
 import imp
 
-from spirl.utils.general_utils import AttrDict, ParamDict
+from spirl.utility.general_utils import AttrDict, ParamDict
 from spirl.components.checkpointer import get_config_path
 from spirl.components.data_loader import GlobalSplitVideoDataset
 from spirl.modules.subnetworks import BaseProcessingLSTM, Predictor, Encoder
-from spirl.utils.pytorch_utils import map2np, ten2ar, RemoveSpatial, ResizeSpatial, map2torch, find_tensor, \
+from spirl.utility.pytorch_utils import map2np, ten2ar, RemoveSpatial, ResizeSpatial, map2torch, find_tensor, \
                                         TensorModule, RAdam
 
 

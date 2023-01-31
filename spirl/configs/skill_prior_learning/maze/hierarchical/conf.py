@@ -1,7 +1,7 @@
 import os
 
 from spirl.models.skill_prior_mdl import ImageSkillPriorMdl, SkillSpaceLogger
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.configs.default_data_configs.maze import data_spec
 from spirl.components.evaluator import TopOfNSequenceEvaluator
 

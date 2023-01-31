@@ -6,8 +6,8 @@ import copy
 from spirl.components.base_model import BaseModel
 from spirl.modules.losses import NLL
 from spirl.modules.subnetworks import Predictor, Encoder
-from spirl.utils.general_utils import AttrDict, ParamDict
-from spirl.utils.pytorch_utils import RemoveSpatial, ResizeSpatial
+from spirl.utility.general_utils import AttrDict, ParamDict
+from spirl.utility.pytorch_utils import RemoveSpatial, ResizeSpatial
 from spirl.modules.variational_inference import ProbabilisticModel, MultivariateGaussian
 from spirl.modules.layers import LayerBuilderParams
 from spirl.modules.mdn import GMM

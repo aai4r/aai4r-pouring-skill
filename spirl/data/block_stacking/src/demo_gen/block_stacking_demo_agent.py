@@ -1,4 +1,4 @@
-from spirl.utils.general_utils import AttrDict, ParamDict
+from spirl.utility.general_utils import AttrDict, ParamDict
 from spirl.rl.components.agent import BaseAgent
 
 from spirl.data.block_stacking.src.demo_gen.block_demo_policy import ClosedLoopBlockStackDemoPolicy

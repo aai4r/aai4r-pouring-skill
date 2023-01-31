@@ -2,7 +2,7 @@ import wandb
 import inspect
 import numpy as np
 
-from spirl.utils.general_utils import flatten_dict, prefix_dict
+from spirl.utility.general_utils import flatten_dict, prefix_dict
 
 
 class WandBLogger:

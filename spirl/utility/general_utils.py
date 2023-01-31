@@ -16,7 +16,7 @@ from functools import partial, reduce
 import collections
 from collections import OrderedDict
 
-from spirl.utils import ndim
+from spirl.utility import ndim
 
 
 class AverageMeter(object):

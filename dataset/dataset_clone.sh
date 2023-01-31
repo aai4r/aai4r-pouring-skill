@@ -51,7 +51,7 @@ echo $batch_list
 # copy rollout files
 # *********************************************
 src_batch="batch1"
-src_rollout="rollout_6.h5"
+src_rollout="rollout_7.h5"
 src=$task_dir/$src_batch/$src_rollout
 n_rollouts=300
 

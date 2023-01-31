@@ -3,7 +3,7 @@ from torchvision.transforms import Resize
 from PIL import Image
 
 import roboverse
-from spirl.utils.general_utils import AttrDict, ParamDict
+from spirl.utility.general_utils import AttrDict, ParamDict
 from spirl.rl.components.environment import GymEnv
 
 

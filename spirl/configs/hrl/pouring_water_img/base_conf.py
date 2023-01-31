@@ -5,7 +5,7 @@ import isaacgym
 import torch
 from init_conf import project_home_path
 
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent, MultiEnvFixedIntervalHierarchicalAgent
 from spirl.rl.components.critic import SplitObsMLPCritic
 from spirl.rl.envs.isaacgym_env import PouringWaterEnv
@@ -16,7 +16,7 @@ from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 from spirl.rl.agents.ac_agent import SACAgent
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
-from spirl.utils.remote_server_utils import WeightNaming
+from spirl.utility.remote_server_utils import WeightNaming
 
 from utils.config import parse_sim_params
 from task_rl.config import load_cfg

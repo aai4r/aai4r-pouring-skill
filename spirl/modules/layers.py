@@ -2,8 +2,8 @@ import math
 from functools import partial
 
 import torch.nn as nn
-from spirl.utils.general_utils import ConcatSequential, HasParameters
-from spirl.utils.general_utils import AttrDict
+from spirl.utility.general_utils import ConcatSequential, HasParameters
+from spirl.utility.general_utils import AttrDict
 from torch.nn import init
 
 
