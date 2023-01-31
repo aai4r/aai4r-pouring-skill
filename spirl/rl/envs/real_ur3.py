@@ -52,8 +52,12 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
             if cont_status["btn_trigger"]:
                 print("VR trigger on!")
+                d_pos, d_rot, grip = action[:3], action[3:6], action[6:]
+                grip_onehot = [1, 0] if grip[0] > grip[1] else [0, 1]
+                self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
+
                 actual_q = self.get_actual_q()
-                goal_pose = self.goal_pose(des_pos=action[:3], des_rot=action[3:])
+                goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)
                 goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
                 diff_q = (np.array(goal_q) - np.array(actual_q)) * 0.5
                 self.speed_j(list(diff_q), self.acc, self.dt)
