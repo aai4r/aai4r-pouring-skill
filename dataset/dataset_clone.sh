@@ -51,9 +51,21 @@ echo $batch_list
 # copy rollout files
 # *********************************************
 src_batch="batch1"
-src_rollout="rollout_7.h5"
-src=$task_dir/$src_batch/$src_rollout
-n_rollouts=300
+
+# [rollout_$start.h5, rollout_$end.h5]
+start=0;
+end=10;
+src_rollouts=()
+for i in $(seq $start 1 $end)
+do
+  src_rollouts+=("rollout_"$i".h5")
+done
+
+echo "src rollouts: "
+echo ${src_rollouts[@]}
+num_src=${#src_rollouts[@]}
+idx=0
+n_rollouts=300  # num files to clone
 
 for batch in $batch_list
 do
@@ -63,7 +75,10 @@ do
     if [ -f "$dst" ]; then
       echo "$dst exists"
     else
+      src=$task_dir/$src_batch/${src_rollouts[$idx]}
       cp $src $dst
+      idx=$(((idx+1) % num_src))
+#      echo $src
     fi
   done
   echo "$batch complete!"

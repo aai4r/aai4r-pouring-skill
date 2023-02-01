@@ -50,7 +50,10 @@ class BaseRTDE:
         return self.rtde_r.getActualQ()
 
     def get_inverse_kinematics(self, tcp_pose):
-        return self.rtde_c.getInverseKinematics(x=tcp_pose)
+        try:
+            return self.rtde_c.getInverseKinematics(x=tcp_pose)
+        except:
+            print("IK exception..! ", tcp_pose)
 
     def speed_j(self, des_j, acc, dt):
         self.rtde_c.speedJ(des_j, acc, dt)
@@ -253,6 +256,7 @@ class UR3ControlMode:
         mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
         des_aa = tr.matrix_to_axis_angle(mat)
         des_rot = des_aa.tolist()
+        print("des_pos: {}, des_rot: {}".format(des_pos, des_rot))
 
         return list(des_pos) + list(des_rot)
 
@@ -503,10 +507,15 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if self.cont_mode_to_str(state.control_mode) != self.CONTROL_MODE:
                 self.switching_control_mode()
 
-            action_q, action_grip = action[:6], action[6:]
-            self.move_grip_on_off(self.grip_onehot_to_bool(action_grip))
+            drv_pos, drv_rot, grip = action[:3], action[3:6], action[6:]
+            self.move_grip_on_off(self.grip_onehot_to_bool(grip))
 
-            goal_j = self.get_inverse_kinematics(tcp_pose=action_q)
+            actual_tcp_pose = self.get_actual_tcp_pose()
+            des_pos = np.array(actual_tcp_pose[:3]) + np.array(drv_pos)
+            des_rot = np.array(drv_rot)
+
+            goal_pose = self.goal_pose(des_pos=des_pos, des_rot=des_rot)
+            goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
             actual_j = self.get_actual_q()
             diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
             self.speed_j(list(diff_j), self.acc, self.dt)
@@ -518,7 +527,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         try:
             self.move_j(self.iposes)
             self.set_rpy_base()
-            if self.collect_demo: self.record_frame(action_q=self.get_actual_tcp_pose(),
+            if self.collect_demo: self.record_frame(action_q=[0., 0., 0.] + self.get_actual_tcp_pose()[3:],
                                                     action_grip=self.grip_one_hot_state(),
                                                     done=0)
 
@@ -528,7 +537,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
-                    self.record_frame(action_q=self.get_actual_tcp_pose(),
+                    self.record_frame(action_q=[0., 0., 0.] + self.get_actual_tcp_pose()[3:],
                                       action_grip=self.grip_one_hot_state(),
                                       done=1)
                     self.speed_stop()
@@ -548,6 +557,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     if cont_status["btn_gripper"]:
                         self.move_grip_on_off_toggle()
 
+                    vr_p = cont_status["lin_vel"]
                     vr_q = torch.tensor(cont_status["pose_quat"])
                     vr_q = quaternion_real_first(q=vr_q)
                     vr_a = tr.quaternion_to_axis_angle(vr_q)           # desired aa pose by VR
@@ -555,13 +565,14 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     actual_tcp_p = self.get_actual_tcp_pose()
                     actual_j = self.get_actual_q()
 
-                    d_pos = np.array(actual_tcp_p[:3]) + cont_status["lin_vel"]
-                    d_rot = vr_a.numpy()
-                    goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
-
-                    if self.collect_demo: self.record_frame(action_q=goal_pose,
+                    action_q = list(vr_p) + vr_a.tolist()
+                    if self.collect_demo: self.record_frame(action_q=action_q,
                                                             action_grip=self.grip_one_hot_state(),
                                                             done=0)
+
+                    d_pos = np.array(actual_tcp_p[:3]) + np.array(action_q[:3])
+                    d_rot = np.array(action_q[3:])
+                    goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
 
                     goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
                     diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
@@ -638,5 +649,5 @@ if __name__ == "__main__":
     # u.vr_handler()
     # u.workspace_verify()
     # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=7)
+    u.replay_mode(batch_idx=1, rollout_idx=8)
     # u.func_test()
