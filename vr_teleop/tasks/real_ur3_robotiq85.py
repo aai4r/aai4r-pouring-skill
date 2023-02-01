@@ -149,6 +149,14 @@ class UR3ControlMode:
         self.Pxz = (self.xz_plane @ (self.xz_plane.T @ self.xz_plane).inverse()) @ self.xz_plane.T
         self.Pyz = (self.yz_plane @ (self.yz_plane.T @ self.yz_plane).inverse()) @ self.yz_plane.T
 
+    def set_rpy_base(self, actual_tcp_pose, log=False):
+        # actual_tcp_p = self.get_actual_tcp_pose()  # [x, y, z, rx, ry, rz], axis-angle orientation
+        yaw, pitch, roll = self.axis_angle_to_euler(actual_tcp_pose[3:], euler="ZYX")
+        self.rpy_base = [roll, pitch, yaw]
+        if log:
+            print("rpy_base ", self.rpy_base)
+            print("euler: ", list(map(rad2deg, [roll, pitch, yaw])))
+
     def cont_mode_one_hot_state(self):
         cm_one_hot = [0] * len(self.cmodes)
         cm_one_hot[self.cmodes_d[self.CONTROL_MODE]] = 1
@@ -414,7 +422,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         super().switching_control_mode()
         self.speed_stop()
         self.move_j(self.iposes)
-        self.set_rpy_base(log=True)
+        self.set_rpy_base(actual_tcp_pose=self.get_actual_tcp_pose(), log=True)
 
     def set_velJ(self):
         pass
@@ -437,14 +445,6 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.v_ax.rx = _rx * self.ap + self.v_ax.rx * (1.0 - self.ap)
         self.v_ax.ry = _ry * self.ap + self.v_ax.ry * (1.0 - self.ap)
         self.v_ax.rz = _rz * self.ap + self.v_ax.rz * (1.0 - self.ap)
-
-    def set_rpy_base(self, log=False):
-        actual_tcp_p = self.get_actual_tcp_pose()  # [x, y, z, rx, ry, rz], axis-angle orientation
-        yaw, pitch, roll = self.axis_angle_to_euler(actual_tcp_p[3:], euler="ZYX")
-        self.rpy_base = [roll, pitch, yaw]
-        if log:
-            print("rpy_base ", self.rpy_base)
-            print("euler: ", list(map(rad2deg, [roll, pitch, yaw])))
 
     def vr_handler(self):
         # int_sec = 0.0
@@ -526,7 +526,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         print("Run VR teleoperation mode")
         try:
             self.move_j(self.iposes)
-            self.set_rpy_base()
+            self.set_rpy_base(actual_tcp_pose=self.get_actual_tcp_pose())
             if self.collect_demo: self.record_frame(action_q=[0., 0., 0.] + self.get_actual_tcp_pose()[3:],
                                                     action_grip=self.grip_one_hot_state(),
                                                     done=0)
@@ -601,7 +601,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
     def replay_mode(self, batch_idx, rollout_idx):
         self.move_j(self.iposes)
-        self.set_rpy_base()
+        self.set_rpy_base(actual_tcp_pose=self.get_actual_tcp_pose())
         while True:
             cont_status = self.vr.get_controller_status()
             if cont_status["btn_reset_pose"]:

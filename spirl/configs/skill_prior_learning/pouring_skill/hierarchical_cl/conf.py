@@ -30,7 +30,7 @@ model_config = AttrDict(
     kl_div_weight=5e-4,
     nz_enc=128,
     nz_mid=128,
-    nz_vae=10,
+    nz_vae=12,
     n_processing_layers=3,
     cond_decode=True,
 )

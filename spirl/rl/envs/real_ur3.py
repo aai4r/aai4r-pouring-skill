@@ -77,6 +77,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
     def reset(self):
         self.speed_stop()
         self.move_j(self.iposes)
+        self.set_rpy_base(self.get_actual_tcp_pose())
         return self.get_obs()
 
 

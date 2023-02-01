@@ -1,6 +1,5 @@
 import os
 import copy
-import torch
 
 from spirl.utility.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
@@ -56,9 +55,9 @@ ll_model_params = AttrDict(
     kl_div_weight=5e-4,
     nz_enc=128,
     nz_mid=128,
-    n_processing_layers=3,
-    nz_vae=10,
-    n_rollout_steps=16,
+    n_processing_layers=5,
+    nz_vae=12,
+    n_rollout_steps=1,
     model_download=False,
     state_cond_pred=False,
     weights_dir="weights",
