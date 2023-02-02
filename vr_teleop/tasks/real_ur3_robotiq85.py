@@ -51,9 +51,12 @@ class BaseRTDE:
 
     def get_inverse_kinematics(self, tcp_pose):
         try:
-            return self.rtde_c.getInverseKinematics(x=tcp_pose)
-        except:
-            print("IK exception..! ", tcp_pose)
+            ik_joint = self.rtde_c.getInverseKinematics(x=tcp_pose)
+            if len(ik_joint) == 0:
+                raise ValueError
+            return ik_joint
+        except ValueError:
+            print("IK exception..! input tcp pose => ", tcp_pose)
 
     def speed_j(self, des_j, acc, dt):
         self.rtde_c.speedJ(des_j, acc, dt)
@@ -560,10 +563,13 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                     vr_p = cont_status["lin_vel"]
                     vr_q = torch.tensor(cont_status["pose_quat"])
+                    # orientation_error(desired=, current=)
                     vr_q = quaternion_real_first(q=vr_q)
                     vr_a = tr.quaternion_to_axis_angle(vr_q)           # desired aa pose by VR
 
-                    actual_tcp_p = self.get_actual_tcp_pose()
+                    actual_tcp = self.get_actual_tcp_pose()
+                    actual_tcp_pos, actual_tcp_rot = actual_tcp[:3], actual_tcp[3:]
+                    # tr.axis_angle_to_quaternion(axis_angle=)
                     actual_j = self.get_actual_q()
 
                     action_q = list(vr_p) + vr_a.tolist()
@@ -571,7 +577,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                                             action_grip=self.grip_one_hot_state(),
                                                             done=0)
 
-                    d_pos = np.array(actual_tcp_p[:3]) + np.array(action_q[:3])
+                    d_pos = np.array(actual_tcp_pos) + np.array(action_q[:3])
                     d_rot = np.array(action_q[3:])
                     goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
 
@@ -580,7 +586,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                     if self.timer.timeover_active:
                         print("Desired AA: ", vr_q, vr_q.norm())
-                        print("Actual AA: ", actual_tcp_p[3:])
+                        print("Actual AA: ", actual_tcp_pos)
                         print("diff: ", rot)
                         print("dt ", cont_status["dt"])
                         # print("TCP: ", actual_tcp_p)

@@ -96,6 +96,12 @@ def mat_to_quat(m):
 
 
 def orientation_error(desired, current):
+    """
+        Input Quat Requirements
+            * Type: Tensor
+            * Order: Real last order: [x, y, z, w]
+            * Batch: [N, Quat]
+    """
     cc = quat_conjugate(current)
     q_r = quat_mul(desired, cc)
     return q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)

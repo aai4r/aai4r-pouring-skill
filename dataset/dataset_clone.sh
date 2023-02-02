@@ -54,7 +54,7 @@ src_batch="batch1"
 
 # [rollout_$start.h5, rollout_$end.h5]
 start=0;
-end=10;
+end=19;
 src_rollouts=()
 for i in $(seq $start 1 $end)
 do
@@ -65,7 +65,7 @@ echo "src rollouts: "
 echo ${src_rollouts[@]}
 num_src=${#src_rollouts[@]}
 idx=0
-n_rollouts=300  # num files to clone
+n_rollouts=250  # num files to clone
 
 for batch in $batch_list
 do
