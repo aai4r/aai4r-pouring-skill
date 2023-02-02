@@ -33,6 +33,8 @@ model_config = AttrDict(
     nz_vae=12,
     n_processing_layers=3,
     cond_decode=True,
+    num_prior_net_layers=3,
+    weights_dir="weights",
 )
 
 # Dataset

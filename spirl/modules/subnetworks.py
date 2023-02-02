@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from spirl.modules.layers import BaseProcessingNet, ConvBlockEnc, \
-    ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock, LayerBuilderParams
+    ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock, LayerBuilderParams, Block
 from spirl.modules.recurrent_modules import BaseProcessingLSTM, \
     BidirectionalLSTM
 from spirl.modules.variational_inference import Gaussian
@@ -49,6 +49,56 @@ class Predictor(BaseProcessingNet):
     def forward(self, *inp):
         out = super().forward(*inp)
         return remove_spatial(out, yes=not self.spatial)
+
+
+class PostPredictor(nn.Module):
+    def __init__(self, hp, input_size, output_size, num_layers=None, detached=False, spatial=True,
+                 final_activation=None, mid_size=None):
+        super().__init__()
+        self.pred = Predictor(hp=hp, input_size=input_size, output_size=output_size,
+                              num_layers=num_layers, detached=detached, spatial=spatial,
+                              final_activation=final_activation, mid_size=mid_size)
+        self.beta = 100.0
+        self.act_dim = 6
+        self.grip_dim = 2
+
+        self.fc_act = nn.Linear(self.act_dim, self.act_dim)
+        self.fc_grip = nn.Sequential(nn.Linear(self.grip_dim, self.grip_dim), nn.Softmax(dim=-1))
+
+        self.fc_grip.apply(init_weights_xavier)
+        self.apply(init_weights_xavier)
+
+    def forward(self, *inp):
+        _out = self.pred(*inp)
+        ad, gd = self.act_dim, self.grip_dim
+
+        out_act = self.fc_act(_out[:, :ad])
+        out_grip = self.fc_grip(_out[:, ad:(ad + gd)] * self.beta)
+        out = torch.concat([out_act, out_grip], dim=-1).view(-1, ad + gd)
+        # print("out ", out.shape, out[0, self.act_dim:(self.act_dim + self.grip_dim)].sum())
+        return out
+
+
+class PostActionPredictor(nn.Sequential):
+    def __init__(self, act_dim, grip_dim):
+        super().__init__()
+        self.act_dim = act_dim
+        self.grip_dim = grip_dim
+        self.beta = 100.0
+
+        self.fc_act = nn.Linear(self.act_dim, self.act_dim)
+        self.fc_grip = nn.Sequential(nn.Linear(self.grip_dim, self.grip_dim), nn.Softmax(dim=-1))
+
+        self.fc_grip.apply(init_weights_xavier)
+        self.apply(init_weights_xavier)
+
+    def forward(self, inp):    # (batch_dim, rollout_dim, action_dim)
+        n_batch, n_rollout, _ = inp.size()
+        _inp = inp.view(-1, self.act_dim + self.grip_dim)
+        out_act = self.fc_act(_inp[:, :self.act_dim])
+        out_grip = self.fc_grip(_inp[:, self.act_dim:(self.act_dim + self.grip_dim)] * self.beta)
+        out = torch.concat([out_act, out_grip], dim=-1).view(n_batch, n_rollout, -1)
+        return out
 
 
 class IBPredictor(Predictor):
