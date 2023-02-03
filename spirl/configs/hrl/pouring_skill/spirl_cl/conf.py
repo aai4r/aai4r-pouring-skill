@@ -28,6 +28,7 @@ hl_policy_params.update(AttrDict(
     prior_model=ll_policy_params.policy_model,
     prior_model_params=ll_policy_params.policy_model_params,
     prior_model_checkpoint=ll_policy_params.policy_model_checkpoint,
+    prior_model_epoch=ll_policy_params.policy_model_epoch
 ))
 
 # register new LL agent in agent_config and turn off LL agent updates

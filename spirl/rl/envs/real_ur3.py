@@ -11,7 +11,7 @@ import numpy as np
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
     state_dim=10,
-    n_actions=8,
+    n_actions=9,
     split=AttrDict(train=0.9, val=0.1, test=0.0),
     env_name="pouring_skill",
     res=128,
@@ -52,14 +52,15 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
             if cont_status["btn_trigger"]:
                 print("VR trigger on!")
-                drv_pos, drv_rot, grip = action[:3], action[3:6], action[6:]
+                act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
                 grip_onehot = [1, 0] if grip[0] > grip[1] else [0, 1]
                 self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
 
-                actual_tcp_pose = self.get_actual_tcp_pose()
+                actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
                 actual_q = self.get_actual_q()
-                des_pos = np.array(actual_tcp_pose[:3]) + np.array(drv_pos)
-                des_rot = np.array(drv_rot)
+                des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
+                # des_rot = np.array(drv_rot)
+                des_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori)
 
                 goal_pose = self.goal_pose(des_pos=des_pos, des_rot=des_rot)
                 goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)

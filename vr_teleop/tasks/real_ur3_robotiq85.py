@@ -46,6 +46,10 @@ class BaseRTDE:
     def get_actual_tcp_pose(self):
         return self.rtde_r.getActualTCPPose()
 
+    def get_actual_tcp_pos_ori(self):
+        pose = self.rtde_r.getActualTCPPose()
+        return pose[:3], pose[3:]
+
     def get_actual_q(self):
         return self.rtde_r.getActualQ()
 
@@ -287,6 +291,20 @@ class UR3ControlMode:
     def rpy_base(self, rpy):
         self._rpy_base[self.CONTROL_MODE] = rpy
 
+    @staticmethod
+    def goal_axis_angle_from_act_quat(act_quat, actual_tcp_aa):
+        if type(act_quat) == list or type(act_quat) == np.ndarray:
+            act_quat = torch.tensor(act_quat).clone()
+
+        if type(actual_tcp_aa) == list or type(actual_tcp_aa) == np.ndarray:
+            actual_tcp_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_aa).clone())
+            actual_tcp_aa = quaternion_real_last(actual_tcp_aa)
+
+        goal_rot_quat = quat_mul(act_quat, actual_tcp_aa)
+        goal_rot_quat = quaternion_real_first(q=goal_rot_quat)
+        goal_rot_aa = tr.quaternion_to_axis_angle(goal_rot_quat)
+        return goal_rot_aa.numpy()
+
 
 class RealUR3(BaseRTDE, UR3ControlMode):
     def __init__(self):
@@ -489,12 +507,19 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("lin_vel: ", cont_status["lin_vel"])
                 #     print("dt: ", cont_status["dt"])
 
-    def record_frame(self, action_q, action_grip, done):
+    def record_frame(self, action_pos, action_quat, action_grip, done):
+        """
+        :param action_pos:      Relative positional diff. (vel), list type
+        :param action_quat:     Rotation as a quaternion (real-last), list type
+        :param action_grip:     Gripper ON/OFF one-hot vector, list type
+        :param done:            Scalar value of 0 or 1
+        :return:
+        """
         state = RobotState(joint=self.get_actual_q(),
                            gripper=self.grip_one_hot_state(),
                            control_mode=self.cont_mode_one_hot_state())
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
-        action = action_q + action_grip
+        action = action_pos + action_quat + action_grip
         self.rollout.append(state=state, action=action, done=done, info=info)
 
     def play_demo(self):
@@ -510,12 +535,12 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if self.cont_mode_to_str(state.control_mode) != self.CONTROL_MODE:
                 self.switching_control_mode()
 
-            drv_pos, drv_rot, grip = action[:3], action[3:6], action[6:]
+            act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
             self.move_grip_on_off(self.grip_onehot_to_bool(grip))
 
-            actual_tcp_pose = self.get_actual_tcp_pose()
-            des_pos = np.array(actual_tcp_pose[:3]) + np.array(drv_pos)
-            des_rot = np.array(drv_rot)
+            actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
+            des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
+            des_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori)
 
             goal_pose = self.goal_pose(des_pos=des_pos, des_rot=des_rot)
             goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
@@ -530,7 +555,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         try:
             self.move_j(self.iposes)
             self.set_rpy_base(actual_tcp_pose=self.get_actual_tcp_pose())
-            if self.collect_demo: self.record_frame(action_q=[0., 0., 0.] + self.get_actual_tcp_pose()[3:],
+            if self.collect_demo: self.record_frame(action_pos=[0., 0., 0.],
+                                                    action_quat=[0., 0., 0., 1.],
                                                     action_grip=self.grip_one_hot_state(),
                                                     done=0)
 
@@ -540,16 +566,18 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
-                    self.record_frame(action_q=[0., 0., 0.] + self.get_actual_tcp_pose()[3:],
+                    self.record_frame(action_pos=[0., 0., 0.],
+                                      action_quat=[0., 0., 0., 1.],
                                       action_grip=self.grip_one_hot_state(),
                                       done=1)
+                    self.rollout.show_rollout_summary()
+                    self.rollout.save_to_file()
+                    self.rollout.reset()
+
                     self.speed_stop()
                     self.move_j(self.iposes)
                     self.move_grip_on_off(grip_action=False)
                     # self.play_demo()
-                    self.rollout.show_rollout_summary()
-                    self.rollout.save_to_file()
-                    self.rollout.reset()
                     continue
 
                 rot = [0.0, 0.0, 0.0]
@@ -561,34 +589,34 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     if cont_status["btn_gripper"]:
                         self.move_grip_on_off_toggle()
 
-                    vr_p = cont_status["lin_vel"]
-                    vr_q = torch.tensor(cont_status["pose_quat"])
-                    # orientation_error(desired=, current=)
-                    vr_q = quaternion_real_first(q=vr_q)
-                    vr_a = tr.quaternion_to_axis_angle(vr_q)           # desired aa pose by VR
+                    vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
+                    act_pos = list(vr_curr_pos_vel)
 
-                    actual_tcp = self.get_actual_tcp_pose()
-                    actual_tcp_pos, actual_tcp_rot = actual_tcp[:3], actual_tcp[3:]
-                    # tr.axis_angle_to_quaternion(axis_angle=)
-                    actual_j = self.get_actual_q()
+                    actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
 
-                    action_q = list(vr_p) + vr_a.tolist()
-                    if self.collect_demo: self.record_frame(action_q=action_q,
+                    actual_tcp_ori_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_ori))
+                    actual_tcp_ori_aa = quaternion_real_last(actual_tcp_ori_aa)
+                    conj = quat_conjugate(actual_tcp_ori_aa)
+                    act_quat = quat_mul(torch.tensor(vr_curr_quat), conj)
+
+                    if self.collect_demo: self.record_frame(action_pos=act_pos,
+                                                            action_quat=act_quat.tolist(),
                                                             action_grip=self.grip_one_hot_state(),
                                                             done=0)
 
-                    d_pos = np.array(actual_tcp_pos) + np.array(action_q[:3])
-                    d_rot = np.array(action_q[3:])
+                    d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
+                    d_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori_aa)
                     goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)    # limit handling
 
+                    actual_j = self.get_actual_q()
                     goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
                     diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
 
                     if self.timer.timeover_active:
-                        print("Desired AA: ", vr_q, vr_q.norm())
-                        print("Actual AA: ", actual_tcp_pos)
-                        print("diff: ", rot)
-                        print("dt ", cont_status["dt"])
+                        # print("Desired AA: ", vr_q, vr_q.norm())
+                        # print("Actual AA: ", actual_tcp_pos)
+                        # print("diff: ", rot)
+                        # print("dt ", cont_status["dt"])
                         # print("TCP: ", actual_tcp_p)
                         # print("des pose: ", des_pose)
                         # print("dj: ", dj)
@@ -656,5 +684,5 @@ if __name__ == "__main__":
     # u.vr_handler()
     # u.workspace_verify()
     # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=10)
+    u.replay_mode(batch_idx=1, rollout_idx=25)
     # u.func_test()

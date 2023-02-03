@@ -59,7 +59,7 @@ class PostPredictor(nn.Module):
                               num_layers=num_layers, detached=detached, spatial=spatial,
                               final_activation=final_activation, mid_size=mid_size)
         self.beta = 100.0
-        self.act_dim = 6
+        self.act_dim = 7
         self.grip_dim = 2
 
         self.fc_act = nn.Linear(self.act_dim, self.act_dim)
@@ -75,7 +75,7 @@ class PostPredictor(nn.Module):
         out_act = self.fc_act(_out[:, :ad])
         out_grip = self.fc_grip(_out[:, ad:(ad + gd)] * self.beta)
         out = torch.concat([out_act, out_grip], dim=-1).view(-1, ad + gd)
-        # print("out ", out.shape, out[0, self.act_dim:(self.act_dim + self.grip_dim)].sum())
+        # print("out ", out.shape, out[0, ad:(ad + gd)].sum())
         return out
 
 
