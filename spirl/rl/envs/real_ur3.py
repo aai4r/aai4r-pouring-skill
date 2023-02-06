@@ -37,7 +37,15 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         g = self.grip_one_hot_state()
         s = self.cont_mode_one_hot_state()
         obs = np.array(q + g + s) if np_type else q + g + s
+        print("obs: ", obs)
         return obs
+
+    @staticmethod
+    def arg_max_one_hot(list1d):
+        one_hot = [0] * len(list1d)
+        arg_max = max(range(len(list1d)), key=lambda i: list1d[i])
+        one_hot[arg_max] = 1
+        return one_hot
 
     def step(self, action):
         obs = self.get_obs()
@@ -53,7 +61,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
             if cont_status["btn_trigger"]:
                 print("VR trigger on!")
                 act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
-                grip_onehot = [1, 0] if grip[0] > grip[1] else [0, 1]
+                grip_onehot = self.arg_max_one_hot(list1d=grip)
                 self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
 
                 actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()

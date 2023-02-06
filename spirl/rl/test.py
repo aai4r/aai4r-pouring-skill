@@ -81,11 +81,7 @@ class RLTrainer:
             start_epoch = self.resume(args.resume, self.conf.ckpt_path)
             self._hp.n_warmup_steps = 1500     # (default: 0) no warmup if we reload from checkpoint!
 
-        # start training/evaluation
-        if args.mode == 'train':
-            pass
-            # self.train(start_epoch)
-        elif args.mode == 'val':
+        if args.mode == 'val':
             self.val()
         elif args.mode == 'demo':
             self.demo()
@@ -113,60 +109,6 @@ class RLTrainer:
             'n_warmup_steps': 0,    # steps of warmup experience collection before training
         })
         return default_dict
-
-    # def train(self, start_epoch):
-    #     """Run outer training loop."""
-    #     if self._hp.n_warmup_steps > 0:
-    #         self.warmup()
-    #
-    #     for epoch in range(start_epoch, self._hp.num_epochs):
-    #         print("Epoch {}".format(epoch))
-    #         self.train_epoch(epoch)
-    #
-    #         if not self.args.dont_save and self.is_chef:
-    #             save_checkpoint({
-    #                 'epoch': epoch,
-    #                 'global_step': self.global_step,
-    #                 'state_dict': self.agent.state_dict(),
-    #             }, os.path.join(self._hp.exp_path, 'weights'), CheckpointHandler.get_ckpt_name(epoch))
-    #             self.agent.save_state(self._hp.exp_path)
-    #             self.val()
-    #
-    # def train_epoch(self, epoch):
-    #     """Run inner training loop."""
-    #     # sync network parameters across workers
-    #     if self.conf.mpi.num_workers > 1:
-    #         self.agent.sync_networks()
-    #
-    #     # initialize timing
-    #     timers = defaultdict(lambda: AverageTimer())
-    #
-    #     self.sampler.init(is_train=True)
-    #     ep_start_step = self.global_step
-    #     while self.global_step - ep_start_step < self._hp.n_steps_per_epoch:
-    #         with timers['batch'].time():
-    #             # collect experience
-    #             with timers['rollout'].time():
-    #                 experience_batch, env_steps = self.sampler.sample_batch(batch_size=self._hp.n_steps_per_update,
-    #                                                                         global_step=self.global_step)
-    #                 if self.use_multiple_workers:
-    #                     experience_batch = mpi_gather_experience(experience_batch)
-    #                 self.global_step += mpi_sum(env_steps)
-    #
-    #             # update policy
-    #             with timers['update'].time():
-    #                 if self.is_chef:
-    #                     agent_outputs = self.agent.update(experience_batch)
-    #                 if self.use_multiple_workers:
-    #                     self.agent.sync_networks()
-    #                 self.n_update_steps += self.agent.update_iterations
-    #
-    #             # log results
-    #             with timers['log'].time():
-    #                 if self.is_chef and self.log_outputs_now:
-    #                     self.agent.log_outputs(agent_outputs, None, self.logger,
-    #                                            log_images=False, step=self.global_step)
-    #                     self.print_train_update(epoch, agent_outputs, timers)
 
     def val(self):
         """Evaluate agent."""

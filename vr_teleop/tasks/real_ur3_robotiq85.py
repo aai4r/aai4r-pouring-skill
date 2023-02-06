@@ -305,6 +305,13 @@ class UR3ControlMode:
         goal_rot_aa = tr.quaternion_to_axis_angle(goal_rot_quat)
         return goal_rot_aa.numpy()
 
+    @staticmethod
+    def quat_from_tcp_axis_angle(actual_tcp_aa, tolist=True):
+        assert type(actual_tcp_aa) == list or type(actual_tcp_aa) == np.ndarray
+        actual_tcp_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_aa).clone())
+        actual_tcp_aa = quaternion_real_last(actual_tcp_aa)
+        return actual_tcp_aa.tolist() if tolist else actual_tcp_aa
+
 
 class RealUR3(BaseRTDE, UR3ControlMode):
     def __init__(self):
@@ -506,6 +513,14 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("Axis-angle: ", aa)
                 #     print("lin_vel: ", cont_status["lin_vel"])
                 #     print("dt: ", cont_status["dt"])
+    def get_state(self):
+        tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
+        state = RobotState(joint=self.get_actual_q(),
+                           ee_pos=tcp_pos,
+                           ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
+                           gripper_one_hot=self.grip_one_hot_state(),
+                           control_mode_one_hot=self.cont_mode_one_hot_state())
+        return state
 
     def record_frame(self, action_pos, action_quat, action_grip, done):
         """
@@ -515,9 +530,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         :param done:            Scalar value of 0 or 1
         :return:
         """
-        state = RobotState(joint=self.get_actual_q(),
-                           gripper=self.grip_one_hot_state(),
-                           control_mode=self.cont_mode_one_hot_state())
+        state = self.get_state()
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         action = action_pos + action_quat + action_grip
         self.rollout.append(state=state, action=action, done=done, info=info)
@@ -532,7 +545,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             start_t = self.init_period()
             state, action, done, info = self.rollout.get(index=idx)
 
-            if self.cont_mode_to_str(state.control_mode) != self.CONTROL_MODE:
+            if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
                 self.switching_control_mode()
 
             act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
@@ -684,5 +697,5 @@ if __name__ == "__main__":
     # u.vr_handler()
     # u.workspace_verify()
     # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=25)
+    u.replay_mode(batch_idx=1, rollout_idx=251)
     # u.func_test()

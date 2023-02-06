@@ -18,23 +18,35 @@ Rollout / demonstration dataset management
 @dataclass
 class RobotState:
     joint: list = None
-    gripper: list = None
-    control_mode: list = None
+    ee_pos: list = None
+    ee_quat: list = None
+    gripper_one_hot: list = None
+    control_mode_one_hot: list = None
 
     def __iter__(self):
         return (getattr(self, field.name) for field in dataclasses.fields(self))
 
     def item_vec(self):
-        return self.joint + self.gripper + self.control_mode
+        return self.joint + self.ee_pos + self.ee_quat + self.gripper_one_hot + self.control_mode_one_hot
+
+    def import_state_from(self, np_state1d):
+        assert type(np_state1d) == np.ndarray
+        self.joint = np_state1d[:6].tolist()
+        self.ee_pos = np_state1d[6:9].tolist()
+        self.ee_quat = np_state1d[9:13].tolist()
+        self.gripper_one_hot = np_state1d[13:15].tolist()
+        self.control_mode_one_hot = np_state1d[15:17].tolist()
 
     @staticmethod
     def random_data(n_joint, n_cont_mode):
         _joint = [random.randint(-100, 100) / 200.0 for _ in range(n_joint)]
+        _ee_pos = [random.randint(-100, 100) / 200.0 for _ in range(3)]
+        _ee_quat = [random.randint(-100, 100) / 200.0 for _ in range(4)]
         grip_on = random.randint(-100, 100) > 0
         _gripper = [int(grip_on), int(not grip_on)]
         _control_mode = [0] * n_cont_mode
         _control_mode[random.randint(0, n_cont_mode - 1)] = 1
-        return RobotState(joint=_joint, gripper=_gripper, control_mode=_control_mode)
+        return _joint + _ee_pos + _ee_quat + _gripper + _control_mode
 
 
 class RolloutManager(BatchRolloutFolder):
@@ -123,9 +135,9 @@ class RolloutManager(BatchRolloutFolder):
                 if name == 'states':
                     temp = f[key + '/' + name][()].astype(np.float32)
                     for i in range(len(temp)):
-                        self._states.append(RobotState(joint=temp[i, :6].tolist(),
-                                                       gripper=temp[i, 6:8].tolist(),
-                                                       control_mode=temp[i, 8:].tolist()))
+                        rs = RobotState()
+                        rs.import_state_from(np_state1d=temp[i])
+                        self._states.append(rs)
                     # self._states = f[key + '/' + name][()].astype(np.float32).tolist()
                 elif name == 'actions':
                     self._actions = f[key + '/' + name][()].astype(np.float32).tolist()
