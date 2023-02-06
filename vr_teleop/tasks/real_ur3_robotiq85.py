@@ -292,6 +292,13 @@ class UR3ControlMode:
         self._rpy_base[self.CONTROL_MODE] = rpy
 
     @staticmethod
+    def add_noise_angle(inputs, deg=5):
+        print("inputs: ", inputs)
+        _inputs = np.array(inputs) + deg2rad(deg) * (np.random.rand(len(inputs)) - 0.5) * 2.0
+        print("_inputs: ", _inputs)
+        return _inputs
+
+    @staticmethod
     def goal_axis_angle_from_act_quat(act_quat, actual_tcp_aa):
         if type(act_quat) == list or type(act_quat) == np.ndarray:
             act_quat = torch.tensor(act_quat).clone()
@@ -515,9 +522,11 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 #     print("dt: ", cont_status["dt"])
     def get_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
+        target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
         state = RobotState(joint=self.get_actual_q(),
                            ee_pos=tcp_pos,
                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
+                           target_diff=target_diff.tolist(),
                            gripper_one_hot=self.grip_one_hot_state(),
                            control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
@@ -588,7 +597,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     self.rollout.reset()
 
                     self.speed_stop()
-                    self.move_j(self.iposes)
+                    _pose = self.add_noise_angle(inputs=self.iposes)
+                    self.move_j(_pose.tolist())
                     self.move_grip_on_off(grip_action=False)
                     # self.play_demo()
                     continue
@@ -696,6 +706,6 @@ if __name__ == "__main__":
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=251)
+    u.run_vr_teleop()
+    # u.replay_mode(batch_idx=1, rollout_idx=100)
     # u.func_test()

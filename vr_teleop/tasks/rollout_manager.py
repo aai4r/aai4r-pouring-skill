@@ -20,6 +20,7 @@ class RobotState:
     joint: list = None
     ee_pos: list = None
     ee_quat: list = None
+    target_diff: list = None
     gripper_one_hot: list = None
     control_mode_one_hot: list = None
 
@@ -27,15 +28,17 @@ class RobotState:
         return (getattr(self, field.name) for field in dataclasses.fields(self))
 
     def item_vec(self):
-        return self.joint + self.ee_pos + self.ee_quat + self.gripper_one_hot + self.control_mode_one_hot
+        return self.joint + self.ee_pos + self.ee_quat + self.target_diff + \
+               self.gripper_one_hot + self.control_mode_one_hot
 
     def import_state_from(self, np_state1d):
         assert type(np_state1d) == np.ndarray
         self.joint = np_state1d[:6].tolist()
         self.ee_pos = np_state1d[6:9].tolist()
         self.ee_quat = np_state1d[9:13].tolist()
-        self.gripper_one_hot = np_state1d[13:15].tolist()
-        self.control_mode_one_hot = np_state1d[15:17].tolist()
+        self.target_diff = np_state1d[13:16].tolist()   # TODO, temp target position difference!!
+        self.gripper_one_hot = np_state1d[16:18].tolist()
+        self.control_mode_one_hot = np_state1d[18:20].tolist()
 
     @staticmethod
     def random_data(n_joint, n_cont_mode):

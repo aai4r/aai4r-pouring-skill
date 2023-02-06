@@ -10,7 +10,7 @@ import numpy as np
 
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
-    state_dim=10,
+    state_dim=20,
     n_actions=9,
     split=AttrDict(train=0.9, val=0.1, test=0.0),
     env_name="pouring_skill",
@@ -33,12 +33,15 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
 
     def get_obs(self, np_type=True):
-        q = self.get_actual_q()
-        g = self.grip_one_hot_state()
-        s = self.cont_mode_one_hot_state()
-        obs = np.array(q + g + s) if np_type else q + g + s
-        print("obs: ", obs)
-        return obs
+        joint = self.get_actual_q()
+        tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
+        tcp_quat = self.quat_from_tcp_axis_angle(tcp_aa, tolist=True)
+        # TODO, target_diff is temporal state...
+        target_diff = (np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)).tolist()
+        g_one_hot = self.grip_one_hot_state()
+        cm_one_hot = self.cont_mode_one_hot_state()
+        obs = joint + tcp_pos + tcp_quat + target_diff + g_one_hot + cm_one_hot
+        return np.array(obs) if np_type else obs
 
     @staticmethod
     def arg_max_one_hot(list1d):
@@ -67,7 +70,6 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                 actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
                 actual_q = self.get_actual_q()
                 des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
-                # des_rot = np.array(drv_rot)
                 des_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori)
 
                 goal_pose = self.goal_pose(des_pos=des_pos, des_rot=des_rot)
@@ -85,7 +87,8 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
     def reset(self):
         self.speed_stop()
-        self.move_j(self.iposes)
+        _pose = self.add_noise_angle(inputs=self.iposes)
+        self.move_j(_pose.tolist())
         self.move_grip_on_off(grip_action=False)
         self.set_rpy_base(self.get_actual_tcp_pose())
         return self.get_obs()

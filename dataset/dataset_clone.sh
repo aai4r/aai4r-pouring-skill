@@ -32,7 +32,7 @@ done
 echo "batch num array: ${ar[@]}"
 
 # create batch folders
-n_batch_folders=3
+n_batch_folders=7
 for i in $(seq 1 1 $n_batch_folders)
 do
   if in_array $i "${ar[*]}"
@@ -54,7 +54,7 @@ src_batch="batch1"
 
 # [rollout_$start.h5, rollout_$end.h5]
 start=0;
-end=25;
+end=100;
 src_rollouts=()
 for i in $(seq $start 1 $end)
 do
