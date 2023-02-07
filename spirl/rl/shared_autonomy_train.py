@@ -167,10 +167,12 @@ class SharedAutonomyTrainer:
 
     def warmup_skill_train(self, epoch):
         self.skill_trainer.skill_train(num_epochs=epoch)
+        print("****************************************")
+        print("After warmup, agent model weight update!")
+        print("****************************************")
+        self.agent.update_model_weights()
 
     def skill_deployment(self):
-        # load updated weights
-
         n_total = 0
         with self.agent.val_mode():
             with torch.no_grad():
@@ -181,9 +183,10 @@ class SharedAutonomyTrainer:
 
     def shared_autonomy_train(self):
         self.warmup_skill_train(epoch=3)
-
-        print("agent model weight update!")
-        self.agent.update_model_weights()
+        self.skill_deployment()
+        # interrupt by user triggering and collect demo dataset
+        # augment the demo dataset and skill retraining (how many epochs?)
+        # agent model update and skill deployment
 
     def demo(self):
         """Run task demonstration"""
