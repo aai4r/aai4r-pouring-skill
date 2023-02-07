@@ -22,6 +22,9 @@ class ActionPriorSACAgent(SACAgent):
         })
         return super()._default_hparams().overwrite(default_dict)
 
+    def update_model_weights(self):
+        self.policy.update_model_weights()
+
     def update(self, experience_batch):
         info = super().update(experience_batch)
         info.target_divergence = self._target_divergence(self.schedule_steps)

@@ -72,6 +72,9 @@ class ModelTrainer(BaseTrainer):
         if args.resume or conf.ckpt_path is not None:
             start_epoch = self.resume(args.resume, conf.ckpt_path)
 
+        if args.init_only:
+            return
+
         if args.val_sweep:
             self.run_val_sweep()
         elif args.train:

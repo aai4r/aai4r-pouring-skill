@@ -345,6 +345,10 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         })
         return super()._default_hparams().overwrite(default_dict)
 
+    def update_model_weights(self):
+        self.hl_agent.update_model_weights()
+        self.ll_agent.update_model_weights()
+
     def act(self, *args, **kwargs):
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
             self.skill_plot.reset()

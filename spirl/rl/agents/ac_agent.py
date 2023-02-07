@@ -107,6 +107,9 @@ class SACAgent(ACAgent):
         })
         return super()._default_hparams().overwrite(default_dict)
 
+    def update_model_weights(self):
+        self.policy.update_model_weights()
+
     def update(self, experience_batch):
         """Updates actor and critics."""
         # push experience batch into replay buffer

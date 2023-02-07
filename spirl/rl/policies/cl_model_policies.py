@@ -27,6 +27,9 @@ class ClModelPolicy(Policy):
         })
         return super()._default_hparams().overwrite(default_dict)
 
+    def update_model_weights(self):
+        BaseAgent.load_model_weights(self.net, self._hp.policy_model_checkpoint, self._hp.policy_model_epoch, self._hp.weights_dir)
+
     def forward(self, obs):
         with no_batchnorm_update(self):     # BN updates harm the initialized policy
             return super().forward(obs)

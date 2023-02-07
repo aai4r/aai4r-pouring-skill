@@ -155,6 +155,13 @@ class LearnedPriorAugmentedPolicy(PriorAugmentedPolicy):
         })
         return super()._default_hparams().overwrite(default_dict)
 
+    def update_model_weights(self):
+        # self._hp.policy_model_checkpoint --> net
+        BaseAgent.load_model_weights(self.net, self._hp.prior_model_checkpoint, self._hp.prior_model_epoch, self._hp.weights_dir)
+        BaseAgent.load_model_weights(self.prior_net, self._hp.prior_model_checkpoint, self._hp.prior_model_epoch, self._hp.weights_dir)
+
+        # optimizer??
+
     def _compute_prior_divergence(self, policy_output, obs):
         with no_batchnorm_update(self.prior_net):
             prior_dist = self.prior_net.compute_learned_prior(obs, first_only=True).detach()
