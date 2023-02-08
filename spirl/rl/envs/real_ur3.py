@@ -25,9 +25,12 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         BaseRTDE.__init__(self, HOST="192.168.0.75")
         UR3ControlMode.__init__(self, init_mode="forward")
 
+        # shared autonomy control params
+        self.user_control_authority = False
+
         # using VR and its trigger for safety
-        self.num_states = 10
-        self.num_acts = 6
+        self.num_states = 6 + 3 + 4 + 3 + 2 + 2     # 20
+        self.num_acts = 7
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
@@ -50,40 +53,59 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         one_hot[arg_max] = 1
         return one_hot
 
-    def step(self, action):
-        obs = self.get_obs()
+    def step(self, action):     # trigger based step
         print("action: ", action)
 
         while True:
-            start_t = self.init_period()
             cont_status = self.vr.get_controller_status()
             if cont_status["btn_reset_pose"]:
                 obs = self.reset()
-                break
+                reward, done, info = 0, True, ""
+                return obs, reward, done, info
 
             if cont_status["btn_trigger"]:
                 print("VR trigger on!")
-                act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
-                grip_onehot = self.arg_max_one_hot(list1d=grip)
-                self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
-
-                actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
-                actual_q = self.get_actual_q()
-                des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
-                des_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori)
-
-                goal_pose = self.goal_pose(des_pos=des_pos, des_rot=des_rot)
+                start_t = self.init_period()
+                goal_pose = self.goal_pose_from_action(action=action)
                 goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
+                actual_q = self.get_actual_q()
                 diff_q = (np.array(goal_q) - np.array(actual_q)) * 0.5
                 self.speed_j(list(diff_q), self.acc, self.dt)
                 self.wait_period(start_t)
                 break
             self.speed_stop()
 
+        obs = self.get_obs()
         reward = 0
         done = False
         info = ""
         return obs, reward, done, info
+
+    def _step(self, action):    # natural step
+        start_t = self.init_period()
+        goal_pose = self.goal_pose_from_action(action=action)
+        goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
+        actual_q = self.get_actual_q()
+        diff_q = (np.array(goal_q) - np.array(actual_q)) * 0.5
+        self.speed_j(list(diff_q), self.acc, self.dt)
+        self.wait_period(start_t)
+
+        obs = self.get_obs()    # next state / observation
+        reward = 0
+        done = False
+        info = ""
+        return obs, reward, done, info
+
+    def goal_pose_from_action(self, action):
+        act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
+        grip_onehot = self.arg_max_one_hot(list1d=grip)
+        self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
+
+        actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
+        des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
+        des_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori)
+
+        return self.goal_pose(des_pos=des_pos, des_rot=des_rot)
 
     def reset(self):
         self.speed_stop()
@@ -91,6 +113,8 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         self.move_j(_pose.tolist())
         self.move_grip_on_off(grip_action=False)
         self.set_rpy_base(self.get_actual_tcp_pose())
+
+        self.user_control_authority = False
         return self.get_obs()
 
 

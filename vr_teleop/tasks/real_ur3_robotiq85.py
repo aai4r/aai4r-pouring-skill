@@ -593,7 +593,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       action_grip=self.grip_one_hot_state(),
                                       done=1)
                     self.rollout.show_rollout_summary()
-                    self.rollout.save_to_file()
+                    # self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
@@ -702,10 +702,30 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             self.stop_script()
 
 
+def vr_test():
+    vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
+    while True:
+        cont_status = vr.get_controller_status()
+        if cont_status["btn_trigger"]:
+            print("btn_trigger on!")
+            # pq = cont_status["pose_quat"]
+            # # pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))   # real first
+            # pq = quaternion_real_first(q=torch.tensor(pq))
+            # aa = tr.quaternion_to_axis_angle(pq)
+
+        if cont_status["btn_reset_pose"]:
+            print("btn_reset_mode")
+        if cont_status["btn_grip"]:
+            print("btn_grip is pressed..")
+        # if cont_status["btn_gripper"]:
+        #     print("btn_gripper")
+
+
 if __name__ == "__main__":
+    # vr_test()
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=130)
+    u.run_vr_teleop()
+    # u.replay_mode(batch_idx=1, rollout_idx=130)
     # u.func_test()

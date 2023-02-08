@@ -13,7 +13,7 @@ configuration = {
     'logger': Logger,
     'data_dir': [os.path.join(os.environ["DATA_DIR"], 'pouring_skill')],
     'epoch_cycles_train': 100,
-    'num_epochs': 5,
+    'num_epochs': 100,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',

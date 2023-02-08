@@ -73,6 +73,7 @@ class VRWrapper:
         self.trk_btn = ButtonPressedEventHandler()
         self.menu_btn = ButtonPressedEventHandler()
         self.mode_btn = ButtonPressedEventHandler()
+        self.grip_btn = ButtonPressedEventHandler()
         self.prev_time = time.time()
 
     def get_controller_status(self):
@@ -84,37 +85,38 @@ class VRWrapper:
         # button status
         controller_status = {"lin_vel": lv, "ang_vel": av, "pose_quat": pq,
                              "btn_trigger": False, "btn_gripper": False, "btn_reset_pose": False,
-                             "trk_x": None, "trk_y": None,
+                             "btn_grip": False, "trk_x": None, "trk_y": None,
                              "dt": time.time() - self.prev_time}
         self.prev_time = time.time()
-        if d['trigger']:
-            lv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0    # m/s
-            av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
-            pq = np.array([v for v in self.vr.devices["controller_1"].get_pose_quaternion()])         # absolute
+        # if d['trigger']:
+        lv = np.array([v for v in self.vr.devices["controller_1"].get_velocity()]) * 1.0    # m/s
+        av = np.array([v for v in self.vr.devices["controller_1"].get_angular_velocity()]) * 1.0  # incremental
+        pq = np.array([v for v in self.vr.devices["controller_1"].get_pose_quaternion()])         # absolute
 
-            lv = torch.matmul(self.rot, torch.tensor(lv).unsqueeze(0).T).T.squeeze(0).numpy()
-            av = torch.tensor(av).unsqueeze(0)
-            _rq = mat_to_quat(self.rot.unsqueeze(0))
-            av = quat_apply(_rq, av).squeeze(0).numpy()
+        lv = torch.matmul(self.rot, torch.tensor(lv).unsqueeze(0).T).T.squeeze(0).numpy()
+        av = torch.tensor(av).unsqueeze(0)
+        _rq = mat_to_quat(self.rot.unsqueeze(0))
+        av = quat_apply(_rq, av).squeeze(0).numpy()
 
-            _pq = torch.tensor(pq[3:]).unsqueeze(0)
-            _pq[0, 2] *= -1.0   # Left-handed --> Right-handed
-            # pq = _pq.squeeze(0).numpy()  # TODO, pure rotation of controller
-            _rq_pre = mat_to_quat(euler_to_mat3d(deg2rad(90.0), deg2rad(0.0), deg2rad(0.0)).unsqueeze(0))
-            _rq_post = mat_to_quat(euler_to_mat3d(deg2rad(-90.0), deg2rad(0.0), deg2rad(-90.0)).unsqueeze(0))
-            pq = quat_mul(_rq_pre, quat_mul(_pq, _rq_post)).squeeze(0).numpy()
+        _pq = torch.tensor(pq[3:]).unsqueeze(0)
+        _pq[0, 2] *= -1.0   # Left-handed --> Right-handed
+        # pq = _pq.squeeze(0).numpy()  # TODO, pure rotation of controller
+        _rq_pre = mat_to_quat(euler_to_mat3d(deg2rad(90.0), deg2rad(0.0), deg2rad(0.0)).unsqueeze(0))
+        _rq_post = mat_to_quat(euler_to_mat3d(deg2rad(-90.0), deg2rad(0.0), deg2rad(-90.0)).unsqueeze(0))
+        pq = quat_mul(_rq_pre, quat_mul(_pq, _rq_post)).squeeze(0).numpy()
 
-            controller_status["lin_vel"] = lv
-            controller_status["ang_vel"] = av
-            controller_status["pose_quat"] = pq
-            controller_status["btn_trigger"] = True
-            controller_status["btn_trackpad"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
-            x, y = d["trackpad_x"], d["trackpad_y"]
-            controller_status["trk_x"] = x
-            controller_status["trk_y"] = y
-            controller_status["btn_gripper"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (y < -0.6)
-            controller_status["btn_control_mode"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (0.6 < y)
-            controller_status["btn_reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
+        controller_status["lin_vel"] = lv
+        controller_status["ang_vel"] = av
+        controller_status["pose_quat"] = pq
+        controller_status["btn_trigger"] = d['trigger']
+        controller_status["btn_trackpad"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
+        controller_status["btn_grip"] = self.grip_btn.is_pressed(event_stream=d["grip_button"])
+        x, y = d["trackpad_x"], d["trackpad_y"]
+        controller_status["trk_x"] = x
+        controller_status["trk_y"] = y
+        controller_status["btn_gripper"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (y < -0.6)
+        controller_status["btn_control_mode"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (0.6 < y)
+        controller_status["btn_reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
         return controller_status
 
 
