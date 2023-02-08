@@ -182,7 +182,7 @@ class SharedAutonomyTrainer:
                     if n_total % 10 == 0: print("n_total: ", n_total)
 
     def shared_autonomy_train(self):
-        self.warmup_skill_train(epoch=100)
+        self.warmup_skill_train(epoch=2)
         self.skill_deployment()
         # interrupt by user triggering and collect demo dataset
         # augment the demo dataset and skill retraining (how many epochs?)

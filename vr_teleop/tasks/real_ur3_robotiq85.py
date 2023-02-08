@@ -57,7 +57,9 @@ class BaseRTDE:
         try:
             ik_joint = self.rtde_c.getInverseKinematics(x=tcp_pose)
             if len(ik_joint) == 0:
-                raise ValueError
+                print("IK exception..! input tcp pose => ", tcp_pose)
+                ik_joint = self.get_actual_q()
+                # raise ValueError
             return ik_joint
         except ValueError:
             print("IK exception..! input tcp pose => ", tcp_pose)
@@ -271,7 +273,7 @@ class UR3ControlMode:
         mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
         des_aa = tr.matrix_to_axis_angle(mat)
         des_rot = des_aa.tolist()
-        print("des_pos: {}, des_rot: {}".format(des_pos, des_rot))
+        # print("des_pos: {}, des_rot: {}".format(des_pos, des_rot))
 
         return list(des_pos) + list(des_rot)
 
@@ -567,7 +569,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             goal_pose = self.goal_pose(des_pos=des_pos, des_rot=des_rot)
             goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
             actual_j = self.get_actual_q()
-            diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
+            diff_j = (np.array(goal_j) - np.array(actual_j)) * 1.0
             self.speed_j(list(diff_j), self.acc, self.dt)
             self.wait_period(start_t)
         self.speed_stop()
@@ -593,7 +595,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       action_grip=self.grip_one_hot_state(),
                                       done=1)
                     self.rollout.show_rollout_summary()
-                    # self.rollout.save_to_file()
+                    self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
@@ -603,7 +605,6 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     # self.play_demo()
                     continue
 
-                rot = [0.0, 0.0, 0.0]
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 if cont_status["btn_trigger"]:
                     if cont_status["btn_control_mode"]:
@@ -633,7 +634,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                     actual_j = self.get_actual_q()
                     goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
-                    diff_j = (np.array(goal_j) - np.array(actual_j)) * 0.5
+                    diff_j = (np.array(goal_j) - np.array(actual_j)) * 1.0
 
                     if self.timer.timeover_active:
                         # print("Desired AA: ", vr_q, vr_q.norm())
@@ -726,6 +727,6 @@ if __name__ == "__main__":
     u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=130)
+    # u.run_vr_teleop()
+    u.replay_mode(batch_idx=1, rollout_idx=130)
     # u.func_test()

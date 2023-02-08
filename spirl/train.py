@@ -419,4 +419,5 @@ def set_run_params():
 if __name__ == '__main__':
     set_run_params()    # comment out if run outside
     args = get_args()
+    args.init_only = False
     ModelTrainer(args=args)

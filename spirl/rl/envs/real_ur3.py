@@ -5,6 +5,11 @@ from spirl.components.data_loader import GlobalSplitVideoDataset
 from vr_teleop.tasks.real_ur3_robotiq85 import BaseRTDE, UR3ControlMode
 from vr_teleop.tasks.base import VRWrapper
 
+from utils.utils import quaternion_real_last, quaternion_real_first
+from utils.torch_jit_utils import quat_mul, quat_conjugate
+from pytorch3d import transforms as tr
+from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState
+import torch
 import numpy as np
 
 
@@ -27,13 +32,39 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
         # shared autonomy control params
         self.user_control_authority = False
+        self.rollout = RolloutManager(task_name="pouring_skill")
+        self.collect_demo = True
 
         # using VR and its trigger for safety
-        self.num_states = 6 + 3 + 4 + 3 + 2 + 2     # 20
-        self.num_acts = 7
+        self.num_states = data_spec.state_dim
+        self.num_acts = data_spec.n_actions
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
+
+    def get_robot_state(self):
+        tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
+        target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
+        state = RobotState(joint=self.get_actual_q(),
+                           ee_pos=tcp_pos,
+                           ee_quat=self.quat_from_tcp_axis_angle(tcp_aa, tolist=True),
+                           target_diff=target_diff.tolist(),
+                           gripper_one_hot=self.grip_one_hot_state(),
+                           control_mode_one_hot=self.cont_mode_one_hot_state())
+        return state
+
+    def record_frame(self, action_pos, action_quat, action_grip, done):
+        """
+        :param action_pos:      Relative positional diff. (vel), list type
+        :param action_quat:     Rotation as a quaternion (real-last), list type
+        :param action_grip:     Gripper ON/OFF one-hot vector, list type
+        :param done:            Scalar value of 0 or 1
+        :return:
+        """
+        state = self.get_robot_state()
+        info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
+        action = action_pos + action_quat + action_grip
+        self.rollout.append(state=state, action=action, done=done, info=info)
 
     def get_obs(self, np_type=True):
         joint = self.get_actual_q()
@@ -53,6 +84,66 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         one_hot[arg_max] = 1
         return one_hot
 
+    def step_sa(self, action):  # shared autonomy step
+        cont_status = self.vr.get_controller_status()
+        if cont_status["btn_trigger"]:
+            print("VR Trigger On!")
+            self.user_control_authority = True
+            self.speed_stop()
+            # if self.rollout.isempty(): self.record_frame(action_pos=[0., 0., 0.],
+            #                                              action_quat=[0., 0., 0., 1.],
+            #                                              action_grip=self.grip_one_hot_state(),
+            #                                              done=0)
+
+        while self.user_control_authority:
+            cont_status = self.vr.get_controller_status()
+            start_t = self.init_period()
+
+            if cont_status["btn_reset_pose"]:
+                obs = self.reset()
+                self.record_frame(action_pos=[0., 0., 0.],
+                                  action_quat=[0., 0., 0., 1.],
+                                  action_grip=self.grip_one_hot_state(),
+                                  done=1)
+                self.rollout.show_rollout_summary()
+                self.rollout.save_to_file()
+                self.rollout.reset()
+
+                reward, done, info = 0, True, ""
+                return obs, reward, done, info
+
+            diff_q = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            if cont_status["btn_trigger"]:
+                if cont_status["btn_gripper"]:
+                    self.move_grip_on_off_toggle()
+
+                vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
+                act_pos = list(vr_curr_pos_vel)
+                actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
+
+                actual_tcp_ori_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_ori))
+                actual_tcp_ori_aa = quaternion_real_last(actual_tcp_ori_aa)
+                conj = quat_conjugate(actual_tcp_ori_aa)
+                act_quat = quat_mul(torch.tensor(vr_curr_quat), conj)
+
+                if self.collect_demo:
+                    self.record_frame(action_pos=act_pos,
+                                      action_quat=act_quat.tolist(),
+                                      action_grip=self.grip_one_hot_state(),
+                                      done=0)
+
+                d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
+                d_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori_aa)
+                goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)  # limit handling
+
+                actual_q = self.get_actual_q()
+                goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
+                diff_q = (np.array(goal_q) - np.array(actual_q)) * 1.0
+            self.speed_j(list(diff_q), self.acc, self.dt)
+            self.wait_period(start_t)
+
+        return self._step(action=action)
+
     def step(self, action):     # trigger based step
         print("action: ", action)
 
@@ -69,7 +160,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                 goal_pose = self.goal_pose_from_action(action=action)
                 goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
                 actual_q = self.get_actual_q()
-                diff_q = (np.array(goal_q) - np.array(actual_q)) * 0.5
+                diff_q = (np.array(goal_q) - np.array(actual_q)) * 1.0
                 self.speed_j(list(diff_q), self.acc, self.dt)
                 self.wait_period(start_t)
                 break
@@ -86,7 +177,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         goal_pose = self.goal_pose_from_action(action=action)
         goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
         actual_q = self.get_actual_q()
-        diff_q = (np.array(goal_q) - np.array(actual_q)) * 0.5
+        diff_q = (np.array(goal_q) - np.array(actual_q)) * 1.0
         self.speed_j(list(diff_q), self.acc, self.dt)
         self.wait_period(start_t)
 
@@ -127,7 +218,8 @@ class RealUR3Env(BaseEnvironment):
         pass
 
     def step(self, action):
-        obs, reward, done, info = self._env.step(action)
+        # obs, reward, done, info = self._env.step(action)
+        obs, reward, done, info = self._env.step_sa(action)
         return obs, reward, done, info
 
     def reset(self):

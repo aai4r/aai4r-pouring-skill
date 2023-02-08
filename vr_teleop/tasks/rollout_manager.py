@@ -63,6 +63,9 @@ class RolloutManager(BatchRolloutFolder):
         self.attr_list = ['state', 'action', 'done', 'info', 'pad_mask']
         self.episode_count = 0
 
+    def isempty(self):
+        return not (bool(self._states) and bool(self._actions) and bool(self._dones) and bool(self._info))
+
     def append(self, state, action, done, info):
         assert type(state) is RobotState
         self._states.append(state)

@@ -54,7 +54,7 @@ src_batch="batch1"
 
 # [rollout_$start.h5, rollout_$end.h5]
 start=0;
-end=100;
+end=50;
 src_rollouts=()
 for i in $(seq $start 1 $end)
 do
