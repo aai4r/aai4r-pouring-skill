@@ -5,7 +5,7 @@ from spirl.components.data_loader import GlobalSplitVideoDataset
 from vr_teleop.tasks.real_ur3_robotiq85 import BaseRTDE, UR3ControlMode
 from vr_teleop.tasks.base import VRWrapper
 
-from utils.utils import quaternion_real_last, quaternion_real_first
+from utils.utils import quaternion_real_last, quaternion_real_first, get_euler_xyz
 from utils.torch_jit_utils import quat_mul, quat_conjugate
 from pytorch3d import transforms as tr
 from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState
@@ -47,7 +47,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
         state = RobotState(joint=self.get_actual_q(),
                            ee_pos=tcp_pos,
-                           ee_quat=self.quat_from_tcp_axis_angle(tcp_aa, tolist=True),
+                           ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
                            target_diff=target_diff.tolist(),
                            gripper_one_hot=self.grip_one_hot_state(),
                            control_mode_one_hot=self.cont_mode_one_hot_state())
@@ -90,40 +90,39 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
             print("VR Trigger On!")
             self.user_control_authority = True
             self.speed_stop()
-            # if self.rollout.isempty(): self.record_frame(action_pos=[0., 0., 0.],
-            #                                              action_quat=[0., 0., 0., 1.],
-            #                                              action_grip=self.grip_one_hot_state(),
-            #                                              done=0)
 
         while self.user_control_authority:
-            cont_status = self.vr.get_controller_status()
             start_t = self.init_period()
+            cont_status = self.vr.get_controller_status()
 
             if cont_status["btn_reset_pose"]:
-                obs = self.reset()
+                self.speed_stop()
                 self.record_frame(action_pos=[0., 0., 0.],
                                   action_quat=[0., 0., 0., 1.],
                                   action_grip=self.grip_one_hot_state(),
                                   done=1)
+
                 self.rollout.show_rollout_summary()
                 self.rollout.save_to_file()
                 self.rollout.reset()
 
+                obs = self.reset()
                 reward, done, info = 0, True, ""
                 return obs, reward, done, info
 
-            diff_q = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             if cont_status["btn_trigger"]:
                 if cont_status["btn_gripper"]:
                     self.move_grip_on_off_toggle()
 
                 vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
                 act_pos = list(vr_curr_pos_vel)
-                actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
 
-                actual_tcp_ori_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_ori))
-                actual_tcp_ori_aa = quaternion_real_last(actual_tcp_ori_aa)
-                conj = quat_conjugate(actual_tcp_ori_aa)
+                actual_tcp_pos, actual_tcp_ori_aa = self.get_actual_tcp_pos_ori()
+
+                actual_tcp_ori_quat = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_ori_aa))
+                actual_tcp_ori_quat = quaternion_real_last(actual_tcp_ori_quat)
+                conj = quat_conjugate(actual_tcp_ori_quat)
                 act_quat = quat_mul(torch.tensor(vr_curr_quat), conj)
 
                 if self.collect_demo:
@@ -136,10 +135,9 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                 d_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori_aa)
                 goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)  # limit handling
 
-                actual_q = self.get_actual_q()
-                goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
-                diff_q = (np.array(goal_q) - np.array(actual_q)) * 1.0
-            self.speed_j(list(diff_q), self.acc, self.dt)
+                goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
+                diff_j = (np.array(goal_j) - np.array(self.get_actual_q())) * 1.0
+            self.speed_j(list(diff_j), self.acc, self.dt)
             self.wait_period(start_t)
 
         return self._step(action=action)
@@ -159,8 +157,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                 start_t = self.init_period()
                 goal_pose = self.goal_pose_from_action(action=action)
                 goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
-                actual_q = self.get_actual_q()
-                diff_q = (np.array(goal_q) - np.array(actual_q)) * 1.0
+                diff_q = (np.array(goal_q) - np.array(self.get_actual_q())) * 1.0
                 self.speed_j(list(diff_q), self.acc, self.dt)
                 self.wait_period(start_t)
                 break
@@ -176,8 +173,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         start_t = self.init_period()
         goal_pose = self.goal_pose_from_action(action=action)
         goal_q = self.get_inverse_kinematics(tcp_pose=goal_pose)
-        actual_q = self.get_actual_q()
-        diff_q = (np.array(goal_q) - np.array(actual_q)) * 1.0
+        diff_q = (np.array(goal_q) - np.array(self.get_actual_q())) * 1.0
         self.speed_j(list(diff_q), self.acc, self.dt)
         self.wait_period(start_t)
 
@@ -203,7 +199,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         _pose = self.add_noise_angle(inputs=self.iposes)
         self.move_j(_pose.tolist())
         self.move_grip_on_off(grip_action=False)
-        self.set_rpy_base(self.get_actual_tcp_pose())
+        print("[Reset] current CONT MODE: ", self.CONTROL_MODE, self.rpy_base)
 
         self.user_control_authority = False
         return self.get_obs()
