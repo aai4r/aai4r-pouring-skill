@@ -103,6 +103,10 @@ class Sampler:
                         # update stored observation
                         self._obs = obs
                         self._episode_step += 1
+
+                        # written by twkim, only for shared autonomy processing
+                        if done: break
+        self._env.reset()
         episode[-1].done = True     # make sure episode is marked as done at final time step
 
         return listdict2dictlist(episode)

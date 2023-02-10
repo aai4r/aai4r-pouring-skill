@@ -28,7 +28,8 @@ class SkillTrainer(ModelTrainer):
         _args = _get_args()
         _args.init_only = True
         super().__init__(args=_args)
-        self.start_epoch = 0
+
+        # prior policy resume...
         if args.resume or self.conf.ckpt_path is not None:
             self.start_epoch = self.resume(args.resume, self.conf.ckpt_path)
 
@@ -38,10 +39,18 @@ class SkillTrainer(ModelTrainer):
 
         sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
         # sys.argv.append("--val_data_size={}".format(160))  # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
-        # sys.argv.append("--resume={}".format('latest'))     # latest or number..
+        sys.argv.append("--resume={}".format('latest'))     # latest or number..
+
+    def train_loader_update(self):
+        params = AttrDict(logger_class=self._hp.logger,
+                          model_class=self._hp.model,
+                          n_repeat=self._hp.epoch_cycles_train,
+                          dataset_size=-1)
+        self.train_loader = self.get_dataset(self.args, self.model, self.conf.data, 'train', params.n_repeat, params.dataset_size)
+        print("Augmented # of Samples: ", self.train_loader.sampler.num_samples)
 
     def skill_train(self, num_epochs):
-        for epoch in range(self.start_epoch, num_epochs):
+        for epoch in range(self.skill_net_start_epoch, self.skill_net_start_epoch + num_epochs):
             self.train_epoch(epoch)
 
             if not self.args.dont_save:
@@ -53,6 +62,7 @@ class SkillTrainer(ModelTrainer):
                 }, os.path.join(self._hp.exp_path, 'weights' if not hasattr(self.conf.model,
                                                                             "weights_dir") else self.conf.model.weights_dir),
                     CheckpointHandler.get_ckpt_name(epoch))
+        self.skill_net_start_epoch += num_epochs
 
 
 class SharedAutonomyTrainer:
@@ -175,14 +185,18 @@ class SharedAutonomyTrainer:
     def skill_deployment(self):
         n_total = 0
         with self.agent.val_mode():
-            with torch.no_grad():
-                while True:  # keep producing rollouts until we get a valid one
+            while True:  # keep producing rollouts until we get a valid one
+                with torch.no_grad():
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     n_total += 1
-                    if n_total % 10 == 0: print("n_total: ", n_total)
+                    print("n_total: ", n_total)
+
+                self.skill_trainer.train_loader_update()
+                self.skill_trainer.skill_train(num_epochs=1)
+                self.agent.update_model_weights()
 
     def shared_autonomy_train(self):
-        self.warmup_skill_train(epoch=2)
+        self.warmup_skill_train(epoch=1)
         self.skill_deployment()
         # interrupt by user triggering and collect demo dataset
         # augment the demo dataset and skill retraining (how many epochs?)
@@ -343,7 +357,7 @@ if __name__ == '__main__':
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
     task_name = "pouring_skill"

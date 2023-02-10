@@ -71,6 +71,7 @@ class ModelTrainer(BaseTrainer):
         self.global_step, start_epoch = 0, 0
         if args.resume or conf.ckpt_path is not None:
             start_epoch = self.resume(args.resume, conf.ckpt_path)
+            self.skill_net_start_epoch = start_epoch
 
         if args.init_only:
             return
@@ -125,6 +126,20 @@ class ModelTrainer(BaseTrainer):
 
             if epoch % self.args.val_interval == 0:
                 self.val()
+
+    def train_wo_val(self, start_epoch):
+        for epoch in range(start_epoch, self._hp.num_epochs):
+            self.train_epoch(epoch)
+
+            if not self.args.dont_save:
+                save_checkpoint({
+                    'epoch': epoch,
+                    'global_step': self.global_step,
+                    'state_dict': self.model.state_dict(),
+                    'optimizer': self.optimizer.state_dict(),
+                }, os.path.join(self._hp.exp_path, 'weights' if not hasattr(self.conf.model,
+                                                                            "weights_dir") else self.conf.model.weights_dir),
+                    CheckpointHandler.get_ckpt_name(epoch))
 
     def train_epoch(self, epoch):
         self.model.train()

@@ -691,5 +691,5 @@ if __name__ == "__main__":
     # u.vr_handler()
     # u.workspace_verify()
     # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=132)
+    u.replay_mode(batch_idx=1, rollout_idx=142)
     # u.func_test()
