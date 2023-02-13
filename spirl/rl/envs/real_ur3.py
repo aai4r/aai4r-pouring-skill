@@ -186,6 +186,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
     def goal_pose_from_action(self, action):
         act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
         grip_onehot = self.arg_max_one_hot(list1d=grip)
+        print("grip: {}, grip_onehot: {}".format(grip, grip_onehot))
         self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
 
         actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()

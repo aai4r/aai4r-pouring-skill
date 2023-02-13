@@ -15,10 +15,11 @@ class ClSPiRLMdl(SkillPriorMdl):
         assert not self._hp.use_convs  # currently only supports non-image inputs
         assert self._hp.cond_decode    # need to decode based on state for closed-loop low-level
         self.q = self._build_inference_net()
-        self.decoder = Predictor(self._hp,
-                                 input_size=self.enc_size + self._hp.nz_vae,
-                                 output_size=self._hp.action_dim, # + self._hp.aux_pred_dim,
-                                 mid_size=self._hp.nz_mid_prior)
+        self.decoder = PostPredictor(self._hp,
+                                     input_size=self.enc_size + self._hp.nz_vae,
+                                     output_size=self._hp.action_dim, # + self._hp.aux_pred_dim,
+                                     mid_size=self._hp.nz_mid_prior,
+                                     final_activation=nn.LeakyReLU(0.2, inplace=True))
         self.p = self._build_prior_ensemble()
         self.log_sigma = get_constant_parameter(0., learnable=False)
 

@@ -79,7 +79,8 @@ class ModelTrainer(BaseTrainer):
         if args.val_sweep:
             self.run_val_sweep()
         elif args.train:
-            self.train(start_epoch)
+            # self.train(start_epoch)
+            self.train_wo_val(start_epoch)
         else:
             self.val()
 

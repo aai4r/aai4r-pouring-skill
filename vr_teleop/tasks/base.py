@@ -110,7 +110,7 @@ class VRWrapper:
         controller_status["pose_quat"] = pq
         controller_status["btn_trigger"] = d['trigger']
         controller_status["btn_trackpad"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
-        controller_status["btn_grip"] = self.grip_btn.is_pressed(event_stream=d["grip_button"])
+        controller_status["btn_grip"] = d["grip_button"]  # self.grip_btn.is_pressed(event_stream=d["grip_button"])
         x, y = d["trackpad_x"], d["trackpad_y"]
         controller_status["trk_x"] = x
         controller_status["trk_y"] = y

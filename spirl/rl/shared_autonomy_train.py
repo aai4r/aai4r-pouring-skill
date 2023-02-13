@@ -196,7 +196,7 @@ class SharedAutonomyTrainer:
                 self.agent.update_model_weights()
 
     def shared_autonomy_train(self):
-        self.warmup_skill_train(epoch=1)
+        self.warmup_skill_train(epoch=0)
         self.skill_deployment()
         # interrupt by user triggering and collect demo dataset
         # augment the demo dataset and skill retraining (how many epochs?)

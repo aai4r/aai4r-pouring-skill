@@ -31,9 +31,9 @@ model_config = AttrDict(
     nz_enc=256,
     nz_mid=256,
     nz_vae=12,
-    n_processing_layers=5,
+    n_processing_layers=4,
     cond_decode=True,
-    num_prior_net_layers=4,
+    num_prior_net_layers=3,
     weights_dir="weights",
 )
 
