@@ -1,3 +1,5 @@
+import time
+
 from utils.torch_jit_utils import *
 import rtde_control
 import rtde_receive
@@ -27,13 +29,8 @@ class BaseRTDE:
         self.rtde_c = rtde_control.RTDEControlInterface(self.HOST)
         self.rtde_r = rtde_receive.RTDEReceiveInterface(self.HOST)
 
-        # temp...
-        self.PORT = 63352   # for robotiq gripper
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((self.HOST, self.PORT))
-
         # gripper control
-        self.gripper = RobotiqGripper(self.rtde_c)
+        self.gripper = RobotiqGripperExpand(self.rtde_c, self.HOST)
         self.gripper.activate()
         self.gripper.set_force(0)  # range: [0, 100]
         self.gripper.set_speed(10)  # range: [0, 100]
@@ -487,45 +484,6 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.v_ax.ry = _ry * self.ap + self.v_ax.ry * (1.0 - self.ap)
         self.v_ax.rz = _rz * self.ap + self.v_ax.rz * (1.0 - self.ap)
 
-    def vr_handler(self):
-        # int_sec = 0.0
-        # int_x = 0.0
-        while True:
-            cont_status = self.vr.get_controller_status()
-            if cont_status["btn_trigger"]:
-                pq = cont_status["pose_quat"]
-                # pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))   # real first
-                pq = quaternion_real_first(q=torch.tensor(pq))
-                aa = tr.quaternion_to_axis_angle(pq)
-
-                if cont_status["btn_trackpad"]:
-                    print("btn_trackpad")
-                if cont_status["btn_control_mode"]:
-                    print("btn_control_mode")
-                if cont_status["btn_gripper"]:
-                    print("btn_gripper")
-
-                # int_x += cont_status["lin_vel"][0] * cont_status["dt"]
-                # # integral
-                # int_sec += cont_status["dt"]
-                # if int_sec >= 1.0:
-                #     print("----------------------")
-                #     print("(x) m/s: ", int_x)
-                #     print("int_sec ", int_sec)
-                #     int_sec = 0.0
-                #     int_x = 0.0
-
-                # if cont_status["btn_gripper"]:
-                #     self.grip_on = not self.grip_on     # toggle
-                #     grip_pos = 63 if self.grip_on else 100
-                #     self.move_grip_to(pos_in_mm=grip_pos)
-                #     print("gripper toggle")
-
-                # if self.timer.elapsed():
-                #     print("VR pose: ", pq)
-                #     print("Axis-angle: ", aa)
-                #     print("lin_vel: ", cont_status["lin_vel"])
-                #     print("dt: ", cont_status["dt"])
     def get_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
         target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
@@ -597,7 +555,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       action_grip=self.grip_one_hot_state(),
                                       done=1)
                     self.rollout.show_rollout_summary()
-                    self.rollout.save_to_file()
+                    # self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
@@ -616,16 +574,12 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                         # print("gripper..........")
                         self.move_grip_on_off_toggle()
 
+                    current_gripper_pos_mm_norm = self.gripper.gripper_to_mm_normalize()
                     if cont_status["btn_grip"]:
-                        print("grip ...... ")
-                        # self.sock.sendall(b'GET POS\n')
-                        # s1.sendall(b'SET POS 255\n')
-                        # data = self.sock.recv(2 ** 10)
-                        # print("data: ", data)
-                        # pos_in_mm = 0
-                        # # self.gripper.call("MOVE22", "rq_move_mm(" + str(pos_in_mm) + ")")
-                        # val = self.gripper.call("MOVE", "rq_current_pos(" + str(1) + ")")
-                        # print("val: ", val)
+                        self.gripper.grasping_by_hold(step=-10.0)
+                    else:
+                        self.gripper.grasping_by_hold(step=10.0)
+                    gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
 
                     vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
                     act_pos = list(vr_curr_pos_vel)
@@ -684,14 +638,15 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
 
 import socket
+from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripperExpand
 
 
 def vr_test():
     vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
+
     HOST = "192.168.0.75"
-    PORT = 63352
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((HOST, PORT))
+    rtde_c = rtde_control.RTDEControlInterface(HOST)
+    gripper = RobotiqGripperExpand(rtde_c, HOST)
 
     while True:
         cont_status = vr.get_controller_status()
@@ -702,59 +657,29 @@ def vr_test():
             # pq = quaternion_real_first(q=torch.tensor(pq))
             # aa = tr.quaternion_to_axis_angle(pq)
 
+        val = gripper.gripper_to_mm_normalize()
+        print("normalized gripper: ", val)
+
         if cont_status["btn_reset_pose"]:
             print("btn_reset_mode")
         if cont_status["btn_grip"]:
             print("btn_grip is pressed..")
+            gripper.grasping_by_hold(step=-5.0)
+        else:
+            gripper.grasping_by_hold(step=5.0)
+
+        gripper_action = gripper.get_gripper_action()
+        print("gripper action: ", gripper_action)
         # if cont_status["btn_gripper"]:
         #     print("btn_gripper")
 
 
-def ROBOTIQ_test():
-    HOST = "192.168.0.75"
-    PORT = 63352
-    gripper_closed_norm = [100, 100, 100, 100]
-    gripper_open_norm = [0, 0, 0, 0]
-    gripper_closed_mm = [0, 0, 0, 0]
-    gripper_open_mm = [50, 50, 50, 50]
-
-    closed_mm = 0.
-    open_mm = 85.
-    closed_norm = 100.
-    open_norm = 0.
-
-    actual_min = 3
-    actual_max = 227
-
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((HOST, PORT))
-        # s.sendall(b'GET POS\n')
-        # s.sendall(b'SET POS 0\n')
-        while True:
-            s.sendall(b'GET POS\n')
-            data = s.recv(2 ** 10)
-            gripper_value = int(data.decode('utf-8').split(' ')[-1])   # [0, 255]
-            value_norm = ((gripper_value - actual_min) / (actual_max - actual_min)) * 100    # [0, 100]
-
-            slope = (closed_mm - open_mm) / (closed_norm - open_norm)
-            value_mm = slope * (value_norm - closed_norm) + closed_mm
-
-            if value_mm > open_mm:
-                value_mm_limited = open_mm
-            elif value_mm < closed_mm:
-                value_mm_limited = closed_mm
-            else:
-                value_mm_limited = value_mm
-
-            print('Raw value: {}, mm: {}'.format(gripper_value, value_mm_limited))
-
-
 if __name__ == "__main__":
-    ROBOTIQ_test()
+    # ROBOTIQ_test()
     # vr_test()
-    # u = RealUR3()
+    u = RealUR3()
     # u.vr_handler()
     # u.workspace_verify()
-    # u.run_vr_teleop()
+    u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=142)
     # u.func_test()
