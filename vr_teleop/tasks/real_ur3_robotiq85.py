@@ -101,6 +101,10 @@ class BaseRTDE:
     def grip_one_hot_state(self):
         return [int(self.grip_on is True), int(self.grip_on is False)]
 
+    def grip_pos(self, normalize=True, list_type=True):
+        pos = self.gripper.gripper_to_mm_normalize() if normalize else self.gripper.gripper_to_mm()
+        return [pos] if list_type else pos
+
     @staticmethod
     def grip_onehot_to_bool(grip_one_hot):
         assert sum(grip_one_hot) == 1.0
@@ -306,6 +310,7 @@ class UR3ControlMode:
     def goal_axis_angle_from_act_quat(act_quat, actual_tcp_aa):
         if type(act_quat) == list or type(act_quat) == np.ndarray:
             act_quat = torch.tensor(act_quat).clone()
+            act_quat = act_quat / act_quat.norm()   # normalize
 
         if type(actual_tcp_aa) == list or type(actual_tcp_aa) == np.ndarray:
             actual_tcp_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_aa).clone())

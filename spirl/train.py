@@ -97,7 +97,7 @@ class ModelTrainer(BaseTrainer):
             'num_epochs': 300,
             'epoch_cycles_train': 1,
             'optimizer': 'radam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
-            'lr': 1e-3,
+            'lr': 3e-4,
             'gradient_clip': None,
             'init_grad_clip': 0.001,
             'init_grad_clip_step': 100,     # clip gradients in initial N steps to avoid NaNs

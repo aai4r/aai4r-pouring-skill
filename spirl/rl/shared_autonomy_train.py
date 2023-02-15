@@ -192,8 +192,8 @@ class SharedAutonomyTrainer:
                     print("n_total: ", n_total)
 
                 self.skill_trainer.train_loader_update()
-                self.skill_trainer.skill_train(num_epochs=1)
-                self.agent.update_model_weights()
+                # self.skill_trainer.skill_train(num_epochs=1)
+                # self.agent.update_model_weights()
 
     def shared_autonomy_train(self):
         self.warmup_skill_train(epoch=0)

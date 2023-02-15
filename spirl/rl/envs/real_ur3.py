@@ -8,20 +8,24 @@ from vr_teleop.tasks.base import VRWrapper
 from utils.utils import quaternion_real_last, quaternion_real_first, get_euler_xyz
 from utils.torch_jit_utils import quat_mul, quat_conjugate
 from pytorch3d import transforms as tr
-from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState
+from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState, RobotState2
 import torch
 import numpy as np
 
 
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
-    state_dim=20,
-    n_actions=9,
+    state_dim=19,
+    n_actions=8,
     split=AttrDict(train=0.9, val=0.1, test=0.0),
     env_name="pouring_skill",
     res=128,
     crop_rand_subseq=True,
 )
+
+
+def sigmoid(x):
+    return 1.0 / (1.0 + np.exp(-x))
 
 
 class RtdeUR3(BaseRTDE, UR3ControlMode):
@@ -45,23 +49,24 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
     def get_robot_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
         target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
-        state = RobotState(joint=self.get_actual_q(),
-                           ee_pos=tcp_pos,
-                           ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
-                           target_diff=target_diff.tolist(),
-                           gripper_one_hot=self.grip_one_hot_state(),
-                           control_mode_one_hot=self.cont_mode_one_hot_state())
+        state = RobotState2(joint=self.get_actual_q(),
+                            ee_pos=tcp_pos,
+                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
+                            target_diff=target_diff.tolist(),
+                            # gripper_one_hot=self.grip_one_hot_state(),
+                            gripper_pos=[self.gripper.gripper_to_mm_normalize()],
+                            control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
 
-    def record_frame(self, action_pos, action_quat, action_grip, done):
+    def record_frame(self, state, action_pos, action_quat, action_grip, done):
         """
+        :param state:
         :param action_pos:      Relative positional diff. (vel), list type
         :param action_quat:     Rotation as a quaternion (real-last), list type
         :param action_grip:     Gripper ON/OFF one-hot vector, list type
         :param done:            Scalar value of 0 or 1
         :return:
         """
-        state = self.get_robot_state()
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         action = action_pos + action_quat + action_grip
         self.rollout.append(state=state, action=action, done=done, info=info)
@@ -72,9 +77,10 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         tcp_quat = self.quat_from_tcp_axis_angle(tcp_aa, tolist=True)
         # TODO, target_diff is temporal state...
         target_diff = (np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)).tolist()
-        g_one_hot = self.grip_one_hot_state()
+        # g_one_hot = self.grip_one_hot_state()
+        g_pos = self.grip_pos(normalize=True, list_type=True)
         cm_one_hot = self.cont_mode_one_hot_state()
-        obs = joint + tcp_pos + tcp_quat + target_diff + g_one_hot + cm_one_hot
+        obs = joint + tcp_pos + tcp_quat + target_diff + g_pos + cm_one_hot
         return np.array(obs) if np_type else obs
 
     @staticmethod
@@ -97,9 +103,10 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
             if cont_status["btn_reset_pose"]:
                 self.speed_stop()
-                self.record_frame(action_pos=[0., 0., 0.],
+                self.record_frame(state=self.get_robot_state(),
+                                  action_pos=[0., 0., 0.],
                                   action_quat=[0., 0., 0., 1.],
-                                  action_grip=self.grip_one_hot_state(),
+                                  action_grip=[self.gripper.gripper_to_mm_normalize()],
                                   done=1)
 
                 self.rollout.show_rollout_summary()
@@ -112,8 +119,15 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
             diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             if cont_status["btn_trigger"]:
-                if cont_status["btn_gripper"]:
-                    self.move_grip_on_off_toggle()
+                state = self.get_robot_state()
+                # if cont_status["btn_gripper"]:
+                #     self.move_grip_on_off_toggle()
+
+                if cont_status["btn_grip"]:
+                    self.gripper.grasping_by_hold(step=-10.0)
+                else:
+                    self.gripper.grasping_by_hold(step=10.0)
+                gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
 
                 vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
                 act_pos = list(vr_curr_pos_vel)
@@ -126,9 +140,10 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                 act_quat = quat_mul(torch.tensor(vr_curr_quat), conj)
 
                 if self.collect_demo:
-                    self.record_frame(action_pos=act_pos,
+                    self.record_frame(state=state,
+                                      action_pos=act_pos,
                                       action_quat=act_quat.tolist(),
-                                      action_grip=self.grip_one_hot_state(),
+                                      action_grip=[gripper_action_norm],
                                       done=0)
 
                 d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -185,9 +200,15 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
     def goal_pose_from_action(self, action):
         act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
-        grip_onehot = self.arg_max_one_hot(list1d=grip)
-        print("grip: {}, grip_onehot: {}".format(grip, grip_onehot))
-        self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
+
+        if len(grip) == 2:
+            grip_onehot = self.arg_max_one_hot(list1d=grip)
+            print("grip: {}, grip_onehot: {}".format(grip, grip_onehot))
+            self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
+        elif len(grip) == 1:
+            self.gripper.rq_move_mm_norm(grip[0] * 1.0)
+        else:
+            raise NotImplementedError
 
         actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
         des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -199,7 +220,8 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         self.speed_stop()
         _pose = self.add_noise_angle(inputs=self.iposes)
         self.move_j(_pose.tolist())
-        self.move_grip_on_off(grip_action=False)
+        # self.move_grip_on_off(grip_action=False)
+        self.gripper.rq_move_mm_norm(1.)
         print("[Reset] current CONT MODE: ", self.CONTROL_MODE, self.rpy_base)
 
         self.user_control_authority = False
