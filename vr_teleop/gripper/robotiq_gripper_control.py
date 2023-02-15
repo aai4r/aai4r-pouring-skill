@@ -215,3 +215,6 @@ class RobotiqGripperExpand(RobotiqGripper):
         var_name_str = "SET POS " + str(pos_gripper) + "\n"
         ack = self.socket_send_recv(var_name_str, n_bytes=2 ** 3)
         return ack
+
+    def rq_move_mm_norm(self, pos_mm_norm):
+        return self.rq_move_mm(pos_mm=pos_mm_norm * self.open_mm)

@@ -52,9 +52,38 @@ class RobotState:
         return _joint + _ee_pos + _ee_quat + _gripper + _control_mode
 
 
+@dataclass
+class RobotState2(RobotState):
+    gripper_pos: list = None  # 1-dim
+
+    def item_vec(self):
+        return self.joint + self.ee_pos + self.ee_quat + self.target_diff + \
+               self.gripper_pos + self.control_mode_one_hot
+
+    def import_state_from(self, np_state1d):
+        assert type(np_state1d) == np.ndarray
+        self.joint = np_state1d[:6].tolist()
+        self.ee_pos = np_state1d[6:9].tolist()
+        self.ee_quat = np_state1d[9:13].tolist()
+        self.target_diff = np_state1d[13:16].tolist()   # TODO, temp target position difference!!
+        self.gripper_pos = np_state1d[16:17].tolist()
+        self.control_mode_one_hot = np_state1d[17:19].tolist()
+
+    @staticmethod
+    def random_data(n_joint, n_cont_mode):
+        _joint = [random.randint(-100, 100) / 200.0 for _ in range(n_joint)]
+        _ee_pos = [random.randint(-100, 100) / 200.0 for _ in range(3)]
+        _ee_quat = [random.randint(-100, 100) / 200.0 for _ in range(4)]
+        _gripper = [random.randint(0, 100) / 100.0]
+        _control_mode = [0] * n_cont_mode
+        _control_mode[random.randint(0, n_cont_mode - 1)] = 1
+        return _joint + _ee_pos + _ee_quat + _gripper + _control_mode
+
+
 class RolloutManager(BatchRolloutFolder):
     def __init__(self, task_name, root_dir=None, task_desc=""):
         super().__init__(task_name=task_name, root_dir=root_dir)
+        self.robot_state_class = RobotState2
         self._states = []    # joint, gripper, etc.
         self._actions = []
         self._dones = []
@@ -67,7 +96,7 @@ class RolloutManager(BatchRolloutFolder):
         return not (bool(self._states) and bool(self._actions) and bool(self._dones) and bool(self._info))
 
     def append(self, state, action, done, info):
-        assert type(state) is RobotState
+        assert type(state) is self.robot_state_class
         self._states.append(state)
         self._actions.append(action)
         self._dones.append(done)
@@ -105,7 +134,7 @@ class RolloutManager(BatchRolloutFolder):
         sample_state, sample_action, sample_done, sample_info = self.get(idx)
 
         print("* STEP: [{}]".format(idx))
-        print("    state * {} dim with {}".format(sum([len(i) for i in sample_state]), sample_state))
+        print("    state * {} dim with {}".format(sum([len(i) if i is not None else 0 for i in sample_state]), sample_state))
         print("    action * {} dim with {}".format(len(sample_action), sample_action))
         print("    done * {} dim with {}".format(len([sample_done]), sample_done))
         print("    info: ", sample_info)
@@ -141,7 +170,7 @@ class RolloutManager(BatchRolloutFolder):
                 if name == 'states':
                     temp = f[key + '/' + name][()].astype(np.float32)
                     for i in range(len(temp)):
-                        rs = RobotState()
+                        rs = self.robot_state_class()
                         rs.import_state_from(np_state1d=temp[i])
                         self._states.append(rs)
                     # self._states = f[key + '/' + name][()].astype(np.float32).tolist()

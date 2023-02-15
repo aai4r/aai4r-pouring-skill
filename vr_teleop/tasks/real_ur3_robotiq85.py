@@ -12,7 +12,7 @@ from utils.utils import euler_to_mat3d, orientation_error, rad2deg, deg2rad, Cus
 from pytorch3d import transforms as tr
 from vr_teleop.tasks.base import VRWrapper
 
-from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState
+from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState, RobotState2
 
 
 def to_n_pi_pi(rad):     # [0, 2*pi] --> [-pi, pi]
@@ -487,29 +487,31 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def get_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
         target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
-        state = RobotState(joint=self.get_actual_q(),
-                           ee_pos=tcp_pos,
-                           ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
-                           target_diff=target_diff.tolist(),
-                           gripper_one_hot=self.grip_one_hot_state(),
-                           control_mode_one_hot=self.cont_mode_one_hot_state())
+        state = RobotState2(joint=self.get_actual_q(),
+                            ee_pos=tcp_pos,
+                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
+                            target_diff=target_diff.tolist(),
+                            # gripper_one_hot=self.grip_one_hot_state(),    # for RobotState
+                            gripper_pos=[self.gripper.gripper_to_mm_normalize()],
+                            control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
 
-    def record_frame(self, action_pos, action_quat, action_grip, done):
+    def record_frame(self, state, action_pos, action_quat, action_grip, done):
         """
+        :param state:
         :param action_pos:      Relative positional diff. (vel), list type
         :param action_quat:     Rotation as a quaternion (real-last), list type
         :param action_grip:     Gripper ON/OFF one-hot vector, list type
         :param done:            Scalar value of 0 or 1
         :return:
         """
-        state = self.get_state()
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         action = action_pos + action_quat + action_grip
         self.rollout.append(state=state, action=action, done=done, info=info)
 
     def play_demo(self):
         # go to initial state in joint space
+        self.speed_stop()
         init_state, _, _, _ = self.rollout.get(0)
         self.move_j(init_state.joint)
 
@@ -522,7 +524,12 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 self.switching_control_mode()
 
             act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
-            self.move_grip_on_off(self.grip_onehot_to_bool(grip))
+            if len(grip) == 2:  # gripper one-hot state
+                self.move_grip_on_off(self.grip_onehot_to_bool(grip))
+            elif len(grip) == 1:    # cont. control
+                self.gripper.rq_move_mm_norm(grip[0])
+            else:
+                raise NotImplementedError
 
             actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
             des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -539,30 +546,27 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         print("Run VR teleoperation mode")
         try:
             self.move_j(self.iposes)
-            if self.collect_demo: self.record_frame(action_pos=[0., 0., 0.],
-                                                    action_quat=[0., 0., 0., 1.],
-                                                    action_grip=self.grip_one_hot_state(),
-                                                    done=0)
-
             while True:
                 start_t = self.init_period()
 
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
-                    self.record_frame(action_pos=[0., 0., 0.],
+                    self.record_frame(state=self.get_state(),
+                                      action_pos=[0., 0., 0.],
                                       action_quat=[0., 0., 0., 1.],
-                                      action_grip=self.grip_one_hot_state(),
+                                      action_grip=[self.gripper.gripper_to_mm_normalize()],
                                       done=1)
+                    # self.play_demo()
                     self.rollout.show_rollout_summary()
-                    # self.rollout.save_to_file()
+                    self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
                     _pose = self.add_noise_angle(inputs=self.iposes)
                     self.move_j(_pose.tolist())
-                    self.move_grip_on_off(grip_action=False)
-                    # self.play_demo()
+                    self.gripper.rq_move_mm_norm(1.)
+                    # self.move_grip_on_off(grip_action=False)
                     continue
 
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -571,10 +575,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                         self.switching_control_mode()
 
                     if cont_status["btn_gripper"]:
-                        # print("gripper..........")
                         self.move_grip_on_off_toggle()
 
-                    current_gripper_pos_mm_norm = self.gripper.gripper_to_mm_normalize()
+                    state = self.get_state()
                     if cont_status["btn_grip"]:
                         self.gripper.grasping_by_hold(step=-10.0)
                     else:
@@ -591,9 +594,10 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     conj = quat_conjugate(actual_tcp_ori_quat)
                     act_quat = quat_mul(torch.tensor(vr_curr_quat), conj)
 
-                    if self.collect_demo: self.record_frame(action_pos=act_pos,
+                    if self.collect_demo: self.record_frame(state=state,
+                                                            action_pos=act_pos,
                                                             action_quat=act_quat.tolist(),
-                                                            action_grip=self.grip_one_hot_state(),
+                                                            action_grip=[gripper_action_norm],
                                                             done=0)
 
                     d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -602,16 +606,6 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                     goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
                     diff_j = (np.array(goal_j) - np.array(self.get_actual_q())) * 1.0
-
-                    if self.timer.timeover_active:
-                        # print("Desired AA: ", vr_q, vr_q.norm())
-                        # print("Actual AA: ", actual_tcp_pos)
-                        # print("diff: ", rot)
-                        # print("dt ", cont_status["dt"])
-                        # print("TCP: ", actual_tcp_p)
-                        # print("des pose: ", des_pose)
-                        # print("dj: ", dj)
-                        print("----------------------------------")
 
                 self.speed_j(list(diff_j), self.acc, self.dt)
                 self.wait_period(start_t)
@@ -681,5 +675,5 @@ if __name__ == "__main__":
     # u.vr_handler()
     # u.workspace_verify()
     u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=142)
+    # u.replay_mode(batch_idx=1, rollout_idx=458)
     # u.func_test()
