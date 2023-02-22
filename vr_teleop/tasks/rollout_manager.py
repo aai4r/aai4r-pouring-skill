@@ -57,17 +57,15 @@ class RobotState2(RobotState):
     gripper_pos: list = None  # 1-dim
 
     def item_vec(self):
-        return self.joint + self.ee_pos + self.ee_quat + self.target_diff + \
-               self.gripper_pos + self.control_mode_one_hot
+        return self.joint + self.ee_pos + self.ee_quat + self.gripper_pos + self.control_mode_one_hot
 
     def import_state_from(self, np_state1d):
         assert type(np_state1d) == np.ndarray
         self.joint = np_state1d[:6].tolist()
         self.ee_pos = np_state1d[6:9].tolist()
         self.ee_quat = np_state1d[9:13].tolist()
-        self.target_diff = np_state1d[13:16].tolist()   # TODO, temp target position difference!!
-        self.gripper_pos = np_state1d[16:17].tolist()
-        self.control_mode_one_hot = np_state1d[17:19].tolist()
+        self.gripper_pos = np_state1d[13:14].tolist()
+        self.control_mode_one_hot = np_state1d[14:16].tolist()
 
     @staticmethod
     def random_data(n_joint, n_cont_mode):
@@ -81,6 +79,9 @@ class RobotState2(RobotState):
 
 
 class RolloutManager(BatchRolloutFolder):
+    """
+    RolloutManager is only for state based skill learning.
+    """
     def __init__(self, task_name, root_dir=None, task_desc=""):
         super().__init__(task_name=task_name, root_dir=root_dir)
         self.robot_state_class = RobotState2
@@ -184,6 +185,43 @@ class RolloutManager(BatchRolloutFolder):
                 else:
                     raise ValueError("{}: Unexpected rollout element...".format(name))
         print("Load complete!")
+
+
+class RolloutManagerExpand(RolloutManager):
+    """
+        RolloutManagerExpand is an expanded version of RolloutManager,
+        where it includes image observations (or depth image is also added later).
+    """
+    def __init__(self, task_name, root_dir=None, task_desc=""):
+        super().__init__(task_name=task_name, root_dir=root_dir, task_desc=task_desc)
+        self._observations = []
+
+    def isempty(self):
+        return not (bool(self._observations) and bool(self._states) and bool(self._actions)
+                    and bool(self._dones) and bool(self._info))
+
+    def append(self, observation, state, action, done, info):
+        assert type(state) is self.robot_state_class
+        self._observations.append(observation)
+        self._states.append(state)
+        self._actions.append(action)
+        self._dones.append(done)
+        self._info.append(info)
+
+    def get(self, index):
+        assert 0 <= index < self.len()
+        return self._observations[index], self._states[index], self._actions[index], self._dones[index], self._info[index]
+
+    def len(self):
+        assert len(self._observations) == len(self._states) == len(self._actions) == len(self._dones) # == len(self._info)
+        return len(self._states)
+
+    def reset(self):
+        self._observations = []
+        self._states = []
+        self._actions = []
+        self._dones = []
+        self._info = []
 
 
 if __name__ == "__main__":

@@ -1,332 +1,8 @@
-import time
+import copy
 
-from utils.torch_jit_utils import *
-import rtde_control
-import rtde_receive
-from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripper
-
-from spirl.utility.general_utils import AttrDict
-from utils.utils import euler_to_mat3d, orientation_error, rad2deg, deg2rad, CustomTimer, \
-    quaternion_real_first, quaternion_real_last
-
-from pytorch3d import transforms as tr
+from lib_modules import *
 from vr_teleop.tasks.base import VRWrapper
-
-from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState, RobotState2
-
-
-def to_n_pi_pi(rad):     # [0, 2*pi] --> [-pi, pi]
-    if rad > 0:
-        return rad - (2 * np.pi) if rad >= np.pi else rad
-    else:
-        return rad + (2 * np.pi) if rad <= np.pi else rad
-
-
-class BaseRTDE:
-    def __init__(self, HOST):
-        self.HOST = HOST
-
-        self.rtde_c = rtde_control.RTDEControlInterface(self.HOST)
-        self.rtde_r = rtde_receive.RTDEReceiveInterface(self.HOST)
-
-        # gripper control
-        self.gripper = RobotiqGripperExpand(self.rtde_c, self.HOST)
-        self.gripper.activate()
-        self.gripper.set_force(0)  # range: [0, 100]
-        self.gripper.set_speed(10)  # range: [0, 100]
-        self.grip_on = None
-        self.move_grip_on_off(grip_action=False)
-
-        self.default_control_params = AttrDict(speed=0.25, acceleration=1.2, blend=0.099, dt=1.0 / 500.0)
-
-    def init_period(self):
-        return self.rtde_c.initPeriod()
-
-    def wait_period(self, t):
-        self.rtde_c.waitPeriod(t)
-
-    def get_actual_tcp_pose(self):
-        return self.rtde_r.getActualTCPPose()
-
-    def get_actual_tcp_pos_ori(self):
-        pose = self.rtde_r.getActualTCPPose()
-        return pose[:3], pose[3:]
-
-    def get_actual_q(self):
-        return self.rtde_r.getActualQ()
-
-    def get_inverse_kinematics(self, tcp_pose):
-        try:
-            ik_joint = self.rtde_c.getInverseKinematics(x=tcp_pose)
-            if len(ik_joint) == 0:
-                print("IK exception..! input tcp pose => ", tcp_pose)
-                ik_joint = self.get_actual_q()
-                # raise ValueError
-            return ik_joint
-        except ValueError:
-            print("IK exception..! input tcp pose => ", tcp_pose)
-
-    def speed_j(self, des_j, acc, dt):
-        self.rtde_c.speedJ(des_j, acc, dt)
-
-    def speed_stop(self):
-        self.rtde_c.speedStop()
-
-    def move_j(self, joint):
-        self.rtde_c.moveJ(joint)
-
-    def stop_script(self):
-        self.rtde_c.stopScript()
-
-    def move_grip_on_off_toggle(self):
-        self.grip_on = not self.grip_on  # toggle
-        grip_pos = 0 if self.grip_on else 100
-        self.move_grip_to(pos_in_mm=grip_pos)
-
-    def move_grip_on_off(self, grip_action):
-        assert type(grip_action) == bool
-        if self.grip_on is not None:
-            if grip_action == self.grip_on: return
-        grip_pos = 0 if grip_action else 100
-        self.move_grip_to(pos_in_mm=grip_pos)
-        self.grip_on = grip_action
-
-    def move_grip_to(self, pos_in_mm):
-        assert self.gripper
-        max_len = 85.0
-        val = min(max(int(pos_in_mm), 0), max_len)  # [0, 50] --> [0/50, 50/50]
-        val = int((float(val) / max_len) * 50.0 + 0.5)
-        self.gripper.move(val)
-
-    def grip_one_hot_state(self):
-        return [int(self.grip_on is True), int(self.grip_on is False)]
-
-    def grip_pos(self, normalize=True, list_type=True):
-        pos = self.gripper.gripper_to_mm_normalize() if normalize else self.gripper.gripper_to_mm()
-        return [pos] if list_type else pos
-
-    @staticmethod
-    def grip_onehot_to_bool(grip_one_hot):
-        assert sum(grip_one_hot) == 1.0
-        return True if grip_one_hot[0] == 1.0 else False
-
-    @property
-    def dt(self):
-        return self.default_control_params.dt
-
-    @property
-    def acc(self):
-        return self.default_control_params.acceleration
-
-
-class UR3ControlMode:
-    def __init__(self, init_mode="forward"):
-        self.cmodes = ["forward", "downward"]
-        self.cmodes_d = {st: i for i, st in enumerate(self.cmodes)}
-        self.CONTROL_MODE = init_mode
-        print("Initial control mode: ", self.CONTROL_MODE)
-
-        self._iposes = AttrDict()
-        self._limits = AttrDict()
-        self._rpy_base = AttrDict()
-
-        self._limits.forward = AttrDict(x_max=0.53, x_min=0.38,
-                                        y_max=0.2, y_min=-0.2,
-                                        z_max=0.3, z_min=0.07,
-                                        rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
-                                        ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
-                                        rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
-
-        self._limits.downward = AttrDict(x_max=0.45, x_min=0.18,
-                                         y_max=0.2, y_min=-0.2,
-                                         z_max=0.15, z_min=0.04,
-                                         rx_max=deg2rad(20.0), rx_min=deg2rad(-20.0),
-                                         ry_max=deg2rad(5.0), ry_min=deg2rad(-10.0),
-                                         rz_max=deg2rad(90.0), rz_min=deg2rad(-90.0))
-
-        self._iposes.forward = [deg2rad(0), deg2rad(-80), deg2rad(-115), deg2rad(-165), deg2rad(-90), deg2rad(0)]
-        self._iposes.downward = [deg2rad(4), deg2rad(-80), deg2rad(-115), deg2rad(-74), deg2rad(-270), deg2rad(180)]
-
-        self._rpy_base.forward = [deg2rad(89.9), deg2rad(0.0), deg2rad(89.9)]
-        self._rpy_base.downward = [deg2rad(179.9), deg2rad(0.0), deg2rad(89.9)]
-
-        # for geometry calc.
-        self.x_axis = torch.tensor([1.0, 0.0, 0.0])
-        self.y_axis = torch.tensor([0.0, 1.0, 0.0])
-        self.z_axis = torch.tensor([0.0, 0.0, 1.0])
-
-        self.xy_plane = torch.stack([self.x_axis, self.y_axis], dim=1)
-        self.xz_plane = torch.stack([self.x_axis, self.z_axis], dim=1)
-        self.yz_plane = torch.stack([self.y_axis, self.z_axis], dim=1)
-
-        # self.Pxy = torch.mm(self.xy_plane.T, self.xy_plane).inverse()
-        self.Pxy = (self.xy_plane @ (self.xy_plane.T @ self.xy_plane).inverse()) @ self.xy_plane.T
-        self.Pxz = (self.xz_plane @ (self.xz_plane.T @ self.xz_plane).inverse()) @ self.xz_plane.T
-        self.Pyz = (self.yz_plane @ (self.yz_plane.T @ self.yz_plane).inverse()) @ self.yz_plane.T
-
-    def set_rpy_base(self, actual_tcp_pose, log=False):
-        # actual_tcp_p = self.get_actual_tcp_pose()  # [x, y, z, rx, ry, rz], axis-angle orientation
-        yaw, pitch, roll = self.axis_angle_to_euler(actual_tcp_pose[3:], euler="ZYX")
-        self.rpy_base = [roll, pitch, yaw]
-        if log:
-            print("rpy_base ", self.rpy_base)
-            print("euler: ", list(map(rad2deg, [roll, pitch, yaw])))
-
-    def cont_mode_one_hot_state(self):
-        cm_one_hot = [0] * len(self.cmodes)
-        cm_one_hot[self.cmodes_d[self.CONTROL_MODE]] = 1
-        return cm_one_hot
-
-    def cont_mode_to_str(self, cm_one_hot):
-        idx = [i for i, e in enumerate(cm_one_hot) if round(e) != 0]
-        return self.cmodes[idx[0]]
-
-    def axis_angle_to_euler(self, axis_angle, euler="XYZ"):
-        """
-        :param axis_angle: 3-dim axis_angle vector
-        :param euler: XYZ, ZYX, ZYZ, etc. specified by euler param
-        :return: e.g. roll, pitch, yaw by XYZ, yaw, pitch, roll by ZYX, and so on
-        """
-        mat = tr.axis_angle_to_matrix(axis_angle if torch.is_tensor(axis_angle) else torch.FloatTensor(axis_angle))
-        return tr.matrix_to_euler_angles(mat, euler)
-
-    def switching_control_mode(self):
-        idx = self.cmodes.index(self.CONTROL_MODE)
-        self.CONTROL_MODE = self.cmodes[(idx + 1) % len(self.cmodes)]
-        print("CONTROL_MODE: {} --> {}".format(self.cmodes[idx], self.CONTROL_MODE))
-
-    def goal_pose(self, des_pos, des_rot):
-        """
-        * Limiting desired position and rotation to working space
-        * Input should be numpy array
-        :param des_pos:
-        :param des_rot:
-        :return: compete goal pose
-        """
-        des_pos[0] = max(self.limits.x_min, min(self.limits.x_max, des_pos[0]))     # x
-        des_pos[1] = max(self.limits.y_min, min(self.limits.y_max, des_pos[1]))     # y
-        des_pos[2] = max(self.limits.z_min, min(self.limits.z_max, des_pos[2]))     # z
-
-        _q = tr.axis_angle_to_quaternion(torch.FloatTensor(des_rot))  # VR_Q [w, x, y, z]
-        q = quaternion_real_last(q=_q)
-
-        qx_axis = tf_vector(q, self.x_axis)  # refer TCP coordinate
-        qy_axis = tf_vector(q, self.y_axis)
-        qz_axis = tf_vector(q, self.z_axis)
-
-        if self.CONTROL_MODE == "forward":
-            # pitch
-            z_xz = self.Pxz @ qz_axis   # projection to plane
-            dot_z_x = (z_xz @ self.x_axis) / (z_xz.norm() * self.x_axis.norm())
-            pitch = torch.acos(dot_z_x)
-            pitch *= 1.0 if z_xz[2] < 0 else -1.0
-            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
-
-            # yaw
-            z_xy = self.Pxy @ qz_axis
-            dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
-            yaw = torch.acos(dot_z_x)
-            yaw *= 1.0 if z_xy[1] > 0 else -1.0
-            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
-
-            # TCP: roll --> Fixed: Pitch
-            y_yz = self.Pyz @ qy_axis
-            dot_y_z = (y_yz @ self.z_axis) / (y_yz.norm() * self.z_axis.norm())
-            roll = torch.acos(dot_y_z)
-            roll *= 1.0 if y_yz[1] > 0 else -1.0
-            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
-
-            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))    # VR axis-angle --> quaternion --> rpy
-            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
-
-            # ZYX order
-            _yaw = yaw + self.rpy_base[2]
-            _pitch = roll + self.rpy_base[1]
-            _roll = pitch + self.rpy_base[0]
-        elif self.CONTROL_MODE == "downward":
-            # TODO, set limits for downward mode
-            # pitch
-            y_xz = self.Pxz @ qy_axis  # projection to plane
-            dot_y_x = (y_xz @ self.x_axis) / (y_xz.norm() * self.x_axis.norm())
-            pitch = torch.acos(dot_y_x)
-            pitch *= 1.0 if y_xz[2] < 0 else -1.0
-            pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
-
-            # yaw
-            y_xy = self.Pxy @ qy_axis
-            dot_y_x = (y_xy @ self.x_axis) / (y_xy.norm() * self.x_axis.norm())
-            yaw = torch.acos(dot_y_x)
-            yaw *= 1.0 if y_xy[1] > 0 else -1.0
-            yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
-
-            # TCP: roll --> Fixed: Pitch
-            z_yz = self.Pyz @ qz_axis
-            dot_z_nz = (z_yz @ -self.z_axis) / (z_yz.norm() * self.z_axis.norm())
-            roll = torch.acos(dot_z_nz)
-            roll *= 1.0 if z_yz[1] < 0 else -1.0
-            roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
-
-            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
-            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
-
-            # ZYX order
-            _yaw = yaw + self.rpy_base[2]
-            _pitch = roll + self.rpy_base[1]
-            _roll = pitch + self.rpy_base[0]
-        else:
-            raise NotImplementedError
-
-        mat = tr.euler_angles_to_matrix(torch.tensor([_yaw, _pitch, _roll]), "ZYX")
-        des_aa = tr.matrix_to_axis_angle(mat)
-        des_rot = des_aa.tolist()
-        # print("des_pos: {}, des_rot: {}".format(des_pos, des_rot))
-
-        return list(des_pos) + list(des_rot)
-
-    @property
-    def iposes(self):
-        return self._iposes[self.CONTROL_MODE]
-
-    @property
-    def limits(self):
-        return self._limits[self.CONTROL_MODE]
-
-    @property
-    def rpy_base(self):
-        return self._rpy_base[self.CONTROL_MODE]
-
-    @rpy_base.setter
-    def rpy_base(self, rpy):
-        self._rpy_base[self.CONTROL_MODE] = rpy
-
-    @staticmethod
-    def add_noise_angle(inputs, deg=5):
-        print("inputs: ", inputs)
-        _inputs = np.array(inputs) + deg2rad(deg) * (np.random.rand(len(inputs)) - 0.5) * 2.0
-        print("_inputs: ", _inputs)
-        return _inputs
-
-    @staticmethod
-    def goal_axis_angle_from_act_quat(act_quat, actual_tcp_aa):
-        if type(act_quat) == list or type(act_quat) == np.ndarray:
-            act_quat = torch.tensor(act_quat).clone()
-            act_quat = act_quat / act_quat.norm()   # normalize
-
-        if type(actual_tcp_aa) == list or type(actual_tcp_aa) == np.ndarray:
-            actual_tcp_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_aa).clone())
-            actual_tcp_aa = quaternion_real_last(actual_tcp_aa)
-
-        goal_rot_quat = quat_mul(act_quat, actual_tcp_aa)
-        goal_rot_quat = quaternion_real_first(q=goal_rot_quat)
-        goal_rot_aa = tr.quaternion_to_axis_angle(goal_rot_quat)
-        return goal_rot_aa.numpy()
-
-    @staticmethod
-    def quat_from_tcp_axis_angle(actual_tcp_aa, tolist=True):
-        assert type(actual_tcp_aa) == list or type(actual_tcp_aa) == np.ndarray
-        actual_tcp_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_aa).clone())
-        actual_tcp_aa = quaternion_real_last(actual_tcp_aa)
-        return actual_tcp_aa.tolist() if tolist else actual_tcp_aa
+from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand, RobotState, RobotState2
 
 
 class RealUR3(BaseRTDE, UR3ControlMode):
@@ -334,6 +10,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.init_vr()
         BaseRTDE.__init__(self, HOST="192.168.0.75")
         UR3ControlMode.__init__(self, init_mode="forward")
+
+        self.cam = RealSense()
 
         # fwd
         self.lim_ax = AttrDict(x_max=0.53, x_min=0.38,
@@ -356,138 +34,10 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
 
-    def limit_check(self, tcp_p):
-        _q = tr.axis_angle_to_quaternion(torch.tensor(tcp_p[3:]))     # [w, x, y, z]
-        q = torch.cat((_q[1:], _q[0].unsqueeze(0)))     # [x, y, z, w]
-
-        qx_axis = tf_vector(q, self.x_axis)      # refer TCP coordinate
-        qy_axis = tf_vector(q, self.y_axis)
-        qz_axis = tf_vector(q, self.z_axis)
-
-        # pitch
-        v_xz = self.Pxz @ qz_axis
-        dot_xz = (v_xz @ self.x_axis) / (v_xz.norm() * self.x_axis.norm())
-        rad_xz = torch.acos(dot_xz)
-        rad_xz *= 1.0 if v_xz[2] < 0 else -1.0
-
-        # yaw
-        v_xy = self.Pxy @ qz_axis
-        dot_xy = (v_xy @ self.x_axis) / (v_xy.norm() * self.x_axis.norm())
-        rad_xy = torch.acos(dot_xy)
-        rad_xy *= 1.0 if v_xy[1] > 0 else -1.0
-
-        # roll
-        v_yz = self.Pyz @ qy_axis
-        dot_yz = (v_yz @ self.z_axis) / (v_yz.norm() * self.z_axis.norm())
-        rad_yz = torch.acos(dot_yz)
-        rad_yz *= 1.0 if v_yz[1] < 0 else -1.0
-
-        lim_flag = AttrDict.fromkeys(self.lim_ax, False)
-
-        # x-axis limit
-        if tcp_p[0] >= self.lim_ax.x_max and self.v_ax.x > 0: lim_flag.x_max = True  # self.v_ax.x *= -1  # 0.0
-        if tcp_p[0] <= self.lim_ax.x_min and self.v_ax.x < 0: lim_flag.x_min = True  # self.v_ax.x *= -1  # 0.0
-
-        # y-axis limit
-        if tcp_p[1] >= self.lim_ax.y_max and self.v_ax.y > 0: lim_flag.y_max = True  # self.v_ax.y *= -1  # 0.0
-        if tcp_p[1] <= self.lim_ax.y_min and self.v_ax.y < 0: lim_flag.y_min = True  # self.v_ax.y *= -1  # 0.0
-
-        # z-axis limit
-        if tcp_p[2] >= self.lim_ax.z_max and self.v_ax.z > 0: lim_flag.z_max = True  # self.v_ax.z *= -1  # 0.0
-        if tcp_p[2] <= self.lim_ax.z_min and self.v_ax.z < 0: lim_flag.z_min = True  # self.v_ax.z *= -1  # 0.0
-
-        # roll limit
-        if rad_yz >= self.lim_ax.rx_max and self.v_ax.rx > 0: lim_flag.rx_max = True  # self.v_ax.rx *= -1  # 0.0
-        if rad_yz < self.lim_ax.rx_min and self.v_ax.rx < 0: lim_flag.rx_min = True  # self.v_ax.rx *= -1  # 0.0
-
-        # pitch limit
-        if rad_xz >= self.lim_ax.ry_max and self.v_ax.ry > 0: lim_flag.ry_max = True  # self.v_ax.ry *= -1  # 0.0
-        if rad_xz < self.lim_ax.ry_min and self.v_ax.ry < 0: lim_flag.ry_min = True  # self.v_ax.ry *= -1  # 0.0
-
-        # yaw limit
-        if rad_xy >= self.lim_ax.rz_max and self.v_ax.rz > 0: lim_flag.rz_max = True  # self.v_ax.rz *= -1  # 0.0
-        if rad_xy < self.lim_ax.rz_min and self.v_ax.rz < 0: lim_flag.rz_min = True  # self.v_ax.rz *= -1  # 0.0
-        return lim_flag
-
-    def workspace_verify(self):
-        try:
-            # Move to initial joint position
-            init_joint = [deg2rad(8.5), deg2rad(-110), deg2rad(-115),
-                          deg2rad(-135), deg2rad(-82), deg2rad(0)]
-            self.move_j(init_joint)
-            init_tcp_p = self.get_actual_tcp_pose()
-
-            # determine limit positions in each axis
-            # [x, y, z, roll, pitch, yaw]
-            check_cnt = AttrDict(x=0, y=0, z=0, rx=0, ry=0, rz=0)
-            test_vel = AttrDict(x=0.05, y=0.05, z=0.05, rx=0.2, ry=0.1, rz=0.1)
-            for key, val in test_vel.items():
-                _vel = AttrDict.fromkeys(test_vel, 0.0)
-                _vel[key] = val
-                self.set_velL(vel=list(_vel.values()))
-
-                while True:
-                    actual_tcp_p = self.get_actual_tcp_pose()
-                    # print("actual_tcp_p: ", actual_tcp_p)
-
-                    lim_flag = self.limit_check(tcp_p=actual_tcp_p)
-                    if lim_flag.x_max or lim_flag.x_min:
-                        self.v_ax.x *= -1.0
-                        check_cnt.x += 1
-                    if lim_flag.y_max or lim_flag.y_min:
-                        self.v_ax.y *= -1.0
-                        check_cnt.y += 1
-                    if lim_flag.z_max or lim_flag.z_min:
-                        self.v_ax.z *= -1.0
-                        check_cnt.z += 1
-                    if lim_flag.rx_max or lim_flag.rx_min:
-                        self.v_ax.rx *= -1.0
-                        check_cnt.rx += 1
-                    if lim_flag.ry_max or lim_flag.ry_min:
-                        self.v_ax.ry *= -1.0
-                        check_cnt.ry += 1
-                    if lim_flag.rz_max or lim_flag.rz_min:
-                        self.v_ax.rz *= -1.0
-                        check_cnt.rz += 1
-
-                    self.rtde_c.speedL(xd=list(self.v_ax.values()), acceleration=1.2)
-
-                    p_err = np.linalg.norm(np.array(init_tcp_p)[:3] - np.array(actual_tcp_p)[:3])
-                    r_err = np.linalg.norm(np.array(init_tcp_p)[3:] - np.array(actual_tcp_p)[3:])
-                    if check_cnt[key] >= 2 and p_err < 0.02 and r_err < 0.03:
-                        break
-        finally:
-            print("end of control... ")
-            if not hasattr(self, "rtde_c"): return
-            self.speed_stop()
-            self.stop_script()
-
     def switching_control_mode(self):
         super().switching_control_mode()
         self.speed_stop()
         self.move_j(self.iposes)
-
-    def set_velJ(self):
-        pass
-
-    def set_velL(self, v):
-        assert len(v) == len(self.v_ax)
-        # apply speed limit
-        _x = v[0] if v[0] == 0 else min(abs(v[0]), self.spd_X_limit) * (1.0 if v[0] > 0 else -1.0)
-        _y = v[1] if v[1] == 0 else min(abs(v[1]), self.spd_X_limit) * (1.0 if v[1] > 0 else -1.0)
-        _z = v[2] if v[2] == 0 else min(abs(v[2]), self.spd_X_limit) * (1.0 if v[2] > 0 else -1.0)
-
-        _rx = v[3] if v[3] == 0 else min(abs(v[3]), self.spd_R_limit) * (1.0 if v[3] > 0 else -1.0)
-        _ry = v[4] if v[4] == 0 else min(abs(v[4]), self.spd_R_limit) * (1.0 if v[4] > 0 else -1.0)
-        _rz = v[5] if v[5] == 0 else min(abs(v[5]), self.spd_R_limit) * (1.0 if v[5] > 0 else -1.0)
-
-        # low-pass filter
-        self.v_ax.x = _x * self.ap + self.v_ax.x * (1.0 - self.ap)
-        self.v_ax.y = _y * self.ap + self.v_ax.y * (1.0 - self.ap)
-        self.v_ax.z = _z * self.ap + self.v_ax.z * (1.0 - self.ap)
-        self.v_ax.rx = _rx * self.ap + self.v_ax.rx * (1.0 - self.ap)
-        self.v_ax.ry = _ry * self.ap + self.v_ax.ry * (1.0 - self.ap)
-        self.v_ax.rz = _rz * self.ap + self.v_ax.rz * (1.0 - self.ap)
 
     def get_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
@@ -550,6 +100,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
         try:
+            depth, color = self.cam.get_np_images()
+            self.cam.visualize(depth, color)
+
             self.move_j(self.iposes)
             while True:
                 start_t = self.init_period()
@@ -564,7 +117,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       done=1)
                     # self.play_demo()
                     self.rollout.show_rollout_summary()
-                    self.rollout.save_to_file()
+                    # self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
@@ -576,13 +129,16 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 if cont_status["btn_trigger"]:
+                    depth, color = self.cam.get_np_images()
+                    self.cam.visualize(depth, color)
+                    state = self.get_state()
+
                     if cont_status["btn_control_mode"]:
                         self.switching_control_mode()
 
                     if cont_status["btn_gripper"]:
                         self.move_grip_on_off_toggle()
 
-                    state = self.get_state()
                     if cont_status["btn_grip"]:
                         self.gripper.grasping_by_hold(step=-10.0)
                     else:
@@ -618,6 +174,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             print("Value Error... ")
         finally:
             print("end of control... ")
+            self.cam.stop_stream()
             if not hasattr(self, "rtde_c"): return
             self.speed_stop()
             print("speed stop.. ")
@@ -634,10 +191,6 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 self.rollout.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
                 self.rollout.show_rollout_summary()
                 self.play_demo()
-
-
-import socket
-from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripperExpand
 
 
 def vr_test():
@@ -673,12 +226,30 @@ def vr_test():
         #     print("btn_gripper")
 
 
+import time
+
+
+def camera_test():
+    rollout = RolloutManagerExpand(task_name="pouring_skill")
+    cam = RealSense()
+    cam.display_info()
+    try:
+        start = time.time()
+        while True:
+            depth, color = cam.get_np_images()
+            rollout.append(observation=copy.deepcopy(color), state=RobotState2(), action=[], done=[], info=[])
+            if cam.visualize(depth, color) == 27:
+                break
+            current = time.time()
+            print("dt: {}, Hz: {}".format(current - start, 1.0 / (current - start)))
+            start = current
+    finally:
+        cam.stop_stream()
+
+
 if __name__ == "__main__":
-    # ROBOTIQ_test()
+    camera_test()
     # vr_test()
-    u = RealUR3()
-    # u.vr_handler()
-    # u.workspace_verify()
-    u.run_vr_teleop()
+    # u = RealUR3()
+    # u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=458)
-    # u.func_test()
