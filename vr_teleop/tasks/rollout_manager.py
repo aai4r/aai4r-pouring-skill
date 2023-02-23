@@ -67,15 +67,18 @@ class RobotState2(RobotState):
         self.gripper_pos = np_state1d[13:14].tolist()
         self.control_mode_one_hot = np_state1d[14:16].tolist()
 
-    @staticmethod
-    def random_data(n_joint, n_cont_mode):
+    def gen_random_data(self, n_joint, n_cont_mode):
         _joint = [random.randint(-100, 100) / 200.0 for _ in range(n_joint)]
         _ee_pos = [random.randint(-100, 100) / 200.0 for _ in range(3)]
         _ee_quat = [random.randint(-100, 100) / 200.0 for _ in range(4)]
         _gripper = [random.randint(0, 100) / 100.0]
         _control_mode = [0] * n_cont_mode
         _control_mode[random.randint(0, n_cont_mode - 1)] = 1
-        return _joint + _ee_pos + _ee_quat + _gripper + _control_mode
+        self.joint = _joint
+        self.ee_pos = _ee_pos
+        self.ee_quat = _ee_quat
+        self.gripper_pos = _gripper
+        self.control_mode_one_hot = _control_mode
 
 
 class RolloutManager(BatchRolloutFolder):
@@ -105,7 +108,7 @@ class RolloutManager(BatchRolloutFolder):
 
     def get(self, index):
         assert 0 <= index < self.len()
-        return self._states[index], self._actions[index], self._dones[index], self._info[index]
+        return None, self._states[index], self._actions[index], self._dones[index], self._info[index]
 
     def len(self):
         assert len(self._states) == len(self._actions) == len(self._dones) # == len(self._info)
@@ -171,9 +174,9 @@ class RolloutManager(BatchRolloutFolder):
                 if name == 'states':
                     temp = f[key + '/' + name][()].astype(np.float32)
                     for i in range(len(temp)):
-                        rs = self.robot_state_class()
-                        rs.import_state_from(np_state1d=temp[i])
-                        self._states.append(rs)
+                        robot_state = self.robot_state_class()
+                        robot_state.import_state_from(np_state1d=temp[i])
+                        self._states.append(robot_state)
                     # self._states = f[key + '/' + name][()].astype(np.float32).tolist()
                 elif name == 'actions':
                     self._actions = f[key + '/' + name][()].astype(np.float32).tolist()
@@ -201,12 +204,8 @@ class RolloutManagerExpand(RolloutManager):
                     and bool(self._dones) and bool(self._info))
 
     def append(self, observation, state, action, done, info):
-        assert type(state) is self.robot_state_class
+        super().append(state, action, done, info)
         self._observations.append(observation)
-        self._states.append(state)
-        self._actions.append(action)
-        self._dones.append(done)
-        self._info.append(info)
 
     def get(self, index):
         assert 0 <= index < self.len()
@@ -217,16 +216,90 @@ class RolloutManagerExpand(RolloutManager):
         return len(self._states)
 
     def reset(self):
+        super().reset()
         self._observations = []
-        self._states = []
-        self._actions = []
-        self._dones = []
-        self._info = []
+
+    def to_np_rollout(self):
+        np_rollout = super().to_np_rollout()
+        c = None
+        for obs in self._observations:
+            c = np.expand_dims(obs, axis=0) if c is None else np.concatenate((c, np.expand_dims(obs, axis=0)), axis=0)
+        np_rollout.observations = c
+        return np_rollout
+
+    def show_rollout_summary(self):
+        print("====================================")
+        print("Current rollout dataset info.")
+        print("Rollout length: ", self.len())
+        idx = 0
+        sample_obs, sample_state, sample_action, sample_done, sample_info = self.get(idx)
+
+        print("* STEP: [{}]".format(idx))
+        print("    observation shape {}".format(sample_obs.shape))
+        print("    state * {} dim with {}".format(sum([len(i) if i is not None else 0 for i in sample_state]), sample_state))
+        print("    action * {} dim with {}".format(len(sample_action), sample_action))
+        print("    done * {} dim with {}".format(len([sample_done]), sample_done))
+        print("    info: ", sample_info)
+
+    def save_to_file(self):
+        np_episode_dict = self.to_np_rollout()
+        save_path = self.get_final_save_path(self.batch_index)
+
+        f = h5py.File(save_path, "w")
+        f.create_dataset("traj_per_file", data=1)
+
+        traj = f.create_group("traj0")
+        traj.create_dataset("observations", data=np_episode_dict.observations)
+        traj.create_dataset("states", data=np_episode_dict.states)
+        traj.create_dataset("actions", data=np_episode_dict.actions)
+        traj.create_dataset("info", data=np_episode_dict.info)
+
+        terminals = np_episode_dict.dones
+        if np.sum(terminals) == 0: terminals[-1] = True
+        is_terminal_idxs = np.nonzero(terminals)[0]
+        pad_mask = np.zeros((len(terminals),))
+        pad_mask[:is_terminal_idxs[0]] = 1.
+        traj.create_dataset("pad_mask", data=pad_mask)
+        f.close()
+        print("save to ", save_path)
+
+    def load_from_file(self, batch_idx, rollout_idx):
+        self.reset()
+        load_path = self.get_final_load_path(batch_index=batch_idx, rollout_num=rollout_idx)
+        with h5py.File(load_path, 'r') as f:
+            key = 'traj{}'.format(0)
+            print("f: ", f[key])
+            for name in f[key].keys():
+                if name == 'observations':
+                    # TODO, uint8 --> float32
+                    img = f[key + '/' + name][()].astype(np.uint8)
+                    print("img shape: ", img.shape)
+                    for i in range(len(img)):
+                        # img = f[key + '/' + name][()].astype(np.float32)
+                        # img /= 255.0
+                        self._observations.append(img[i])
+                elif name == 'states':
+                    temp = f[key + '/' + name][()].astype(np.float32)
+                    for i in range(len(temp)):
+                        robot_state = self.robot_state_class()
+                        robot_state.import_state_from(np_state1d=temp[i])
+                        self._states.append(robot_state)
+                    # self._states = f[key + '/' + name][()].astype(np.float32).tolist()
+                elif name == 'actions':
+                    self._actions = f[key + '/' + name][()].astype(np.float32).tolist()
+                elif name == 'pad_mask':
+                    self._dones = f[key + '/' + name][()].astype(np.float32).tolist()
+                elif name == 'info':
+                    # temp = f[key + '/' + name][()]
+                    self._info = f[key + '/' + name][()]
+                else:
+                    raise ValueError("{}: Unexpected rollout element...".format(name))
+        print("Load complete!")
 
 
 if __name__ == "__main__":
     # test code for rollout file check
-    task = "pouring_skill"
+    task = "pouring_skill_img"
     roll = RolloutManager(task_name=task)
     roll.load_from_file(batch_idx=1, rollout_idx=6)
     for i in range(roll.len()):

@@ -28,7 +28,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
         self.timer = CustomTimer(duration_sec=1.0)
 
-        self.rollout = RolloutManager(task_name="pouring_skill")
+        self.rollout = RolloutManagerExpand(task_name="pouring_skill_img")
         self.collect_demo = True
 
     def init_vr(self):
@@ -51,8 +51,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                             control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
 
-    def record_frame(self, state, action_pos, action_quat, action_grip, done):
+    def record_frame(self, observation, state, action_pos, action_quat, action_grip, done):
         """
+        :param observation
         :param state:
         :param action_pos:      Relative positional diff. (vel), list type
         :param action_quat:     Rotation as a quaternion (real-last), list type
@@ -62,18 +63,22 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         """
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         action = action_pos + action_quat + action_grip
-        self.rollout.append(state=state, action=action, done=done, info=info)
+        self.rollout.append(observation=observation, state=state, action=action, done=done, info=info)
 
     def play_demo(self):
         # go to initial state in joint space
         self.speed_stop()
-        init_state, _, _, _ = self.rollout.get(0)
+        init_obs, init_state, _, _, _ = self.rollout.get(0)
+        if hasattr(self, 'cam') and init_obs is not None:
+            self.cam.visualize(np.zeros(init_obs.shape), init_obs)
         self.move_j(init_state.joint)
 
         # loop for playing demo
         for idx in range(1, self.rollout.len()):
             start_t = self.init_period()
-            state, action, done, info = self.rollout.get(index=idx)
+            obs, state, action, done, info = self.rollout.get(index=idx)
+            if hasattr(self, 'cam') and obs is not None:
+                self.cam.visualize(np.zeros(obs.shape), obs)
 
             if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
                 self.switching_control_mode()
@@ -110,14 +115,16 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_pose"]:
-                    self.record_frame(state=self.get_state(),
+                    depth, color = self.cam.get_np_images()
+                    self.record_frame(observation=copy.deepcopy(color),
+                                      state=self.get_state(),
                                       action_pos=[0., 0., 0.],
                                       action_quat=[0., 0., 0., 1.],
                                       action_grip=[self.gripper.gripper_to_mm_normalize()],
                                       done=1)
                     # self.play_demo()
                     self.rollout.show_rollout_summary()
-                    # self.rollout.save_to_file()
+                    self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
@@ -130,7 +137,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 if cont_status["btn_trigger"]:
                     depth, color = self.cam.get_np_images()
-                    self.cam.visualize(depth, color)
+                    self.cam.visualize(depth, copy.deepcopy(color))
                     state = self.get_state()
 
                     if cont_status["btn_control_mode"]:
@@ -155,7 +162,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     conj = quat_conjugate(actual_tcp_ori_quat)
                     act_quat = quat_mul(torch.tensor(vr_curr_quat), conj)
 
-                    if self.collect_demo: self.record_frame(state=state,
+                    if self.collect_demo: self.record_frame(observation=copy.deepcopy(color),
+                                                            state=state,
                                                             action_pos=act_pos,
                                                             action_quat=act_quat.tolist(),
                                                             action_grip=[gripper_action_norm],
@@ -230,26 +238,52 @@ import time
 
 
 def camera_test():
-    rollout = RolloutManagerExpand(task_name="pouring_skill")
+    rollout = RolloutManagerExpand(task_name="pouring_skill_img")
     cam = RealSense()
     cam.display_info()
+
+    class Check_dt:
+        def __init__(self):
+            self.start = time.time()
+
+        def print_dt(self):
+            current = time.time()
+            print("dt: {}, Hz: {}".format(current - self.start, 1.0 / (current - self.start)))
+            self.start = current
+
     try:
-        start = time.time()
+        dt = Check_dt()
         while True:
+        # for i in range(10):
             depth, color = cam.get_np_images()
-            rollout.append(observation=copy.deepcopy(color), state=RobotState2(), action=[], done=[], info=[])
+            st = RobotState2()
+            st.gen_random_data(n_joint=6, n_cont_mode=2)
+            # rollout.append(observation=color, state=st,
+            #                action=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], done=[0], info=[""])
             if cam.visualize(depth, color) == 27:
                 break
-            current = time.time()
-            print("dt: {}, Hz: {}".format(current - start, 1.0 / (current - start)))
-            start = current
+            # dt.print_dt()
+        # rollout.save_to_file()
     finally:
         cam.stop_stream()
 
 
+def camera_load_test(batch_idx, rollout_idx):
+    cam = RealSense()
+    rollout = RolloutManagerExpand(task_name="pouring_skill_img")
+    rollout.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
+    for i in range(rollout.len()):
+        obs, state, action, done, info = rollout.get(i)
+        print("obs ", obs.shape, obs.dtype)
+        _depth = np.zeros(obs.shape[:2])
+        cam.visualize(_depth, obs)
+        print(i, cv2.waitKey(0))
+
+
 if __name__ == "__main__":
-    camera_test()
+    # camera_test()
+    # camera_load_test(batch_idx=1, rollout_idx=0)
     # vr_test()
-    # u = RealUR3()
-    # u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=458)
+    u = RealUR3()
+    u.run_vr_teleop()
+    # u.replay_mode(batch_idx=1, rollout_idx=0)
