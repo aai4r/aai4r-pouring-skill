@@ -12,7 +12,7 @@ from vr_teleop.gripper.robotiq_gripper_control import RobotiqGripper, RobotiqGri
 from spirl.utility.general_utils import AttrDict
 
 
-def to_n_pi_pi(rad):     # [0, 2*pi] --> [-pi, pi]
+def to_n_pi_pi(rad):  # [0, 2*pi] --> [-pi, pi]
     if rad > 0:
         return rad - (2 * np.pi) if rad >= np.pi else rad
     else:
@@ -200,9 +200,9 @@ class UR3ControlMode:
         :param des_rot:
         :return: compete goal pose
         """
-        des_pos[0] = max(self.limits.x_min, min(self.limits.x_max, des_pos[0]))     # x
-        des_pos[1] = max(self.limits.y_min, min(self.limits.y_max, des_pos[1]))     # y
-        des_pos[2] = max(self.limits.z_min, min(self.limits.z_max, des_pos[2]))     # z
+        des_pos[0] = max(self.limits.x_min, min(self.limits.x_max, des_pos[0]))  # x
+        des_pos[1] = max(self.limits.y_min, min(self.limits.y_max, des_pos[1]))  # y
+        des_pos[2] = max(self.limits.z_min, min(self.limits.z_max, des_pos[2]))  # z
 
         _q = tr.axis_angle_to_quaternion(torch.FloatTensor(des_rot))  # VR_Q [w, x, y, z]
         q = quaternion_real_last(q=_q)
@@ -213,7 +213,7 @@ class UR3ControlMode:
 
         if self.CONTROL_MODE == "forward":
             # pitch
-            z_xz = self.Pxz @ qz_axis   # projection to plane
+            z_xz = self.Pxz @ qz_axis  # projection to plane
             dot_z_x = (z_xz @ self.x_axis) / (z_xz.norm() * self.x_axis.norm())
             pitch = torch.acos(dot_z_x)
             pitch *= 1.0 if z_xz[2] < 0 else -1.0
@@ -233,7 +233,7 @@ class UR3ControlMode:
             roll *= 1.0 if y_yz[1] > 0 else -1.0
             roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
 
-            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))    # VR axis-angle --> quaternion --> rpy
+            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
             _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
 
             # ZYX order
@@ -307,7 +307,7 @@ class UR3ControlMode:
     def goal_axis_angle_from_act_quat(act_quat, actual_tcp_aa):
         if type(act_quat) == list or type(act_quat) == np.ndarray:
             act_quat = torch.tensor(act_quat).clone()
-            act_quat = act_quat / act_quat.norm()   # normalize
+            act_quat = act_quat / act_quat.norm()  # normalize
 
         if type(actual_tcp_aa) == list or type(actual_tcp_aa) == np.ndarray:
             actual_tcp_aa = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_aa).clone())
@@ -374,8 +374,10 @@ class RealSense:
         print("* Image Stream")
         print("    Width: {}, Height: {}, FPS: {}".format(self.args.width, self.args.height, self.args.fps))
         print("* Actual Data")
-        print("    Depth shape: {}, min / max: {} / {}, dtype: {}".format(depth.shape, depth.min(), depth.max(), depth.dtype))
-        print("    Color shape: {}, min / max: {} / {}, dtype: {}".format(color.shape, color.min(), color.max(), color.dtype))
+        print("    Depth shape: {}, min / max: {} / {}, dtype: {}".format(depth.shape, depth.min(), depth.max(),
+                                                                          depth.dtype))
+        print("    Color shape: {}, min / max: {} / {}, dtype: {}".format(color.shape, color.min(), color.max(),
+                                                                          color.dtype))
 
     def stop_stream(self):
         self.pipeline.stop()
@@ -388,8 +390,8 @@ class RealSense:
             return None, None
 
         # Convert images to numpy arrays
-        depth_image = np.asanyarray(depth_frame.get_data())     # (h, w, 1)
-        color_image = np.asanyarray(color_frame.get_data())     # (h, w, 3)
+        depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
+        color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
         return depth_image, color_image
 
     def visualize(self, depth_image, color_image):
@@ -417,3 +419,48 @@ class RealSense:
         cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
         cv2.imshow('RealSense', images)
         return cv2.waitKey(1)
+
+
+def noisy(noise_type, image, random_noise=False):
+    if image.dtype == np.uint8:
+        image = image.astype(np.float32) / 255.0
+    if random_noise:
+        noise_list = ['gauss', 's&p', 'poisson', 'speckle']
+        noise_type = noise_list[np.random.randint(0, len(noise_list))]
+    if noise_type == "gauss":
+        row, col, ch = image.shape
+        mean = 0
+        var = 0.001
+        sigma = var ** 0.5
+        gauss = np.random.normal(mean, sigma, (row, col, ch))
+        gauss = gauss.reshape(row, col, ch)
+        noisy = image + gauss
+    elif noise_type == "s&p":
+        row, col, ch = image.shape
+        s_vs_p = 0.5
+        amount = 0.004
+        out = np.copy(image)
+        # Salt mode
+        num_salt = np.ceil(amount * image.size * s_vs_p)
+        coords = [np.random.randint(0, i, int(num_salt)) for i in image.shape]
+        out[coords[0], coords[1], coords[2]] = 1
+
+        # Pepper mode
+        num_pepper = np.ceil(amount * image.size * (1. - s_vs_p))
+        coords = [np.random.randint(0, i - 1, int(num_pepper))
+                  for i in image.shape]
+        out[coords[0], coords[1], coords[2]] = 0
+        return out
+    elif noise_type == "poisson":
+        vals = len(np.unique(image))
+        vals = 2 ** np.ceil(np.log2(vals))
+        noisy = np.random.poisson(image * vals) / float(vals)
+    elif noise_type == "speckle":
+        row, col, ch = image.shape
+        gauss = np.random.randn(row, col, ch)
+        gauss = gauss.reshape(row, col, ch)
+        noisy = image + image * gauss * 0.15     # scaled
+
+    if noisy.dtype == np.float32:
+        noisy = noisy.astype(np.uint8)
+    return noisy

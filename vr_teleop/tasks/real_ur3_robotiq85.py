@@ -281,9 +281,9 @@ def camera_load_test(batch_idx, rollout_idx):
 
 
 if __name__ == "__main__":
-    # camera_test()
+    camera_test()
     # camera_load_test(batch_idx=1, rollout_idx=0)
     # vr_test()
-    u = RealUR3()
-    u.run_vr_teleop()
+    # u = RealUR3()
+    # u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=0)

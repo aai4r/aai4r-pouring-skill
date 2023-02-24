@@ -1,10 +1,16 @@
+from lib_modules import noisy
 import os
+import time
+
 import h5py
 import random
 import numpy as np
 
 import dataclasses
 from dataclasses import dataclass
+
+import torch.cuda
+
 from dataset.rollout_dataset import BatchRolloutFolder
 from spirl.utility.general_utils import AttrDict
 
@@ -297,12 +303,129 @@ class RolloutManagerExpand(RolloutManager):
         print("Load complete!")
 
 
+from torchvision import models, transforms
+import cv2
+
+
+class VideoDatasetCompressor(RolloutManagerExpand):
+    def __init__(self, task_name, root_dir=None):
+        super().__init__(task_name=task_name, root_dir=root_dir)
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.resnet18 = models.resnet18(pretrained=True).to(self.device)
+        self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                           std=[0.229, 0.224, 0.225])])
+
+    @staticmethod
+    def pre_processing(color_image, crop_h=450, crop_w=450, resize_h=150, resize_w=150):
+        """
+        In:
+        1) random crop
+        2) resize
+        3) photometric distortion
+            - brightness
+            - zoom
+            - salt-pepper, gaussian noise
+            - candidates(affine transformation, rotation, )
+        :param resize_w:
+        :param resize_h:
+        :param crop_w: crop width size
+        :param crop_h: crop height size
+        :param color_image:
+        :return:
+        """
+        ih, iw = color_image.shape[:2]
+        y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
+        cropped_img = color_image[y:y+crop_h, x:x+crop_w]
+        resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+        noisy_img = noisy(noise_type='s&p', image=resized_img, random_noise=True)
+        out = noisy_img
+        return out
+
+    @staticmethod
+    def visualize(depth_image, color_image, delay=1):
+        if depth_image is None or color_image is None:
+            print("Can't get a frame....")
+            return cv2.waitKey(delay)
+
+        # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+
+        depth_colormap_dim = depth_colormap.shape
+        color_colormap_dim = color_image.shape
+
+        # If depth and color resolutions are different, resize color image to match depth image for display
+        if depth_colormap_dim != color_colormap_dim:
+            resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]),
+                                             interpolation=cv2.INTER_AREA)
+            images = np.hstack((resized_color_image, depth_colormap))
+        else:
+            images = np.hstack((color_image, depth_colormap))
+
+        # Show images
+        cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
+        cv2.imshow('RealSense', images)
+        return cv2.waitKey(delay)
+
+    @staticmethod
+    def np_img_to_tensor(np_img, device):
+        """
+        In: np_img(height, width, channel), [0, 255], uint8
+        :param device: cpu, cuda:0, etc.
+        :param np_img:
+        :return: tensor(channel, height, width), [0, 1], float32
+        """
+        assert np_img.dtype == np.uint8 and len(np_img.shape) == 3
+        img_tensor = torch.tensor(np_img.transpose(2, 0, 1), device=device, dtype=torch.float32)
+        return img_tensor / 255.0
+
+    @staticmethod
+    def tensor_img_to_np(tensor_img):
+        """
+        In: tensor_img(channel, height, width), [0, 1], float32
+        :param tensor_img:
+        :return: np(height, width, channel), [0, 255], uint8
+        """
+        assert tensor_img.dtype == torch.float32 and len(tensor_img.shape) == 3
+        np_img = tensor_img.cpu().numpy().transpose(1, 2, 0)
+        return (np_img * 255.0).astype(np.uint8)
+
+    def compress(self, batch_idx, rollout_idx):
+        """
+        Compress each of image observation to feature vector by CNN-like models
+        and save it to file
+        :param batch_idx:
+        :param rollout_idx:
+        :return:
+        """
+
+        self.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
+        for i in range(self.len()):
+            start = time.time()
+            obs, state, action, done, info = self.get(i)
+            print("{}: np obs: {}".format(i, obs.shape))
+            obs_tensor = self.np_img_to_tensor(np_img=obs, device=self.device).unsqueeze(0)
+            print("{}: torch obs: {}, min/max: {}/{}, dtype: {}"
+                  .format(i, obs_tensor.shape, obs_tensor.min(), obs_tensor.max(), obs_tensor.dtype))
+
+            f = self.resnet18(obs_tensor)
+            print("Feature: {}, elapsed: {}".format(f.shape, time.time() - start))
+
+            # obs_tensor = self.tr(obs_tensor)
+            # print("TR: {}: torch obs: {}, min/max: {}/{}, dtype: {}"
+            #       .format(i, obs_tensor.shape, obs_tensor.min(), obs_tensor.max(), obs_tensor.dtype))
+            obs_np = self.tensor_img_to_np(obs_tensor.squeeze(0))
+            print("obs_np, shape: {}, min/max: {}/{}, dtype: {}"
+                  .format(obs_np.shape, obs_np.min(), obs_np.max(), obs_np.dtype))
+
+            obs_np = self.pre_processing(obs_np)
+            if self.visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=0) == 27:
+                break
+
+
 if __name__ == "__main__":
     # test code for rollout file check
     task = "pouring_skill_img"
-    roll = RolloutManager(task_name=task)
-    roll.load_from_file(batch_idx=1, rollout_idx=6)
-    for i in range(roll.len()):
-        state, action, done, info = roll.get(i)
-        print("state: ", state)
+    vdc = VideoDatasetCompressor(task_name=task)
+    vdc.compress(batch_idx=1, rollout_idx=0)
+
 

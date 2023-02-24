@@ -29,6 +29,9 @@ class MinMax:
 
 
 class BatchRolloutFolder(object):
+    """
+        Manages batch folder structures such as indexing of batch folder, rollout file, etc.
+    """
     def __init__(self, task_name, root_dir, dataset_desc=""):
         self.task_name = task_name
         self.root_dir = os.path.dirname(os.path.abspath(__file__)) if root_dir is None else root_dir
