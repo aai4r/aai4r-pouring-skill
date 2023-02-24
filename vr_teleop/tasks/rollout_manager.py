@@ -303,6 +303,7 @@ class RolloutManagerExpand(RolloutManager):
         print("Load complete!")
 
 
+from torch import nn
 from torchvision import models, transforms
 import cv2
 
@@ -311,20 +312,27 @@ class VideoDatasetCompressor(RolloutManagerExpand):
     def __init__(self, task_name, root_dir=None):
         super().__init__(task_name=task_name, root_dir=root_dir)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.resnet18 = models.resnet18(pretrained=True).to(self.device)
+        modules = models.resnet18(pretrained=True).to(self.device)
+        modules = list(modules.children())[:-1]
+        self.resnet18 = nn.Sequential(*modules)
+        for p in self.resnet18.parameters():
+            p.requires_grad = False
+        self.resnet18.eval()
+
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])
 
-    @staticmethod
-    def pre_processing(color_image, crop_h=450, crop_w=450, resize_h=150, resize_w=150):
+        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=150, resize_w=150)
+
+    def pre_processing(self, color_image):
         """
         In:
         1) random crop
         2) resize
         3) photometric distortion
-            - brightness
             - zoom
-            - salt-pepper, gaussian noise
+            - brightness
+            - noises(gaussian, salt-pepper, poisson, speckle)
             - candidates(affine transformation, rotation, )
         :param resize_w:
         :param resize_h:
@@ -334,10 +342,18 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         :return:
         """
         ih, iw = color_image.shape[:2]
+        crop_h, crop_w = self.config.crop_h, self.config.crop_w
+        resize_h, resize_w = self.config.resize_h, self.config.resize_w
         y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
-        cropped_img = color_image[y:y+crop_h, x:x+crop_w]
+
+        zoom_pix = 50
+        zoom = np.random.randint(0, zoom_pix)
+        cropped_img = color_image[y:y+crop_h-zoom, x:x+crop_w-zoom]
         resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
-        noisy_img = noisy(noise_type='s&p', image=resized_img, random_noise=True)
+
+        brightness = 50
+        resized_img = cv2.convertScaleAbs(resized_img, resized_img, 1, np.random.randint(-brightness, brightness))
+        noisy_img = noisy(image=resized_img, noise_type='s&p', random_noise=False)
         out = noisy_img
         return out
 
@@ -374,9 +390,9 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         :param np_img:
         :return: tensor(channel, height, width), [0, 1], float32
         """
-        assert np_img.dtype == np.uint8 and len(np_img.shape) == 3
+        assert len(np_img.shape) == 3
         img_tensor = torch.tensor(np_img.transpose(2, 0, 1), device=device, dtype=torch.float32)
-        return img_tensor / 255.0
+        return img_tensor / 255.0 if np_img.dtype == np.uint8 else img_tensor
 
     @staticmethod
     def tensor_img_to_np(tensor_img):
@@ -385,11 +401,13 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         :param tensor_img:
         :return: np(height, width, channel), [0, 255], uint8
         """
-        assert tensor_img.dtype == torch.float32 and len(tensor_img.shape) == 3
+        assert ((tensor_img.dtype == torch.float16) or
+                (tensor_img.dtype == torch.float32) or
+                tensor_img.dtype == torch.float64) and len(tensor_img.shape) == 3
         np_img = tensor_img.cpu().numpy().transpose(1, 2, 0)
         return (np_img * 255.0).astype(np.uint8)
 
-    def compress(self, batch_idx, rollout_idx):
+    def compressed(self, batch_idx, rollout_idx):
         """
         Compress each of image observation to feature vector by CNN-like models
         and save it to file
@@ -399,33 +417,36 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         """
 
         self.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
+        obs_stack_tensor = torch.zeros(self.len(), 3, self.config.resize_h, self.config.resize_w, device=self.device)
+        start = time.time()
         for i in range(self.len()):
-            start = time.time()
             obs, state, action, done, info = self.get(i)
-            print("{}: np obs: {}".format(i, obs.shape))
-            obs_tensor = self.np_img_to_tensor(np_img=obs, device=self.device).unsqueeze(0)
-            print("{}: torch obs: {}, min/max: {}/{}, dtype: {}"
-                  .format(i, obs_tensor.shape, obs_tensor.min(), obs_tensor.max(), obs_tensor.dtype))
-
-            f = self.resnet18(obs_tensor)
-            print("Feature: {}, elapsed: {}".format(f.shape, time.time() - start))
-
-            # obs_tensor = self.tr(obs_tensor)
-            # print("TR: {}: torch obs: {}, min/max: {}/{}, dtype: {}"
-            #       .format(i, obs_tensor.shape, obs_tensor.min(), obs_tensor.max(), obs_tensor.dtype))
-            obs_np = self.tensor_img_to_np(obs_tensor.squeeze(0))
-            print("obs_np, shape: {}, min/max: {}/{}, dtype: {}"
-                  .format(obs_np.shape, obs_np.min(), obs_np.max(), obs_np.dtype))
-
-            obs_np = self.pre_processing(obs_np)
-            if self.visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=0) == 27:
+            obs_np = self.pre_processing(obs)
+            obs_tensor = self.np_img_to_tensor(np_img=obs_np, device=self.device).unsqueeze(0)
+            obs_stack_tensor[i] = obs_tensor
+            if self.visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=1) == 27:
                 break
+        print("elapsed: {}".format(time.time() - start))
+        print("obs_stack_tensor: ", obs_stack_tensor.shape)
+        obs_stack_tensor = self.tr(obs_stack_tensor)
+
+        # # check the visual result of tr
+        # for i in range(len(obs_stack_tensor)):
+        #     obs_tensor = obs_stack_tensor[i]
+        #     obs_np = self.tensor_img_to_np(obs_tensor)
+        #     if self.visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=0) == 27:
+        #         break
+        start = time.time()
+        f = self.resnet18(obs_stack_tensor)
+        f = f.view(len(f), -1)
+        print("feature stack tensor, elapsed: {}, shape: {}, value: {}, "
+              .format(time.time() - start, f.shape, f))
+        return f.cpu().numpy()
 
 
 if __name__ == "__main__":
     # test code for rollout file check
     task = "pouring_skill_img"
     vdc = VideoDatasetCompressor(task_name=task)
-    vdc.compress(batch_idx=1, rollout_idx=0)
-
-
+    f = vdc.compressed(batch_idx=1, rollout_idx=0)
+    print("f: ", f.shape, type(f), f)

@@ -421,7 +421,7 @@ class RealSense:
         return cv2.waitKey(1)
 
 
-def noisy(noise_type, image, random_noise=False):
+def noisy(image, noise_type='gauss', random_noise=False):
     if image.dtype == np.uint8:
         image = image.astype(np.float32) / 255.0
     if random_noise:
@@ -438,7 +438,7 @@ def noisy(noise_type, image, random_noise=False):
     elif noise_type == "s&p":
         row, col, ch = image.shape
         s_vs_p = 0.5
-        amount = 0.004
+        amount = 0.005
         out = np.copy(image)
         # Salt mode
         num_salt = np.ceil(amount * image.size * s_vs_p)
@@ -462,5 +462,5 @@ def noisy(noise_type, image, random_noise=False):
         noisy = image + image * gauss * 0.15     # scaled
 
     if noisy.dtype == np.float32:
-        noisy = noisy.astype(np.uint8)
+        noisy = (np.clip(noisy, 0., 1.) * 255.0).astype(np.uint8)
     return noisy
