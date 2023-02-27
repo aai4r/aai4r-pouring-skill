@@ -43,6 +43,20 @@ class BatchRolloutFolder(object):
         self.rollout_idx = 0
         self.batch_name = 'batch'
 
+    def get_batch_folders(self):
+        return [] if not os.path.exists(self.task_dir) else \
+            [batch for batch in os.listdir(self.task_dir) if 'batch' in batch]
+
+    def get_rollout_list(self, batch_idx):
+        batches = self.get_batch_folders()
+        if not batches: return batches
+        rollout_list = []
+        for i, b in enumerate(batches):
+            if int(b[5:]) == batch_idx:
+                rollout_list = get_ordered_file_list(path=os.path.join(self.task_dir, batches[i]),
+                                                     included_ext=['h5'])
+        return rollout_list
+
     def get_last_batch_idx(self):     # return batch num 0 if the path does not exist
         if not os.path.exists(self.task_dir): return 0
         folders = os.listdir(self.task_dir)

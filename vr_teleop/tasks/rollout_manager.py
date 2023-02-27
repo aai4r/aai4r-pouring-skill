@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import torch.cuda
 
-from dataset.rollout_dataset import BatchRolloutFolder
+from dataset.rollout_dataset import BatchRolloutFolder, get_ordered_file_list
 from spirl.utility.general_utils import AttrDict
 
 """
@@ -318,6 +318,8 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         for p in self.resnet18.parameters():
             p.requires_grad = False
         self.resnet18.eval()
+        self._features = []
+        self.aux_tag = '_f'
 
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])
@@ -407,7 +409,17 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         np_img = tensor_img.cpu().numpy().transpose(1, 2, 0)
         return (np_img * 255.0).astype(np.uint8)
 
-    def compressed(self, batch_idx, rollout_idx):
+    def to_np_rollout(self):
+        if not self._features: raise IndexError("Empty features...")
+        np_rollout = RolloutManager.to_np_rollout(self)
+        np_rollout.features = np.array(self._features)
+        return np_rollout
+
+    def reset(self):
+        super().reset()
+        self._features = []
+
+    def compressed(self):
         """
         Compress each of image observation to feature vector by CNN-like models
         and save it to file
@@ -415,10 +427,7 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         :param rollout_idx:
         :return:
         """
-
-        self.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
         obs_stack_tensor = torch.zeros(self.len(), 3, self.config.resize_h, self.config.resize_w, device=self.device)
-        start = time.time()
         for i in range(self.len()):
             obs, state, action, done, info = self.get(i)
             obs_np = self.pre_processing(obs)
@@ -426,8 +435,6 @@ class VideoDatasetCompressor(RolloutManagerExpand):
             obs_stack_tensor[i] = obs_tensor
             if self.visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=1) == 27:
                 break
-        print("elapsed: {}".format(time.time() - start))
-        print("obs_stack_tensor: ", obs_stack_tensor.shape)
         obs_stack_tensor = self.tr(obs_stack_tensor)
 
         # # check the visual result of tr
@@ -436,17 +443,100 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         #     obs_np = self.tensor_img_to_np(obs_tensor)
         #     if self.visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=0) == 27:
         #         break
-        start = time.time()
         f = self.resnet18(obs_stack_tensor)
         f = f.view(len(f), -1)
-        print("feature stack tensor, elapsed: {}, shape: {}, value: {}, "
-              .format(time.time() - start, f.shape, f))
         return f.cpu().numpy()
+
+    def featurization(self, batch_idx, rollout_idx, n_augments=3):
+        self.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
+        for i in range(n_augments):
+            features = self.compressed()
+            self._features = features.tolist()
+            self.save_to_file_f()
+        self.reset()
+
+    def featurization_all(self, n_augments=3):
+        batches = self.get_batch_folders()
+        print(batches)
+        for b in batches:
+            b_idx = int(b[5:])
+            rollout_list = self.get_rollout_list(b_idx)
+            for r in rollout_list:
+                r_idx = r[len('rollout_'):r.find('.')]
+                self.featurization(batch_idx=b_idx, rollout_idx=r_idx, n_augments=n_augments)
+
+    def get_final_save_path_f(self, batch_index):
+        batch_dir = self.batch_name + "{}".format(batch_index)
+        task_dir = os.path.join(self.root_dir, self.task_name + self.aux_tag)
+        task_batch_dir = os.path.join(task_dir, batch_dir)
+        if not os.path.exists(task_batch_dir): os.makedirs(task_batch_dir)
+
+        rollout_list = get_ordered_file_list(path=task_batch_dir, included_ext=['h5'])
+        next_idx = (lambda x: int(x[x.find('_') + 1:x.find('.')]))(rollout_list[-1]) + 1 if len(rollout_list) > 0 else 0
+        save_path = os.path.join(task_batch_dir, "rollout_{}.h5".format(next_idx))
+        return save_path
+
+    def get_final_load_path_f(self, batch_idx, rollout_num):
+        batch_dir = self.batch_name + "{}".format(batch_idx)
+        task_batch_dir = os.path.join(self.root_dir, self.task_name + self.aux_tag, batch_dir)
+        if not os.path.exists(task_batch_dir):
+            raise OSError("{} not exists".format(task_batch_dir))
+        load_path = os.path.join(task_batch_dir, "rollout_{}.h5".format(rollout_num))
+        return load_path
+
+    def save_to_file_f(self):
+        np_episode_dict = self.to_np_rollout()
+        save_path = self.get_final_save_path_f(batch_index=self.batch_index)
+
+        f = h5py.File(save_path, "w")
+        f.create_dataset("traj_per_file", data=1)
+
+        traj = f.create_group("traj0")
+        traj.create_dataset("features", data=np_episode_dict.features)
+        traj.create_dataset("states", data=np_episode_dict.states)
+        traj.create_dataset("actions", data=np_episode_dict.actions)
+        traj.create_dataset("info", data=np_episode_dict.info)
+
+        terminals = np_episode_dict.dones
+        if np.sum(terminals) == 0: terminals[-1] = True
+        is_terminal_idxs = np.nonzero(terminals)[0]
+        pad_mask = np.zeros((len(terminals),))
+        pad_mask[:is_terminal_idxs[0]] = 1.
+        traj.create_dataset("pad_mask", data=pad_mask)
+        f.close()
+        print("save to ", save_path)
+
+    def load_from_file_f(self, batch_idx, rollout_idx):
+        self.reset()
+        load_path = self.get_final_load_path_f(batch_idx=batch_idx, rollout_num=rollout_idx)
+        with h5py.File(load_path, 'r') as f:
+            key = 'traj{}'.format(0)
+            for name in f[key].keys():
+                if name == 'features':
+                    self._features = f[key + '/' + name][()].astype(np.float32).tolist()
+                elif name == 'states':
+                    temp = f[key + '/' + name][()].astype(np.float32)
+                    for i in range(len(temp)):
+                        robot_state = self.robot_state_class()
+                        robot_state.import_state_from(np_state1d=temp[i])
+                        self._states.append(robot_state)
+                    # self._states = f[key + '/' + name][()].astype(np.float32).tolist()
+                elif name == 'actions':
+                    self._actions = f[key + '/' + name][()].astype(np.float32).tolist()
+                elif name == 'pad_mask':
+                    self._dones = f[key + '/' + name][()].astype(np.float32).tolist()
+                elif name == 'info':
+                    self._info = f[key + '/' + name][()]
+                else:
+                    raise ValueError("{}: Unexpected rollout element...".format(name))
+        print("Load complete!")
 
 
 if __name__ == "__main__":
     # test code for rollout file check
     task = "pouring_skill_img"
     vdc = VideoDatasetCompressor(task_name=task)
-    f = vdc.compressed(batch_idx=1, rollout_idx=0)
-    print("f: ", f.shape, type(f), f)
+    vdc.load_from_file_f(batch_idx=1, rollout_idx=0)
+    np_rollout = vdc.to_np_rollout()
+    print(np_rollout.features.shape)
+    # vdc.featurization_all(n_augments=3)
