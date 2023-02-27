@@ -1,6 +1,6 @@
 import copy
 
-from lib_modules import *
+from vr_teleop.tasks.lib_modules import *
 from vr_teleop.tasks.base import VRWrapper
 from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand, RobotState, RobotState2
 

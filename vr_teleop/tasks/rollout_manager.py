@@ -1,4 +1,4 @@
-from lib_modules import noisy
+from vr_teleop.tasks.lib_modules import noisy
 import os
 import time
 
@@ -203,34 +203,34 @@ class RolloutManagerExpand(RolloutManager):
     """
     def __init__(self, task_name, root_dir=None, task_desc=""):
         super().__init__(task_name=task_name, root_dir=root_dir, task_desc=task_desc)
-        self._observations = []
+        self._images = []
 
     def isempty(self):
-        return not (bool(self._observations) and bool(self._states) and bool(self._actions)
+        return not (bool(self._images) and bool(self._states) and bool(self._actions)
                     and bool(self._dones) and bool(self._info))
 
-    def append(self, observation, state, action, done, info):
+    def append(self, image, state, action, done, info):
         super().append(state, action, done, info)
-        self._observations.append(observation)
+        self._images.append(image)
 
     def get(self, index):
         assert 0 <= index < self.len()
-        return self._observations[index], self._states[index], self._actions[index], self._dones[index], self._info[index]
+        return self._images[index], self._states[index], self._actions[index], self._dones[index], self._info[index]
 
     def len(self):
-        assert len(self._observations) == len(self._states) == len(self._actions) == len(self._dones) # == len(self._info)
+        assert len(self._images) == len(self._states) == len(self._actions) == len(self._dones) # == len(self._info)
         return len(self._states)
 
     def reset(self):
         super().reset()
-        self._observations = []
+        self._images = []
 
     def to_np_rollout(self):
         np_rollout = super().to_np_rollout()
         c = None
-        for obs in self._observations:
+        for obs in self._images:
             c = np.expand_dims(obs, axis=0) if c is None else np.concatenate((c, np.expand_dims(obs, axis=0)), axis=0)
-        np_rollout.observations = c
+        np_rollout.images = c
         return np_rollout
 
     def show_rollout_summary(self):
@@ -255,7 +255,7 @@ class RolloutManagerExpand(RolloutManager):
         f.create_dataset("traj_per_file", data=1)
 
         traj = f.create_group("traj0")
-        traj.create_dataset("observations", data=np_episode_dict.observations)
+        traj.create_dataset("images", data=np_episode_dict.images)
         traj.create_dataset("states", data=np_episode_dict.states)
         traj.create_dataset("actions", data=np_episode_dict.actions)
         traj.create_dataset("info", data=np_episode_dict.info)
@@ -276,14 +276,14 @@ class RolloutManagerExpand(RolloutManager):
             key = 'traj{}'.format(0)
             print("f: ", f[key])
             for name in f[key].keys():
-                if name == 'observations':
+                if name == 'images':
                     # TODO, uint8 --> float32
                     img = f[key + '/' + name][()].astype(np.uint8)
                     print("img shape: ", img.shape)
                     for i in range(len(img)):
                         # img = f[key + '/' + name][()].astype(np.float32)
                         # img /= 255.0
-                        self._observations.append(img[i])
+                        self._images.append(img[i])
                 elif name == 'states':
                     temp = f[key + '/' + name][()].astype(np.float32)
                     for i in range(len(temp)):
@@ -301,6 +301,31 @@ class RolloutManagerExpand(RolloutManager):
                 else:
                     raise ValueError("{}: Unexpected rollout element...".format(name))
         print("Load complete!")
+
+
+def visualize(depth_image, color_image, delay=1):
+    if depth_image is None or color_image is None:
+        print("Can't get a frame....")
+        return cv2.waitKey(delay)
+
+    # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+    depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+
+    depth_colormap_dim = depth_colormap.shape
+    color_colormap_dim = color_image.shape
+
+    # If depth and color resolutions are different, resize color image to match depth image for display
+    if depth_colormap_dim != color_colormap_dim:
+        resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]),
+                                         interpolation=cv2.INTER_AREA)
+        images = np.hstack((resized_color_image, depth_colormap))
+    else:
+        images = np.hstack((color_image, depth_colormap))
+
+    # Show images
+    cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
+    cv2.imshow('RealSense', images)
+    return cv2.waitKey(delay)
 
 
 from torch import nn
@@ -360,31 +385,6 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         return out
 
     @staticmethod
-    def visualize(depth_image, color_image, delay=1):
-        if depth_image is None or color_image is None:
-            print("Can't get a frame....")
-            return cv2.waitKey(delay)
-
-        # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-
-        depth_colormap_dim = depth_colormap.shape
-        color_colormap_dim = color_image.shape
-
-        # If depth and color resolutions are different, resize color image to match depth image for display
-        if depth_colormap_dim != color_colormap_dim:
-            resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]),
-                                             interpolation=cv2.INTER_AREA)
-            images = np.hstack((resized_color_image, depth_colormap))
-        else:
-            images = np.hstack((color_image, depth_colormap))
-
-        # Show images
-        cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
-        cv2.imshow('RealSense', images)
-        return cv2.waitKey(delay)
-
-    @staticmethod
     def np_img_to_tensor(np_img, device):
         """
         In: np_img(height, width, channel), [0, 255], uint8
@@ -433,7 +433,7 @@ class VideoDatasetCompressor(RolloutManagerExpand):
             obs_np = self.pre_processing(obs)
             obs_tensor = self.np_img_to_tensor(np_img=obs_np, device=self.device).unsqueeze(0)
             obs_stack_tensor[i] = obs_tensor
-            if self.visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=1) == 27:
+            if visualize(depth_image=np.zeros(obs_np.shape), color_image=obs_np, delay=1) == 27:
                 break
         obs_stack_tensor = self.tr(obs_stack_tensor)
 
@@ -533,10 +533,33 @@ class VideoDatasetCompressor(RolloutManagerExpand):
 
 
 if __name__ == "__main__":
-    # test code for rollout file check
     task = "pouring_skill_img"
+    roll = RolloutManagerExpand(task_name=task)
+    rollouts = roll.get_rollout_list(batch_idx=2)
+    for i in range(len(rollouts)):
+        roll.load_from_file(batch_idx=2, rollout_idx=i)
+        np_rollout = roll.to_np_rollout()
+        print(i, np_rollout.images.shape)
+        np_rollout.dones[-1] = 1.
+        print("dones: ", np_rollout.dones)
+        # visualize(depth_image=np.zeros(np_rollout.images[0].shape), color_image=np_rollout.images[0], delay=0)
+        roll.save_to_file()
+    # print(np_rollout.observations.shape, np_rollout.observations)
+    exit()
+
     vdc = VideoDatasetCompressor(task_name=task)
-    vdc.load_from_file_f(batch_idx=1, rollout_idx=0)
-    np_rollout = vdc.to_np_rollout()
-    print(np_rollout.features.shape)
-    # vdc.featurization_all(n_augments=3)
+    batches = vdc.get_batch_folders()
+    print(batches)
+    for b in batches:
+        b_idx = int(b[5:])
+        rollout_list = vdc.get_rollout_list(b_idx)
+        for r in rollout_list:
+            r_idx = r[len('rollout_'):r.find('.')]
+            print(rollout_list)
+
+    # vdc.load_from_file(batch_idx=1, rollout_idx=0)
+    # obs, state, action, done, info = vdc.get(0)
+    # vdc.visualize(depth_image=np.zeros(obs.shape), color_image=obs, delay=0)
+    # np_rollout = vdc.to_np_rollout()
+    # print(np_rollout.features.shape)
+    # vdc.featurization_all(n_augments=1)

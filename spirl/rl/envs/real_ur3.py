@@ -15,11 +15,11 @@ import numpy as np
 
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
-    state_dim=19,
+    state_dim=16,
     n_actions=8,
-    split=AttrDict(train=0.9, val=0.1, test=0.0),
+    split=AttrDict(train=0.95, val=0.05, test=0.0),
     env_name="pouring_skill",
-    res=128,
+    res=150,
     crop_rand_subseq=True,
 )
 

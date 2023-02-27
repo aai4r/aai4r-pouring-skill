@@ -125,8 +125,8 @@ class PreTrainEncoder(nn.Module):
             # freeze_modules([self.net])
             freeze_model_until(model=self.net, until=self._hp.layer_freeze)  # resnet 18 has 9 layers except for the last fc layer
 
-        # if self._hp.layer_freeze == -1:
-        #     self.net.eval()
+        if self._hp.layer_freeze == -1:
+            self.net.eval()
         self.tr = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],

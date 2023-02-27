@@ -92,7 +92,7 @@ class ModelTrainer(BaseTrainer):
             'logger_test': None,
             'evaluator': None,
             'data_dir': None,  # directory where dataset is in
-            'batch_size': 128,
+            'batch_size': 1,
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
@@ -423,7 +423,7 @@ def set_run_params():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    task_name = "pouring_skill"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
+    task_name = "pouring_skill_img"     # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
     mode = "hierarchical_cl"
 
     # config path & params
