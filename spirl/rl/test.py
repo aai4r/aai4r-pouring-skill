@@ -30,6 +30,7 @@ WANDB_ENTITY_NAME = 'twkim0812'
 class RLTrainer:
     """Sets up RL training loop, instantiates all components, runs training."""
     def __init__(self, args):
+        cv2.namedWindow("RealSense D435", cv2.WINDOW_AUTOSIZE)
         self.args = args
         self.setup_device()
 
@@ -93,6 +94,7 @@ class RLTrainer:
         else:
             print("Invalid mode...")
             raise ValueError
+        cv2.destroyAllWindows()
 
     def _default_hparams(self):
         default_dict = ParamDict({
@@ -330,6 +332,4 @@ if __name__ == '__main__':
     # args.resume = "latest"
     args.mode = "demo"     # "train" / "val" / "demo" / "collect"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-
-    # cv2.namedWindow("RealSense D435", cv2.WINDOW_AUTOSIZE)
     RLTrainer(args=args)

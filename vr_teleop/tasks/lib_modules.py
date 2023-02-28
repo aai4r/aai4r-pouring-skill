@@ -331,8 +331,9 @@ import numpy as np
 import cv2
 
 
-def visualize(depth_image, color_image):
+def visualize(depth_image, color_image, disp_name=None):
     """
+    :param disp_name: name of cv2.namedWindow
     :param depth_image: (h, w, c), uint16
     :param color_image: (h, w, c), uint8
     :return:
@@ -358,8 +359,11 @@ def visualize(depth_image, color_image):
         images = np.hstack((_color_image, depth_colormap))
 
     # Show images
-    cv2.namedWindow('RealSense D435', cv2.WINDOW_AUTOSIZE)
-    cv2.imshow('RealSense D435', images)
+    if disp_name:
+        cv2.imshow(disp_name, images)
+    else:
+        cv2.namedWindow('RealSense D435', cv2.WINDOW_AUTOSIZE)
+        cv2.imshow('RealSense D435', images)
     return cv2.waitKey(1)
 
 
