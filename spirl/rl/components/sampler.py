@@ -336,7 +336,7 @@ class ACImageAugmentedSampler(ImageAugmentedSampler):
     """Adds no-op renders to make sure agent-centric camera reaches agent."""
     def _reset_env(self):
         obs = super()._reset_env()
-        for _ in range(10):  # so that camera can "reach" agent
+        for _ in range(5):  # so that camera can "reach" agent
             self._env.render(mode='rgb_array')
         return obs
 

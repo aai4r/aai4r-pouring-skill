@@ -4,6 +4,7 @@ from spirl.components.data_loader import GlobalSplitVideoDataset
 
 from vr_teleop.tasks.real_ur3_robotiq85 import BaseRTDE, UR3ControlMode
 from vr_teleop.tasks.base import VRWrapper
+from vr_teleop.tasks.lib_modules import RealSense
 
 from utils.utils import quaternion_real_last, quaternion_real_first, get_euler_xyz
 from utils.torch_jit_utils import quat_mul, quat_conjugate
@@ -18,7 +19,7 @@ data_spec = AttrDict(
     state_dim=16,
     n_actions=8,
     split=AttrDict(train=0.9, val=0.1, test=0.0),
-    env_name="pouring_skill",
+    env_name="pouring_skill_img",
     res=150,
     crop_rand_subseq=True,
 )
@@ -79,8 +80,8 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         target_diff = (np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)).tolist()
         # g_one_hot = self.grip_one_hot_state()
         g_pos = self.grip_pos(normalize=True, list_type=True)
-        cm_one_hot = self.cont_mode_one_hot_state()
-        obs = joint + tcp_pos + tcp_quat + target_diff + g_pos + cm_one_hot
+        cont_mode_one_hot = self.cont_mode_one_hot_state()
+        obs = joint + tcp_pos + tcp_quat + g_pos + cont_mode_one_hot
         return np.array(obs) if np_type else obs
 
     @staticmethod
@@ -227,11 +228,49 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         self.user_control_authority = False
         return self.get_obs()
 
+    def render(self):
+        raise NotImplementedError
+
+
+from vr_teleop.tasks.lib_modules import visualize
+import cv2
+
+
+class ImageRtdeUR3(RtdeUR3):
+    def __init__(self):
+        super().__init__()
+        self.cam = RealSense()
+        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=150, resize_w=150)
+
+    def pre_processing(self, color_image):
+        """
+        * crop and resize
+        :param color_image:
+        :return:
+        """
+        ih, iw = color_image.shape[:2]
+        crop_h = crop_w = min(iw, iw)
+        resize_h, resize_w = self.config.resize_h, self.config.resize_w
+        y, x = (0.5 * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
+
+        cropped_img = color_image[y:y+crop_h, x:x+crop_w]
+        resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+        out = resized_img
+        return out
+
+    def render(self, mode='rgb_array'):
+        depth, color = self.cam.get_np_images()
+        visualize(depth_image=depth, color_image=color)
+
+        color = self.pre_processing(color)
+        color = (color / 255.0).astype(np.float32)
+        return color
+
 
 class RealUR3Env(BaseEnvironment):
     def __init__(self, config):
         self.config = config
-        self._env = RtdeUR3()
+        self._env = ImageRtdeUR3() if self.config.image_observation else RtdeUR3()
 
     def _default_hparams(self):
         pass
@@ -245,8 +284,7 @@ class RealUR3Env(BaseEnvironment):
         return self._env.reset()
 
     def render(self, mode='rgb_array'):
-        return np.random.rand(128, 128, 3)
-        # raise NotImplementedError
+        return self._env.render()
 
     def _postprocess_info(self):
         pass

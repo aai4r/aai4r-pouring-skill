@@ -1,4 +1,6 @@
 from vr_teleop.tasks.lib_modules import noisy
+from vr_teleop.tasks.lib_modules import visualize
+
 import os
 import time
 
@@ -301,31 +303,6 @@ class RolloutManagerExpand(RolloutManager):
                 else:
                     raise ValueError("{}: Unexpected rollout element...".format(name))
         print("Load complete!")
-
-
-def visualize(depth_image, color_image, delay=1):
-    if depth_image is None or color_image is None:
-        print("Can't get a frame....")
-        return cv2.waitKey(delay)
-
-    # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-    depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-
-    depth_colormap_dim = depth_colormap.shape
-    color_colormap_dim = color_image.shape
-
-    # If depth and color resolutions are different, resize color image to match depth image for display
-    if depth_colormap_dim != color_colormap_dim:
-        resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]),
-                                         interpolation=cv2.INTER_AREA)
-        images = np.hstack((resized_color_image, depth_colormap))
-    else:
-        images = np.hstack((color_image, depth_colormap))
-
-    # Show images
-    cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
-    cv2.imshow('RealSense', images)
-    return cv2.waitKey(delay)
 
 
 from torch import nn

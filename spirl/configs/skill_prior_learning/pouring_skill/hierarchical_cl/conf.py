@@ -4,7 +4,7 @@ from spirl.models.closed_loop_spirl_mdl import ClSPiRLMdl
 from spirl.components.logger import Logger
 from spirl.utility.general_utils import AttrDict
 from spirl.components.evaluator import TopOfNSequenceEvaluator
-from spirl.rl.envs.real_ur3 import data_spec
+from spirl.rl.envs.real_ur3_env import data_spec
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 

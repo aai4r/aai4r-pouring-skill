@@ -4,7 +4,7 @@ from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.components.logger import Logger
 from spirl.utility.general_utils import AttrDict
 from spirl.components.evaluator import TopOfNSequenceEvaluator
-from spirl.rl.envs.real_ur3 import data_spec
+from spirl.rl.envs.real_ur3_env import data_spec
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -37,9 +37,12 @@ model_config = AttrDict(
     use_pretrain=True,
     layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
     state_cond=False,
+    state_cond_size=16,
+    model_download=False,
     aux_pred_dim=len([]),     # gripper, bottle, cup position, set zero for only actions
     prior_input_res=data_spec.res,
     weights_dir="weights",
+    recurrent_prior=False,
 )
 
 # Dataset

@@ -1,6 +1,9 @@
 import sys
 import time
 
+import cv2
+import numpy as np
+
 import isaacgym
 import torch
 import os
@@ -307,19 +310,19 @@ class RLTrainer:
 
 if __name__ == '__main__':
     # comment out following codes if you run this script directly
-    os.environ["EXP_DIR"] = "../experiments"
-    os.environ["DATA_DIR"] = "../data"
+    os.environ["EXP_DIR"] = "../../experiments"
+    os.environ["DATA_DIR"] = "../../data"
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
-    task_name = "pouring_skill"
+    task_name = "pouring_skill_img"
     mode = "spirl_cl"
 
     args = get_args()
-    args.path = os.path.join("./", "configs", "hrl", task_name, mode)
+    args.path = os.path.join("../", "configs", "hrl", task_name, mode)
     args.seed = 0
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name
@@ -327,4 +330,6 @@ if __name__ == '__main__':
     # args.resume = "latest"
     args.mode = "demo"     # "train" / "val" / "demo" / "collect"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
+
+    # cv2.namedWindow("RealSense D435", cv2.WINDOW_AUTOSIZE)
     RLTrainer(args=args)
