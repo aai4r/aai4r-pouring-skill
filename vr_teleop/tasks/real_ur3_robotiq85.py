@@ -63,7 +63,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         """
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         action = action_pos + action_quat + action_grip
-        self.rollout.append(observation=observation, state=state, action=action, done=done, info=info)
+        self.rollout.append(image=observation, state=state, action=action, done=done, info=info)
 
     def play_demo(self):
         # go to initial state in joint space
@@ -137,7 +137,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 if cont_status["btn_trigger"]:
                     depth, color = self.cam.get_np_images()
-                    self.cam.visualize(depth, copy.deepcopy(color))
+                    visualize(depth, color)
                     state = self.get_state()
 
                     if cont_status["btn_control_mode"]:

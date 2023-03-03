@@ -1,3 +1,5 @@
+import copy
+
 from spirl.rl.components.environment import BaseEnvironment
 from spirl.utility.general_utils import AttrDict
 from spirl.components.data_loader import GlobalSplitVideoDataset
@@ -9,7 +11,7 @@ from vr_teleop.tasks.lib_modules import RealSense
 from utils.utils import quaternion_real_last, quaternion_real_first, get_euler_xyz
 from utils.torch_jit_utils import quat_mul, quat_conjugate
 from pytorch3d import transforms as tr
-from vr_teleop.tasks.rollout_manager import RolloutManager, RobotState, RobotState2
+from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand, RobotState, RobotState2
 import torch
 import numpy as np
 
@@ -77,7 +79,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
         tcp_quat = self.quat_from_tcp_axis_angle(tcp_aa, tolist=True)
         # TODO, target_diff is temporal state...
-        target_diff = (np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)).tolist()
+        # target_diff = (np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)).tolist()
         # g_one_hot = self.grip_one_hot_state()
         g_pos = self.grip_pos(normalize=True, list_type=True)
         cont_mode_one_hot = self.cont_mode_one_hot_state()
@@ -241,6 +243,22 @@ class ImageRtdeUR3(RtdeUR3):
         super().__init__()
         self.cam = RealSense()
         self.config = AttrDict(crop_h=460, crop_w=460, resize_h=150, resize_w=150)
+        self.rollout = RolloutManagerExpand(task_name="pouring_skill_img")    # TODO, task_name param
+
+    def get_robot_state(self):
+        tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
+        state = RobotState2(joint=self.get_actual_q(),
+                            ee_pos=tcp_pos,
+                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
+                            # gripper_one_hot=self.grip_one_hot_state(),
+                            gripper_pos=[self.gripper.gripper_to_mm_normalize()],
+                            control_mode_one_hot=self.cont_mode_one_hot_state())
+        return state
+
+    def record_frame(self, image, state, action_pos, action_quat, action_grip, done):
+        info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
+        action = action_pos + action_quat + action_grip
+        self.rollout.append(image=image, state=state, action=action, done=done, info=info)
 
     def pre_processing(self, color_image):
         """
@@ -260,11 +278,81 @@ class ImageRtdeUR3(RtdeUR3):
 
     def render(self, mode='rgb_array'):
         depth, color = self.cam.get_np_images()
-        visualize(depth_image=depth, color_image=color)
+        visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
 
         color = self.pre_processing(color)
         color = (color / 255.0).astype(np.float32)
         return color
+
+    def step_sa(self, action):  # shared autonomy step
+        cont_status = self.vr.get_controller_status()
+        if cont_status["btn_trigger"]:
+            print("VR Trigger On!")
+            self.user_control_authority = True
+            self.speed_stop()
+
+        while self.user_control_authority:
+            start_t = self.init_period()
+            cont_status = self.vr.get_controller_status()
+
+            if cont_status["btn_reset_pose"]:
+                self.speed_stop()
+                depth, color = self.cam.get_np_images()
+                self.record_frame(image=copy.deepcopy(color),
+                                  state=self.get_robot_state(),
+                                  action_pos=[0., 0., 0.],
+                                  action_quat=[0., 0., 0., 1.],
+                                  action_grip=[self.gripper.gripper_to_mm_normalize()],
+                                  done=1)
+
+                self.rollout.show_rollout_summary()
+                self.rollout.save_to_file()
+                self.rollout.reset()
+
+                obs = self.reset()
+                reward, done, info = 0, True, ""
+                return obs, reward, done, info
+
+            diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            if cont_status["btn_trigger"]:
+                depth, color = self.cam.get_np_images()
+                visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
+                state = self.get_robot_state()
+
+                if cont_status["btn_grip"]:
+                    self.gripper.grasping_by_hold(step=-10.0)
+                else:
+                    self.gripper.grasping_by_hold(step=10.0)
+                gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
+
+                vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
+                act_pos = list(vr_curr_pos_vel)
+
+                actual_tcp_pos, actual_tcp_ori_aa = self.get_actual_tcp_pos_ori()
+
+                actual_tcp_ori_quat = tr.axis_angle_to_quaternion(torch.tensor(actual_tcp_ori_aa))
+                actual_tcp_ori_quat = quaternion_real_last(actual_tcp_ori_quat)
+                conj = quat_conjugate(actual_tcp_ori_quat)
+                act_quat = quat_mul(torch.tensor(vr_curr_quat), conj)
+
+                if self.collect_demo:
+                    self.record_frame(image=copy.deepcopy(color),
+                                      state=state,
+                                      action_pos=act_pos,
+                                      action_quat=act_quat.tolist(),
+                                      action_grip=[gripper_action_norm],
+                                      done=0)
+
+                d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
+                d_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori_aa)
+                goal_pose = self.goal_pose(des_pos=d_pos, des_rot=d_rot)  # limit handling
+
+                goal_j = self.get_inverse_kinematics(tcp_pose=goal_pose)
+                diff_j = (np.array(goal_j) - np.array(self.get_actual_q())) * 1.0
+            self.speed_j(list(diff_j), self.acc, self.dt)
+            self.wait_period(start_t)
+
+        return self._step(action=action)
 
 
 class RealUR3Env(BaseEnvironment):

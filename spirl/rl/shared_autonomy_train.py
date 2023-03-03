@@ -34,10 +34,10 @@ class SkillTrainer(ModelTrainer):
             self.start_epoch = self.resume(args.resume, self.conf.ckpt_path)
 
     def set_params(self):
-        task_name = "pouring_skill"  # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
+        task_name = "pouring_skill_img"  # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
         mode = "hierarchical_cl"
 
-        sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
+        sys.argv.append("--path=" + "../configs/skill_prior_learning/{}/{}".format(task_name, mode))
         # sys.argv.append("--val_data_size={}".format(160))  # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
         sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
@@ -65,9 +65,13 @@ class SkillTrainer(ModelTrainer):
         self.skill_net_start_epoch += num_epochs
 
 
+import cv2
+
+
 class SharedAutonomyTrainer:
     """Sets up RL training loop, instantiates all components, runs training."""
     def __init__(self, args):
+        cv2.namedWindow("RealSense D435", cv2.WINDOW_AUTOSIZE)
         self.skill_trainer = SkillTrainer()
 
         self.args = args
@@ -192,8 +196,8 @@ class SharedAutonomyTrainer:
                     print("n_total: ", n_total)
 
                 self.skill_trainer.train_loader_update()
-                # self.skill_trainer.skill_train(num_epochs=1)
-                # self.agent.update_model_weights()
+                self.skill_trainer.skill_train(num_epochs=1)
+                self.agent.update_model_weights()
 
     def shared_autonomy_train(self):
         self.warmup_skill_train(epoch=0)
@@ -352,19 +356,19 @@ class SharedAutonomyTrainer:
 
 if __name__ == '__main__':
     # comment out following codes if you run this script directly
-    os.environ["EXP_DIR"] = "../experiments"
-    os.environ["DATA_DIR"] = "../dataset"
+    os.environ["EXP_DIR"] = "../../experiments"
+    os.environ["DATA_DIR"] = "../../dataset"
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
-    task_name = "pouring_skill"
+    task_name = "pouring_skill_img"
     mode = "spirl_cl"
 
     args = get_args()
-    args.path = os.path.join("./", "configs", "hrl", task_name, mode)
+    args.path = os.path.join("../", "configs", "hrl", task_name, mode)
     args.seed = 0
     args.prefix = "{}".format("SPIRL_" + task_name + "_seed0")
     args.task_name = task_name

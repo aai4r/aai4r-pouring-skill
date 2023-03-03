@@ -511,32 +511,33 @@ class VideoDatasetCompressor(RolloutManagerExpand):
 
 if __name__ == "__main__":
     task = "pouring_skill_img"
-    roll = RolloutManagerExpand(task_name=task)
-    rollouts = roll.get_rollout_list(batch_idx=2)
-    for i in range(len(rollouts)):
-        roll.load_from_file(batch_idx=2, rollout_idx=i)
-        np_rollout = roll.to_np_rollout()
-        print(i, np_rollout.images.shape)
-        np_rollout.dones[-1] = 1.
-        print("dones: ", np_rollout.dones)
-        # visualize(depth_image=np.zeros(np_rollout.images[0].shape), color_image=np_rollout.images[0], delay=0)
-        roll.save_to_file()
+    # roll = RolloutManagerExpand(task_name=task)
+    # rollouts = roll.get_rollout_list(batch_idx=2)
+    # for i in range(len(rollouts)):
+    #     roll.load_from_file(batch_idx=2, rollout_idx=i)
+    #     np_rollout = roll.to_np_rollout()
+    #     print(i, np_rollout.images.shape)
+    #     np_rollout.dones[-1] = 1.
+    #     print("dones: ", np_rollout.dones)
+    #     # visualize(depth_image=np.zeros(np_rollout.images[0].shape), color_image=np_rollout.images[0], delay=0)
+    #     roll.save_to_file()
     # print(np_rollout.observations.shape, np_rollout.observations)
-    exit()
+    # exit()
 
     vdc = VideoDatasetCompressor(task_name=task)
     batches = vdc.get_batch_folders()
-    print(batches)
-    for b in batches:
-        b_idx = int(b[5:])
-        rollout_list = vdc.get_rollout_list(b_idx)
-        for r in rollout_list:
-            r_idx = r[len('rollout_'):r.find('.')]
-            print(rollout_list)
+    # print(batches)
+    # for b in batches:
+    #     b_idx = int(b[5:])
+    #     rollout_list = vdc.get_rollout_list(b_idx)
+    #     for r in rollout_list:
+    #         r_idx = r[len('rollout_'):r.find('.')]
+    #         print(rollout_list)
 
-    # vdc.load_from_file(batch_idx=1, rollout_idx=0)
-    # obs, state, action, done, info = vdc.get(0)
-    # vdc.visualize(depth_image=np.zeros(obs.shape), color_image=obs, delay=0)
+    vdc.load_from_file(batch_idx=1, rollout_idx=43)
+    for i in range(vdc.len()):
+        obs, state, action, done, info = vdc.get(i)
+        visualize(depth_image=np.zeros(obs.shape), color_image=obs)
     # np_rollout = vdc.to_np_rollout()
     # print(np_rollout.features.shape)
     # vdc.featurization_all(n_augments=1)
