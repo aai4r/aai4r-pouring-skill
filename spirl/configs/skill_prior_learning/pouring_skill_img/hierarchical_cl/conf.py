@@ -12,7 +12,7 @@ configuration = {
     'model': ImageClSPiRLMdl,
     'logger': Logger,
     'data_dir': [os.path.join(os.environ["DATA_DIR"], 'pouring_skill_img')],
-    'epoch_cycles_train': 10,
+    'epoch_cycles_train': 100,
     'num_epochs': 10,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
@@ -36,8 +36,8 @@ model_config = AttrDict(
     cond_decode=True,
     use_pretrain=True,
     layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
-    state_cond=False,
-    state_cond_size=16,
+    state_cond=True,
+    state_cond_size=data_spec.state_dim,
     model_download=False,
     aux_pred_dim=len([]),     # gripper, bottle, cup position, set zero for only actions
     prior_input_res=data_spec.res,

@@ -267,20 +267,21 @@ class ImageRtdeUR3(RtdeUR3):
         :return:
         """
         ih, iw = color_image.shape[:2]
-        crop_h = crop_w = min(iw, iw)
+        crop_h = crop_w = min(iw, ih)
         resize_h, resize_w = self.config.resize_h, self.config.resize_w
-        y, x = (0.5 * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
 
-        cropped_img = color_image[y:y+crop_h, x:x+crop_w]
+        y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
+
+        cropped_img = color_image[y:y + crop_h, x:x + crop_w]
         resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
         out = resized_img
         return out
 
     def render(self, mode='rgb_array'):
         depth, color = self.cam.get_np_images()
-        visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
 
         color = self.pre_processing(color)
+        visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
         color = (color / 255.0).astype(np.float32)
         return color
 
@@ -305,12 +306,12 @@ class ImageRtdeUR3(RtdeUR3):
                                   action_grip=[self.gripper.gripper_to_mm_normalize()],
                                   done=1)
 
+                obs = self.reset()
+                reward, done, info = 0, True, ""
+
                 self.rollout.show_rollout_summary()
                 self.rollout.save_to_file()
                 self.rollout.reset()
-
-                obs = self.reset()
-                reward, done, info = 0, True, ""
                 return obs, reward, done, info
 
             diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

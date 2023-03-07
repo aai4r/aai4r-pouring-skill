@@ -362,8 +362,9 @@ def visualize(depth_image, color_image, disp_name=None):
     if disp_name:
         cv2.imshow(disp_name, images)
     else:
-        cv2.namedWindow('RealSense D435', cv2.WINDOW_AUTOSIZE)
-        cv2.imshow('RealSense D435', images)
+        wnd_name = 'RealSense D435'
+        # cv2.namedWindow(wnd_name, cv2.WINDOW_AUTOSIZE)
+        cv2.imshow(wnd_name, images)
     return cv2.waitKey(1)
 
 

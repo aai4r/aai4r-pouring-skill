@@ -133,18 +133,19 @@ class PreTrainEncoder(nn.Module):
                                  std=[0.229, 0.224, 0.225])])
 
     def visualize(self, unroll, index):     # for debugging
-        w = self._hp.prior_input_res if self._hp.n_input_frames > 1 else 224    # Resnet resize value
-        img = unroll[index, :, :, :w].cpu().numpy().transpose(1, 2, 0)
+        # w = self._hp.prior_input_res if self._hp.n_input_frames > 1 else 224    # Resnet resize value
+        w = self._hp.prior_input_res
+        img = (unroll[index, :, :, :w].cpu().numpy()).transpose(1, 2, 0)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         for i in range(1, self._hp.n_input_frames):
             start, end = i * w, (i + 1) * w
-            temp = unroll[index, :, :, start:end].cpu().numpy().transpose(1, 2, 0)
+            temp = (unroll[index, :, :, start:end].cpu().numpy()).transpose(1, 2, 0)
             temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
             img = np.concatenate((img, temp), axis=-2)
 
         img = ((img + 1) * (255/2)).astype(np.uint8)
-        cv2.imshow("images", img)
-        cv2.waitKey()
+        cv2.imshow("stacked images", img)
+        cv2.waitKey(1)
 
     def forward(self, input):
         # input shape: (batch*n_rollout, n_frames*n_channel, h, w),  range: [-1, 1]

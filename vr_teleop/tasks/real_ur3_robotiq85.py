@@ -260,7 +260,7 @@ def camera_test():
             st.gen_random_data(n_joint=6, n_cont_mode=2)
             # rollout.append(observation=color, state=st,
             #                action=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], done=[0], info=[""])
-            if cam.visualize(depth, color) == 27:
+            if visualize(depth, color) == 27:
                 break
             # dt.print_dt()
         # rollout.save_to_file()

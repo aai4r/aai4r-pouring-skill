@@ -288,12 +288,12 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
                                states=inputs.obs[:, :self._hp.state_cond_size]) if self._hp.state_cond else inputs
             return self._compute_learned_prior(self.p[0], _inputs)
 
-        # if self._hp.state_cond:
-        #     assert inputs.states.shape[0] % self._hp.n_prior_nets == 0
-        #     per_prior_inputs = (inputs, )
-        # else:
-        assert inputs.shape[0] % self._hp.n_prior_nets == 0
-        per_prior_inputs = torch.chunk(inputs, self._hp.n_prior_nets)
+        if self._hp.state_cond:
+            assert inputs.states.shape[0] % self._hp.n_prior_nets == 0
+            per_prior_inputs = (inputs, )
+        else:
+            assert inputs.shape[0] % self._hp.n_prior_nets == 0
+            per_prior_inputs = torch.chunk(inputs, self._hp.n_prior_nets)
         prior_results = [self._compute_learned_prior(prior, input_batch)
                          for prior, input_batch in zip(self.p, per_prior_inputs)]
 
