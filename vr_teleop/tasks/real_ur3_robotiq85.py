@@ -70,7 +70,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.speed_stop()
         init_obs, init_state, _, _, _ = self.rollout.get(0)
         if hasattr(self, 'cam') and init_obs is not None:
-            self.cam.visualize(np.zeros(init_obs.shape), init_obs)
+            visualize(np.zeros(init_obs.shape), init_obs)
         self.move_j(init_state.joint)
 
         # loop for playing demo
@@ -78,7 +78,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             start_t = self.init_period()
             obs, state, action, done, info = self.rollout.get(index=idx)
             if hasattr(self, 'cam') and obs is not None:
-                self.cam.visualize(np.zeros(obs.shape), obs)
+                visualize(np.zeros(obs.shape), obs)
 
             if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
                 self.switching_control_mode()
@@ -87,7 +87,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if len(grip) == 2:  # gripper one-hot state
                 self.move_grip_on_off(self.grip_onehot_to_bool(grip))
             elif len(grip) == 1:    # cont. control
-                self.gripper.rq_move_mm_norm(grip[0])
+                # self.gripper.rq_move_mm_norm(grip[0])
+                self.gripper.grasping_by_hold(grip[0])
             else:
                 raise NotImplementedError
 
@@ -105,8 +106,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
         try:
-            depth, color = self.cam.get_np_images()
-            self.cam.visualize(depth, color)
+            for _ in range(10):
+                depth, color = self.cam.get_np_images()
+                visualize(depth, color)
 
             self.move_j(self.iposes)
             while True:
@@ -120,7 +122,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       state=self.get_state(),
                                       action_pos=[0., 0., 0.],
                                       action_quat=[0., 0., 0., 1.],
-                                      action_grip=[self.gripper.gripper_to_mm_normalize()],
+                                      action_grip=[1.0],
                                       done=1)
                     # self.play_demo()
                     self.rollout.show_rollout_summary()
@@ -146,11 +148,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     if cont_status["btn_gripper"]:
                         self.move_grip_on_off_toggle()
 
-                    if cont_status["btn_grip"]:
-                        self.gripper.grasping_by_hold(step=-10.0)
-                    else:
-                        self.gripper.grasping_by_hold(step=10.0)
-                    gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
+                    gripper_action = -1.0 if cont_status["btn_grip"] else 1.0
+                    self.gripper.grasping_by_hold(step=gripper_action)
+                    # gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
 
                     vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
                     act_pos = list(vr_curr_pos_vel)
@@ -166,7 +166,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                                             state=state,
                                                             action_pos=act_pos,
                                                             action_quat=act_quat.tolist(),
-                                                            action_grip=[gripper_action_norm],
+                                                            action_grip=[gripper_action],
                                                             done=0)
 
                     d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -281,9 +281,9 @@ def camera_load_test(batch_idx, rollout_idx):
 
 
 if __name__ == "__main__":
-    camera_test()
+    # camera_test()
     # camera_load_test(batch_idx=1, rollout_idx=0)
     # vr_test()
-    # u = RealUR3()
+    u = RealUR3()
     # u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=0)
+    u.replay_mode(batch_idx=1, rollout_idx=0)

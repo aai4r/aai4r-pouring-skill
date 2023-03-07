@@ -169,9 +169,15 @@ class RobotiqGripperExpand(RobotiqGripper):
             return True
         return False
 
-    def grasping_by_hold(self, step=-5.0):
+    def grasping_by_hold(self, step=1.0):
+        """
+
+        :param step: negative(to close), positive(to open)
+        :return:
+        """
+        scale = 10.0
         value_mm = self.gripper_to_mm()
-        value_mm += step
+        value_mm += (step * scale)
         self.target_grip_mm = value_mm
         return self.rq_move_mm(value_mm)
 

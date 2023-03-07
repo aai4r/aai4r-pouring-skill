@@ -109,7 +109,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                 self.record_frame(state=self.get_robot_state(),
                                   action_pos=[0., 0., 0.],
                                   action_quat=[0., 0., 0., 1.],
-                                  action_grip=[self.gripper.gripper_to_mm_normalize()],
+                                  action_grip=[1.0],   # to open
                                   done=1)
 
                 self.rollout.show_rollout_summary()
@@ -126,11 +126,9 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                 # if cont_status["btn_gripper"]:
                 #     self.move_grip_on_off_toggle()
 
-                if cont_status["btn_grip"]:
-                    self.gripper.grasping_by_hold(step=-10.0)
-                else:
-                    self.gripper.grasping_by_hold(step=10.0)
-                gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
+                gripper_action = -1.0 if cont_status["btn_grip"] else 1.0
+                self.gripper.grasping_by_hold(step=gripper_action)
+                # gripper_action = self.gripper.get_gripper_action(normalize=True)
 
                 vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
                 act_pos = list(vr_curr_pos_vel)
@@ -146,7 +144,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
                     self.record_frame(state=state,
                                       action_pos=act_pos,
                                       action_quat=act_quat.tolist(),
-                                      action_grip=[gripper_action_norm],
+                                      action_grip=[gripper_action],
                                       done=0)
 
                 d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -209,7 +207,8 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
             print("grip: {}, grip_onehot: {}".format(grip, grip_onehot))
             self.move_grip_on_off(self.grip_onehot_to_bool(grip_onehot))
         elif len(grip) == 1:
-            self.gripper.rq_move_mm_norm(grip[0] * 1.0)
+            # self.gripper.rq_move_mm_norm(grip[0] * 1.0)
+            self.gripper.grasping_by_hold(step=grip[0])
         else:
             raise NotImplementedError
 
@@ -234,7 +233,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         raise NotImplementedError
 
 
-from vr_teleop.tasks.lib_modules import visualize
+from vr_teleop.tasks.lib_modules import visualize, noisy
 import cv2
 
 
@@ -266,14 +265,13 @@ class ImageRtdeUR3(RtdeUR3):
         :param color_image:
         :return:
         """
-        ih, iw = color_image.shape[:2]
-        crop_h = crop_w = min(iw, ih)
+        # ih, iw = color_image.shape[:2]
+        # crop_h = crop_w = min(iw, ih)
         resize_h, resize_w = self.config.resize_h, self.config.resize_w
+        # y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
 
-        y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
-
-        cropped_img = color_image[y:y + crop_h, x:x + crop_w]
-        resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+        # cropped_img = color_image[y:y + crop_h, x:x + crop_w]
+        resized_img = cv2.resize(color_image, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
         out = resized_img
         return out
 
@@ -303,7 +301,7 @@ class ImageRtdeUR3(RtdeUR3):
                                   state=self.get_robot_state(),
                                   action_pos=[0., 0., 0.],
                                   action_quat=[0., 0., 0., 1.],
-                                  action_grip=[self.gripper.gripper_to_mm_normalize()],
+                                  action_grip=[1.0],
                                   done=1)
 
                 obs = self.reset()
@@ -320,11 +318,9 @@ class ImageRtdeUR3(RtdeUR3):
                 visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
                 state = self.get_robot_state()
 
-                if cont_status["btn_grip"]:
-                    self.gripper.grasping_by_hold(step=-10.0)
-                else:
-                    self.gripper.grasping_by_hold(step=10.0)
-                gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
+                gripper_action = -1.0 if cont_status["btn_grip"] else 1.0
+                self.gripper.grasping_by_hold(step=gripper_action)
+                # gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
 
                 vr_curr_pos_vel, vr_curr_quat = cont_status["lin_vel"], cont_status["pose_quat"]
                 act_pos = list(vr_curr_pos_vel)
@@ -341,7 +337,7 @@ class ImageRtdeUR3(RtdeUR3):
                                       state=state,
                                       action_pos=act_pos,
                                       action_quat=act_quat.tolist(),
-                                      action_grip=[gripper_action_norm],
+                                      action_grip=[gripper_action],
                                       done=0)
 
                 d_pos = np.array(actual_tcp_pos) + np.array(act_pos)

@@ -64,7 +64,8 @@ class PostPredictor(nn.Module):
 
         self.fc_act = nn.Linear(output_size, self.act_dim)
         # self.fc_grip = nn.Sequential(nn.Linear(self.grip_dim, self.grip_dim), nn.Softmax(dim=-1))
-        self.fc_grip = nn.Sequential(nn.Linear(output_size, self.grip_dim), nn.Sigmoid())
+        # self.fc_grip = nn.Sequential(nn.Linear(output_size, self.grip_dim), nn.Sigmoid())
+        self.fc_grip = nn.Sequential(nn.Linear(output_size, self.grip_dim), nn.Tanh())
 
         self.fc_grip.apply(init_weights_xavier)
         self.apply(init_weights_xavier)
