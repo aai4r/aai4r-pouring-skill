@@ -48,6 +48,11 @@ class ButtonPressedEventHandler:
         self._curr = None
         self._prev = None
 
+        self._prev_time = time.time()
+        self._curr_time = time.time()
+        self._acc_time = 0
+        self.timeout_flag = False
+
     def is_pressed(self, event_stream):
         btn_pressed = False
         self._curr = 0 if event_stream else 1
@@ -57,6 +62,35 @@ class ButtonPressedEventHandler:
                 btn_pressed = True
         self._prev = self.clone(self._curr)
         return btn_pressed
+
+    def is_button_up(self, event_stream):
+        button_up = False
+        self._curr_time = time.time()
+
+        if event_stream:
+            self._curr = 1
+            if self._prev and not self.timeout_flag:
+                dt = self._curr_time - self._prev_time
+                self._acc_time += dt
+        else:
+            self._curr = 0
+            if self._prev is not None and not self.timeout_flag:
+                if (self._curr - self._prev) < 0:
+                    button_up = True
+            self._acc_time = 0
+            self.timeout_flag = False
+
+        self._prev_time = self._curr_time
+        self._prev = self.clone(self._curr)
+        return button_up
+
+    def button_timeout(self, timeout_sec=3.0):
+        timeout = False
+        if self._acc_time >= timeout_sec:
+            self._acc_time = 0
+            timeout = True
+            self.timeout_flag = True
+        return timeout
 
     def clone(self, val):
         return copy.deepcopy(val)
@@ -84,7 +118,8 @@ class VRWrapper:
 
         # button status
         controller_status = {"lin_vel": lv, "ang_vel": av, "pose_quat": pq,
-                             "btn_trigger": False, "btn_gripper": False, "btn_reset_pose": False,
+                             "btn_trigger": False, "btn_gripper": False,
+                             "btn_reset_pose": False, "btn_reset_timeout": False,
                              "btn_grip": False, "trk_x": None, "trk_y": None,
                              "dt": time.time() - self.prev_time}
         self.prev_time = time.time()
@@ -116,7 +151,8 @@ class VRWrapper:
         controller_status["trk_y"] = y
         controller_status["btn_gripper"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (y < -0.6)
         controller_status["btn_control_mode"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (0.6 < y)
-        controller_status["btn_reset_pose"] = self.menu_btn.is_pressed(event_stream=d["menu_button"])
+        controller_status["btn_reset_pose"] = self.menu_btn.is_button_up(event_stream=d["menu_button"])
+        controller_status["btn_reset_timeout"] = self.menu_btn.button_timeout(timeout_sec=3.0)
         return controller_status
 
 

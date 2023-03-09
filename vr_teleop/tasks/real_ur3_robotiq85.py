@@ -204,9 +204,11 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 def vr_test():
     vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
 
-    HOST = "192.168.0.75"
-    rtde_c = rtde_control.RTDEControlInterface(HOST)
-    gripper = RobotiqGripperExpand(rtde_c, HOST)
+    # def robot_test():
+    #     HOST = "192.168.0.75"
+    #     rtde_c = rtde_control.RTDEControlInterface(HOST)
+    #     gripper = RobotiqGripperExpand(rtde_c, HOST)
+    #     return gripper
 
     while True:
         cont_status = vr.get_controller_status()
@@ -217,19 +219,18 @@ def vr_test():
             # pq = quaternion_real_first(q=torch.tensor(pq))
             # aa = tr.quaternion_to_axis_angle(pq)
 
-        val = gripper.gripper_to_mm_normalize()
-        print("normalized gripper: ", val)
-
+        if cont_status["btn_reset_timeout"]:
+            print("btn_reset timeout")
         if cont_status["btn_reset_pose"]:
             print("btn_reset_mode")
         if cont_status["btn_grip"]:
             print("btn_grip is pressed..")
-            gripper.grasping_by_hold(step=-5.0)
+            gripper_action = -1.0
         else:
-            gripper.grasping_by_hold(step=5.0)
+            gripper_action = 1.0
 
-        gripper_action = gripper.get_gripper_action()
-        print("gripper action: ", gripper_action)
+        # gripper.grasping_by_hold(step=gripper_action)
+
         # if cont_status["btn_gripper"]:
         #     print("btn_gripper")
 
@@ -283,7 +284,7 @@ def camera_load_test(batch_idx, rollout_idx):
 if __name__ == "__main__":
     # camera_test()
     # camera_load_test(batch_idx=1, rollout_idx=0)
-    # vr_test()
-    u = RealUR3()
+    vr_test()
+    # u = RealUR3()
     # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=0)
+    # u.replay_mode(batch_idx=1, rollout_idx=0)

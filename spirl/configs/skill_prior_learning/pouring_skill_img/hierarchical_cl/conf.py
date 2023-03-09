@@ -12,7 +12,7 @@ configuration = {
     'model': ImageClSPiRLMdl,
     'logger': Logger,
     'data_dir': [os.path.join(os.environ["DATA_DIR"], 'pouring_skill_img')],
-    'epoch_cycles_train': 100,
+    'epoch_cycles_train': 10,
     'num_epochs': 10,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
