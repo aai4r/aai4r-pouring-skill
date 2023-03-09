@@ -294,6 +294,14 @@ class ImageRtdeUR3(RtdeUR3):
             start_t = self.init_period()
             cont_status = self.vr.get_controller_status()
 
+            if cont_status["btn_reset_timeout"]:
+                print("***** Discard current demo data *****")
+                self.speed_stop()
+                obs = self.reset()
+                reward, done, info = 0, True, ""
+                self.rollout.reset()
+                return obs, reward, done, info
+
             if cont_status["btn_reset_pose"]:
                 self.speed_stop()
                 depth, color = self.cam.get_np_images()
