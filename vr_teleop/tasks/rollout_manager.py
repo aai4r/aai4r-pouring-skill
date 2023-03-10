@@ -206,6 +206,7 @@ class RolloutManagerExpand(RolloutManager):
     def __init__(self, task_name, root_dir=None, task_desc=""):
         super().__init__(task_name=task_name, root_dir=root_dir, task_desc=task_desc)
         self._images = []
+        self.curr_load_path = ""
 
     def isempty(self):
         return not (bool(self._images) and bool(self._states) and bool(self._actions)
@@ -238,6 +239,7 @@ class RolloutManagerExpand(RolloutManager):
     def show_rollout_summary(self):
         print("====================================")
         print("Current rollout dataset info.")
+        print("Current Load path: ", self.curr_load_path)
         print("Rollout length: ", self.len())
         idx = 0
         sample_obs, sample_state, sample_action, sample_done, sample_info = self.get(idx)
@@ -274,6 +276,7 @@ class RolloutManagerExpand(RolloutManager):
     def load_from_file(self, batch_idx, rollout_idx):
         self.reset()
         load_path = self.get_final_load_path(batch_index=batch_idx, rollout_num=rollout_idx)
+        self.curr_load_path = load_path
         with h5py.File(load_path, 'r') as f:
             key = 'traj{}'.format(0)
             print("f: ", f[key])
