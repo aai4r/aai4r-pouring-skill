@@ -22,7 +22,7 @@ data_spec = AttrDict(
     n_actions=8,
     split=AttrDict(train=0.95, val=0.05, test=0.0),
     env_name="pouring_skill_img",
-    res=150,
+    res=224,
     crop_rand_subseq=True,
 )
 
@@ -241,7 +241,7 @@ class ImageRtdeUR3(RtdeUR3):
     def __init__(self):
         super().__init__()
         self.cam = RealSense()
-        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=150, resize_w=150)
+        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
         self.rollout = RolloutManagerExpand(task_name="pouring_skill_img")    # TODO, task_name param
 
     def get_robot_state(self):

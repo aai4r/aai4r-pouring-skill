@@ -214,8 +214,8 @@ class SharedAutonomyTrainer:
         n_total = 0
         with self.agent.val_mode():
             while True:  # keep producing rollouts until we get a valid one
-                if input('{}th Eval GO?'.format(n_total)) is not 'g':
-                    continue
+                # if input('{}th Eval GO?'.format(n_total)) != 'g':
+                #     continue
                 with torch.no_grad():
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     n_total += 1
@@ -390,5 +390,5 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-    args.run_mode = 'train'  # train, eval
+    args.run_mode = 'eval'  # train, eval
     SharedAutonomyTrainer(args=args)

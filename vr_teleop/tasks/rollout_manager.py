@@ -329,7 +329,7 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])
 
-        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=150, resize_w=150)
+        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
 
     def pre_processing(self, color_image):
         """
