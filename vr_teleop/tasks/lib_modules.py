@@ -371,8 +371,15 @@ def visualize(depth_image, color_image, disp_name=None):
 class RealSense:
     def __init__(self, args=None):
         # Configure depth and color streams
+        """
+        Currently, each cam is used as following:
+            [front] cam is used for recording evaluation process
+            [rear] cam is used for observing the environment
+        """
+        self.cam_id = AttrDict(front='832412070289', rear='832412070267')
         self.pipeline = rs.pipeline()
         self.config = rs.config()
+        self.config.enable_device(self.cam_id.rear)
         self.args = args if args is not None else AttrDict(width=640, height=480, fps=30)
 
         # Get device product line for setting a supporting resolution
