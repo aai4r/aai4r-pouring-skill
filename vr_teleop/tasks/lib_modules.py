@@ -1,4 +1,5 @@
 import copy
+import os
 
 from utils.torch_jit_utils import *
 from pytorch3d import transforms as tr
@@ -581,6 +582,54 @@ class RealSenseMulti(RealSenseBase):
             cv2.namedWindow(wnd_name, cv2.WINDOW_AUTOSIZE)
             cv2.imshow(wnd_name, images)
         return cv2.waitKey(1)
+
+
+from init_conf import project_home_path
+
+
+class EvalVideoManager:
+    def __init__(self, path, task, root=project_home_path):
+        self.root = root
+        self.path = path
+        self.task = task
+        self.eval_cnt = 0
+        self.color_stack = []
+        self.depth_stack = []
+
+    def stack_reset(self):
+        self.color_stack = []
+        self.depth_stack = []
+
+    def video_stack(self, color_frame, depth_frame=None):
+        """
+        :param color_frame: numpy, uint8
+        :param depth_frame: numpy, uint16
+        :return:
+        """
+        self.color_stack.append(color_frame)
+        # self.depth_stack.append(depth_frame)
+
+    def save_video(self):
+        # do save
+        filename = "eval_video_{}.txt".format(self.eval_cnt)
+        save_path = os.path.join(self.root, self.path, self.task, filename)
+        folder = os.path.dirname(save_path)
+        print("folder ", folder)
+        if not os.path.exists(folder):
+            print("hey...", folder)
+            os.makedirs(folder)
+
+        # save_path = os.path.join(path, filename)
+        # f = open(save_path, 'w')
+        # f.write("This is the test program...")
+        # f.close()
+
+        self.stack_reset()
+        self.eval_cnt += 1
+
+    def load_video(self):
+        self.stack_reset()
+        # do load
 
 
 def noisy(image, noise_type='gauss', random_noise=False):
