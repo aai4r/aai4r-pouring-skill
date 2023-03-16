@@ -240,8 +240,10 @@ import time
 
 def camera_test():
     rollout = RolloutManagerExpand(task_name="pouring_skill_img")
-    cam = RealSense()
-    cam.display_info()
+    cam = RealSenseMulti()
+    idx1 = cam.index_from_key('rear')
+    idx2 = cam.index_from_key('front')
+    cam.display_info(idx1)
 
     class Check_dt:
         def __init__(self):
@@ -256,17 +258,18 @@ def camera_test():
         dt = Check_dt()
         while True:
         # for i in range(10):
-            depth, color = cam.get_np_images()
+            depth, color = cam.get_np_images(idx1)
+            depth2, color2 = cam.get_np_images(idx2)
             st = RobotState2()
             st.gen_random_data(n_joint=6, n_cont_mode=2)
             # rollout.append(observation=color, state=st,
             #                action=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], done=[0], info=[""])
-            if visualize(depth, color) == 27:
+            if cam.visualize([depth, depth2], [color, color2]) == 27:
                 break
             # dt.print_dt()
         # rollout.save_to_file()
     finally:
-        cam.stop_stream()
+        cam.stop_stream_all()
 
 
 def camera_load_test(batch_idx, rollout_idx):

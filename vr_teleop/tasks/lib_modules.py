@@ -368,15 +368,27 @@ def visualize(depth_image, color_image, disp_name=None):
     return cv2.waitKey(1)
 
 
-class RealSense:
-    def __init__(self, args=None):
-        # Configure depth and color streams
+class RealSenseBase:
+    def __init__(self):
         """
         Currently, each cam is used as following:
             [front] cam is used for recording evaluation process
             [rear] cam is used for observing the environment
         """
         self.cam_id = AttrDict(front='832412070289', rear='832412070267')
+
+    @staticmethod
+    def check_devices():
+        ctx = rs.context()
+        devices = list(ctx.query_devices())
+        print(devices)
+        return devices
+
+
+class RealSense(RealSenseBase):
+    def __init__(self, args=None):
+        super().__init__()
+        # Configure depth and color streams
         self.pipeline = rs.pipeline()
         self.config = rs.config()
         self.config.enable_device(self.cam_id.rear)
@@ -437,6 +449,138 @@ class RealSense:
         depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
         color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
         return depth_image, color_image
+
+
+class RealSenseMulti(RealSenseBase):
+    def __init__(self, args=None):
+        super().__init__()
+        if args is not None:
+            self.args = args
+        else:
+            self.args = [AttrDict(width=640, height=480, fps=30) for i in range(len(self.cam_id.keys()))]
+
+        self.pipelines = []
+        self.configs = []
+        self._key_to_index = AttrDict()
+        for idx, key in enumerate(self.cam_id.keys()):
+            self.pipelines.append(rs.pipeline())
+            self.configs.append(rs.config())
+            self.configs[idx].enable_device(self.cam_id[key])
+            self._key_to_index[key] = idx
+
+        for i in range(len(self.pipelines)):
+            self.init_device(index=i)
+
+    def init_device(self, index):
+        # Get device product line for setting a supporting resolution
+        pipeline_wrapper = rs.pipeline_wrapper(self.pipelines[index])
+        pipeline_profile = self.configs[index].resolve(pipeline_wrapper)
+        device = pipeline_profile.get_device()
+        device_product_line = str(device.get_info(rs.camera_info.product_line))
+
+        found_rgb = False
+        for s in device.sensors:
+            if s.get_info(rs.camera_info.name) == 'RGB Camera':
+                found_rgb = True
+                break
+        if not found_rgb:
+            print("The demo requires Depth camera with Color sensor")
+            raise ConnectionError
+
+        self.configs[index].enable_stream(rs.stream.depth,
+                                          self.args[index].width, self.args[index].height, rs.format.z16,
+                                          self.args[index].fps)
+
+        if device_product_line == 'L500':
+            self.configs[index].enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, self.args[index].fps)
+        else:
+            self.configs[index].enable_stream(rs.stream.color,
+                                              self.args[index].width, self.args[index].height, rs.format.bgr8,
+                                              self.args[index].fps)
+
+        # Start streaming
+        self.pipelines[index].start(self.configs[index])
+
+    def index_from_key(self, key):
+        return self._key_to_index[key]
+
+    def display_info(self, index):
+        depth, color = self.get_np_images(index)
+        if depth is None or color is None:
+            raise ValueError
+
+        print("====================")
+        print("-Vision Information-")
+        print("====================")
+        print("* Image Stream")
+        print("    Width: {}, Height: {}, FPS: {}".format(self.args[index].width, self.args[index].height,
+                                                          self.args[index].fps))
+        print("* Actual Data")
+        print("    Depth shape: {}, min / max: {} / {}, dtype: {}".format(depth.shape, depth.min(), depth.max(),
+                                                                          depth.dtype))
+        print("    Color shape: {}, min / max: {} / {}, dtype: {}".format(color.shape, color.min(), color.max(),
+                                                                          color.dtype))
+
+    def get_np_images(self, index):
+        frames = self.pipelines[index].wait_for_frames()
+        depth_frame = frames.get_depth_frame()
+        color_frame = frames.get_color_frame()
+        if not depth_frame or not color_frame:
+            return None, None
+
+        # Convert images to numpy arrays
+        depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
+        color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
+        return depth_image, color_image
+
+    def stop_stream(self, index):
+        self.pipelines[index].stop()
+
+    def stop_stream_all(self):
+        [p.stop() for p in self.pipelines]
+
+    def visualize(self, depth_image, color_image, disp_name=None):
+        """
+        :param disp_name: name of cv2.namedWindow
+        :param depth_image: (h, w, c), uint16
+        :param color_image: (h, w, c), uint8
+        :return:
+        """
+        if depth_image is None or color_image is None:
+            print("Can't get a frame....")
+            return cv2.waitKey(1)
+
+        images, depth_list, color_list = [], [], []
+        depth_list += list(depth_image) if type(depth_image) != list else depth_image
+        color_list += list(color_image) if type(color_image) != list else color_image
+
+        for depth_image, color_image in zip(depth_list, color_list):
+            # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
+            depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+
+            depth_colormap_dim = depth_colormap.shape
+            color_colormap_dim = color_image.shape
+
+            # If depth and color resolutions are different, resize color image to match depth image for display
+            if depth_colormap_dim != color_colormap_dim:
+                resized_color_image = cv2.resize(color_image, dsize=(depth_colormap_dim[1], depth_colormap_dim[0]),
+                                                 interpolation=cv2.INTER_AREA)
+                _images = np.hstack((resized_color_image, depth_colormap))
+            else:
+                _images = np.hstack((color_image, depth_colormap))
+
+            if type(images) == list and not images:
+                images = _images
+                continue
+            images = np.vstack((images, _images))
+
+        if disp_name:
+            cv2.imshow(disp_name, images)
+        else:
+            wnd_name = 'RealSense D435'
+            cv2.namedWindow(wnd_name, cv2.WINDOW_AUTOSIZE)
+            cv2.imshow(wnd_name, images)
+        return cv2.waitKey(1)
 
 
 def noisy(image, noise_type='gauss', random_noise=False):
