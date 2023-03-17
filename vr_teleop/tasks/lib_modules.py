@@ -551,7 +551,8 @@ class RealSenseMulti(RealSenseBase):
             print("Can't get a frame....")
             return cv2.waitKey(1)
 
-        images, depth_list, color_list = [], [], []
+        images = None
+        depth_list, color_list = [], []
         depth_list += [depth_image] if type(depth_image) != list else depth_image
         color_list += [color_image] if type(color_image) != list else color_image
 
@@ -570,7 +571,7 @@ class RealSenseMulti(RealSenseBase):
             else:
                 _images = np.hstack((color_image, depth_colormap))
 
-            if type(images) == list and not images:
+            if images is None:
                 images = _images
                 continue
             images = np.vstack((images, _images))
@@ -585,6 +586,7 @@ class RealSenseMulti(RealSenseBase):
 
 
 from init_conf import project_home_path
+import h5py
 
 
 class EvalVideoManager:
@@ -606,30 +608,62 @@ class EvalVideoManager:
         :param depth_frame: numpy, uint16
         :return:
         """
-        self.color_stack.append(color_frame)
-        # self.depth_stack.append(depth_frame)
+        self.color_stack.append(copy.deepcopy(color_frame))
+        # self.depth_stack.append(copy.deepcopy(depth_frame))
 
-    def save_video(self):
-        # do save
-        filename = "eval_video_{}.txt".format(self.eval_cnt)
+    def save_to_h5(self):
+        filename = "eval_video_{}.h5".format(self.eval_cnt)
         save_path = os.path.join(self.root, self.path, self.task, filename)
         folder = os.path.dirname(save_path)
-        print("folder ", folder)
         if not os.path.exists(folder):
-            print("hey...", folder)
             os.makedirs(folder)
 
-        # save_path = os.path.join(path, filename)
-        # f = open(save_path, 'w')
-        # f.write("This is the test program...")
-        # f.close()
+        print("Video Length: {} frames".format(len(self.color_stack)))
+        print("Save path: {}".format(save_path))
+        assert self.color_stack[0].dtype == np.uint8
+
+        f = h5py.File(save_path, "w")
+        f.create_dataset("video", data=np.array(self.color_stack))
+        f.close()
 
         self.stack_reset()
         self.eval_cnt += 1
 
-    def load_video(self):
+    def save_to_mp4(self):
+        filename = "eval_video_{}.mp4".format(self.eval_cnt)
+        save_path = os.path.join(self.root, self.path, self.task, filename)
+        folder = os.path.dirname(save_path)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
+        print("Video Length: {} frames".format(len(self.color_stack)))
+        print("Save path: {}".format(save_path))
+        assert self.color_stack[0].dtype == np.uint8
+
+        size = self.color_stack[0].shape[0:2]
+        duration = len(self.color_stack)
+        fps = 30
+        out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (size[1], size[0]), True)
+        for i in range(duration):
+            data = self.color_stack[i].astype(np.uint8)
+            out.write(data)
+        out.release()
+
         self.stack_reset()
+        self.eval_cnt += 1
+
+    def load_video(self, target_num):
+        self.stack_reset()
+
         # do load
+        filename = "eval_video_{}.h5".format(target_num)
+        load_path = os.path.join(self.root, self.path, self.task, filename)
+        with h5py.File(load_path, 'r') as f:
+            print("f keys ", f.keys())
+            key = "video"
+            video = f[key][()].astype(np.uint8)
+            assert len(video.shape) == 4
+            [self.color_stack.append(v) for v in video]
 
 
 def noisy(image, noise_type='gauss', random_noise=False):
