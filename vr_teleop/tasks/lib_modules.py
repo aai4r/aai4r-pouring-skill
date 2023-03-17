@@ -552,8 +552,8 @@ class RealSenseMulti(RealSenseBase):
             return cv2.waitKey(1)
 
         images, depth_list, color_list = [], [], []
-        depth_list += list(depth_image) if type(depth_image) != list else depth_image
-        color_list += list(color_image) if type(color_image) != list else color_image
+        depth_list += [depth_image] if type(depth_image) != list else depth_image
+        color_list += [color_image] if type(color_image) != list else color_image
 
         for depth_image, color_image in zip(depth_list, color_list):
             # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
