@@ -6,7 +6,7 @@ from spirl.components.data_loader import GlobalSplitVideoDataset
 
 from vr_teleop.tasks.real_ur3_robotiq85 import BaseRTDE, UR3ControlMode
 from vr_teleop.tasks.base import VRWrapper
-from vr_teleop.tasks.lib_modules import RealSense
+from vr_teleop.tasks.lib_modules import RealSense, RealSenseMulti, EvalVideoManager
 
 from utils.utils import quaternion_real_last, quaternion_real_first, get_euler_xyz
 from utils.torch_jit_utils import quat_mul, quat_conjugate
@@ -32,7 +32,8 @@ def sigmoid(x):
 
 
 class RtdeUR3(BaseRTDE, UR3ControlMode):
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.init_vr()  # TODO, for safe test..
         BaseRTDE.__init__(self, HOST="192.168.0.75")
         UR3ControlMode.__init__(self, init_mode="forward")
@@ -238,10 +239,15 @@ import cv2
 
 
 class ImageRtdeUR3(RtdeUR3):
-    def __init__(self):
-        super().__init__()
-        self.cam = RealSense()
-        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
+    def __init__(self, config):
+        super().__init__(config=config)
+        self.cam = RealSenseMulti()
+        self.idx_rear = self.cam.index_from_key(key='rear')
+        self.idx_front = self.cam.index_from_key(key='front')
+
+        self.ev_mgr = EvalVideoManager(path="eval_video", task=self.config.task_name)
+
+        self.config.img_cfg = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
         self.rollout = RolloutManagerExpand(task_name="pouring_skill_img")    # TODO, task_name param
 
     def get_robot_state(self):
@@ -267,7 +273,7 @@ class ImageRtdeUR3(RtdeUR3):
         """
         # ih, iw = color_image.shape[:2]
         # crop_h = crop_w = min(iw, ih)
-        resize_h, resize_w = self.config.resize_h, self.config.resize_w
+        resize_h, resize_w = self.config.img_cfg.resize_h, self.config.img_cfg.resize_w
         # y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
 
         # cropped_img = color_image[y:y + crop_h, x:x + crop_w]
@@ -276,12 +282,47 @@ class ImageRtdeUR3(RtdeUR3):
         return out
 
     def render(self, mode='rgb_array'):
-        depth, color = self.cam.get_np_images()
+        depth, color = self.cam.get_np_images(index=self.idx_rear)
+        depth_f, color_f = self.cam.get_np_images(index=self.idx_front)
+        self.ev_mgr.video_stack(color_frame=color_f)
 
         color = self.pre_processing(color)
         visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
         color = (color / 255.0).astype(np.float32)
         return color
+
+    def reset(self, save_eval_video=False):
+        obs = super().reset()
+        if save_eval_video:
+            self.ev_mgr.save_to_mp4()
+        return obs
+
+    def step_eval(self, action):
+        cont_status = self.vr.get_controller_status()
+        if cont_status["btn_trigger"]:
+            print("VR Trigger On!")
+            self.user_control_authority = True
+            self.speed_stop()
+
+        while self.user_control_authority:
+            cont_status = self.vr.get_controller_status()
+            if cont_status["btn_reset_timeout"]:
+                print("Discard THIS Evaluation Video...")
+                obs = self.reset(save_eval_video=False)
+                reward, done, info = 0, True, ""
+                return obs, reward, done, info
+
+            if cont_status["btn_reset_pose"]:
+                print("Save THIS Evaluation Video !!")
+                obs = self.reset(save_eval_video=True)
+                reward, done, info = 0, True, ""
+                return obs, reward, done, info
+
+            """
+            No Tele-operation in Evaluation Mode!!
+            """
+
+        return self._step(action=action)
 
     def step_sa(self, action):  # shared autonomy step
         cont_status = self.vr.get_controller_status()
@@ -304,7 +345,7 @@ class ImageRtdeUR3(RtdeUR3):
 
             if cont_status["btn_reset_pose"]:
                 self.speed_stop()
-                depth, color = self.cam.get_np_images()
+                depth, color = self.cam.get_np_images(self.idx_rear)
                 self.record_frame(image=copy.deepcopy(color),
                                   state=self.get_robot_state(),
                                   action_pos=[0., 0., 0.],
@@ -322,7 +363,7 @@ class ImageRtdeUR3(RtdeUR3):
 
             diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             if cont_status["btn_trigger"]:
-                depth, color = self.cam.get_np_images()
+                depth, color = self.cam.get_np_images(self.idx_rear)
                 visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
                 state = self.get_robot_state()
 
@@ -363,14 +404,17 @@ class ImageRtdeUR3(RtdeUR3):
 class RealUR3Env(BaseEnvironment):
     def __init__(self, config):
         self.config = config
-        self._env = ImageRtdeUR3() if self.config.image_observation else RtdeUR3()
+        self._env = ImageRtdeUR3(config) if self.config.image_observation else RtdeUR3(config)
 
     def _default_hparams(self):
         pass
 
     def step(self, action):
-        # obs, reward, done, info = self._env.step(action)
-        obs, reward, done, info = self._env.step_sa(action)
+        if self.config.run_mode == 'train':
+            # obs, reward, done, info = self._env.step(action)
+            obs, reward, done, info = self._env.step_sa(action)
+        elif self.config.run_mode == 'eval':
+            obs, reward, done, info = self._env.step_eval(action)
         return obs, reward, done, info
 
     def reset(self):

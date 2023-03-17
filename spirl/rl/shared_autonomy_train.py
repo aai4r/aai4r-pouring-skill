@@ -105,6 +105,10 @@ class SharedAutonomyTrainer:
         if 'task_params' in self.conf.env: self.conf.env.task_params.seed=self._hp.seed
         if 'general' in self.conf: self.conf.general.seed=self._hp.seed
 
+        # get essential props from args
+        self.conf.env.run_mode = args.run_mode
+        self.conf.env.task_name = args.task_name
+
         self.env = self._hp.environment(self.conf.env)
         self.conf.agent.env_params = self.env      # (optional) set params from env for agent
         if self.is_chef:
@@ -125,11 +129,9 @@ class SharedAutonomyTrainer:
             self._hp.n_warmup_steps = 1500     # (default: 0) no warmup if we reload from checkpoint!
 
         if args.run_mode == 'train':
-            # skill train
             self.shared_autonomy_train()
         elif args.run_mode == 'eval':
-            # skill evaluation
-            self.evaluation()
+            self.evaluation(n_eval=10)
 
     def default_hparams(self):
         default_dict = ParamDict({
@@ -210,16 +212,19 @@ class SharedAutonomyTrainer:
         # augment the demo dataset and skill retraining (how many epochs?)
         # agent model update and skill deployment
 
-    def evaluation(self):
+    def evaluation(self, n_eval):
         n_total = 0
         with self.agent.val_mode():
-            while True:  # keep producing rollouts until we get a valid one
+            while n_total < n_eval:  # keep producing rollouts until we get a valid one
                 # if input('{}th Eval GO?'.format(n_total)) != 'g':
                 #     continue
                 with torch.no_grad():
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     n_total += 1
-                    print("n_total: ", n_total)
+                enter = input('Continue? {}/{}, YES: any, NO: q'.format(n_total, n_eval))
+                if enter == 'q':
+                    break
+        print("Evaluation Ends!")
 
     def demo(self):
         """Run task demonstration"""
@@ -390,5 +395,5 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-    args.run_mode = 'train'  # train, eval
+    args.run_mode = 'eval'  # train, eval
     SharedAutonomyTrainer(args=args)

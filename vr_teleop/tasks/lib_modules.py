@@ -585,6 +585,7 @@ class RealSenseMulti(RealSenseBase):
         return cv2.waitKey(1)
 
 
+from dataset.rollout_dataset import get_ordered_file_list
 from init_conf import project_home_path
 import h5py
 
@@ -597,6 +598,8 @@ class EvalVideoManager:
         self.eval_cnt = 0
         self.color_stack = []
         self.depth_stack = []
+
+        self.ext_list = ['h5', 'mp4']
 
     def stack_reset(self):
         self.color_stack = []
@@ -611,35 +614,38 @@ class EvalVideoManager:
         self.color_stack.append(copy.deepcopy(color_frame))
         # self.depth_stack.append(copy.deepcopy(depth_frame))
 
-    def save_to_h5(self):
-        filename = "eval_video_{}.h5".format(self.eval_cnt)
-        save_path = os.path.join(self.root, self.path, self.task, filename)
-        folder = os.path.dirname(save_path)
+    def save(self, ext='mp4'):
+        folder = os.path.join(self.root, self.path, self.task)
         if not os.path.exists(folder):
             os.makedirs(folder)
+
+        # check current folder files to avoid unintended overwrites
+        file_list = get_ordered_file_list(folder, ext)
+        print(file_list)
+        next_idx = (lambda x: int(x[x.find('_') + 1:x.find('.')]))(file_list[-1]) + 1 if len(file_list) > 0 else 0
+        filename = "eval_{}.{}".format(next_idx, ext)
+        save_path = os.path.join(self.root, self.path, self.task, filename)
 
         print("Video Length: {} frames".format(len(self.color_stack)))
         print("Save path: {}".format(save_path))
         assert self.color_stack[0].dtype == np.uint8
 
+        if ext not in self.ext_list:
+            raise ModuleNotFoundError("{} is NOT supported yet, Available ext: {}".format(ext, self.ext_list))
+
+        if ext == 'h5':
+            self.save_to_h5(save_path)
+        elif ext == 'mp4':
+            self.save_to_mp4(save_path)
+        self.stack_reset()
+        self.eval_cnt += next_idx
+
+    def save_to_h5(self, save_path):
         f = h5py.File(save_path, "w")
         f.create_dataset("video", data=np.array(self.color_stack))
         f.close()
 
-        self.stack_reset()
-        self.eval_cnt += 1
-
-    def save_to_mp4(self):
-        filename = "eval_video_{}.mp4".format(self.eval_cnt)
-        save_path = os.path.join(self.root, self.path, self.task, filename)
-        folder = os.path.dirname(save_path)
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-
-        print("Video Length: {} frames".format(len(self.color_stack)))
-        print("Save path: {}".format(save_path))
-        assert self.color_stack[0].dtype == np.uint8
-
+    def save_to_mp4(self, save_path):
         size = self.color_stack[0].shape[0:2]
         duration = len(self.color_stack)
         fps = 30
@@ -648,9 +654,6 @@ class EvalVideoManager:
             data = self.color_stack[i].astype(np.uint8)
             out.write(data)
         out.release()
-
-        self.stack_reset()
-        self.eval_cnt += 1
 
     def load_video(self, target_num):
         self.stack_reset()
