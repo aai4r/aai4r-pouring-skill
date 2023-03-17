@@ -294,7 +294,7 @@ class ImageRtdeUR3(RtdeUR3):
     def reset(self, save_eval_video=False):
         obs = super().reset()
         if save_eval_video:
-            self.ev_mgr.save_to_mp4()
+            self.ev_mgr.save(ext='mp4')
         return obs
 
     def step_eval(self, action):
