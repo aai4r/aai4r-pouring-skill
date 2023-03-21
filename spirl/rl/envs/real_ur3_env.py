@@ -21,7 +21,7 @@ data_spec = AttrDict(
     state_dim=16,
     n_actions=9,
     split=AttrDict(train=0.95, val=0.05, test=0.0),
-    env_name="pick_and_place_img",   # "pouring_skill_img"
+    env_name="pick_and_place_img",   # "pouring_skill_img"  # TODO, how it is affected?
     res=224,
     crop_rand_subseq=True,
 )
@@ -40,7 +40,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
         # shared autonomy control params
         self.user_control_authority = False
-        self.rollout = RolloutManager(task_name="pouring_skill")
+        self.rollout = RolloutManager(task_name=self.config.task_name)
         self.collect_demo = True
 
         # using VR and its trigger for safety
@@ -248,7 +248,16 @@ class ImageRtdeUR3(RtdeUR3):
         self.ev_mgr = EvalVideoManager(path="eval_video", task=self.config.task_name)
 
         self.config.img_cfg = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
-        self.rollout = RolloutManagerExpand(task_name="pouring_skill_img")    # TODO, task_name param
+        self.rollout = RolloutManagerExpand(task_name=self.config.task_name)
+
+    def control_mode_to(self, cont_to, move_j):
+        if cont_to not in self.cmodes:
+            raise IndexError("cont_to should be one of the {}".format(self.cmodes))
+        idx = self.cmodes_d[cont_to]
+        self.CONTROL_MODE = self.cmodes[idx]
+        if move_j:
+            self.speed_stop()
+            self.move_j(self.iposes)
 
     def get_robot_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
@@ -260,9 +269,9 @@ class ImageRtdeUR3(RtdeUR3):
                             control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
 
-    def record_frame(self, image, state, action_pos, action_quat, action_grip, done):
+    def record_frame(self, image, state, action_pos, action_quat, action_grip, action_mode, done):
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
-        action = action_pos + action_quat + action_grip
+        action = action_pos + action_quat + action_grip + action_mode
         self.rollout.append(image=image, state=state, action=action, done=done, info=info)
 
     def pre_processing(self, color_image):
@@ -351,6 +360,7 @@ class ImageRtdeUR3(RtdeUR3):
                                   action_pos=[0., 0., 0.],
                                   action_quat=[0., 0., 0., 1.],
                                   action_grip=[1.0],
+                                  action_mode=[0.0],
                                   done=1)
 
                 obs = self.reset()
@@ -362,10 +372,19 @@ class ImageRtdeUR3(RtdeUR3):
                 return obs, reward, done, info
 
             diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            action_mode = [0.0]
             if cont_status["btn_trigger"]:
                 depth, color = self.cam.get_np_images(self.idx_rear)
                 visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
                 state = self.get_robot_state()
+
+                if cont_status["trk_up"]:
+                    # self.shift_control_mode(move_j=True)
+                    self.control_mode_to(cont_to="forward", move_j=True)
+                    action_mode[0] = 1.0
+                elif cont_status["trk_down"]:
+                    self.control_mode_to(cont_to="downward", move_j=True)
+                    action_mode[0] = -1.0
 
                 gripper_action = -1.0 if cont_status["btn_grip"] else 1.0
                 self.gripper.grasping_by_hold(step=gripper_action)
@@ -387,6 +406,7 @@ class ImageRtdeUR3(RtdeUR3):
                                       action_pos=act_pos,
                                       action_quat=act_quat.tolist(),
                                       action_grip=[gripper_action],
+                                      action_mode=action_mode,
                                       done=0)
 
                 d_pos = np.array(actual_tcp_pos) + np.array(act_pos)

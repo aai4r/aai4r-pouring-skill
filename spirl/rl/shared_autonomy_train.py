@@ -23,8 +23,8 @@ WANDB_ENTITY_NAME = 'twkim0812'
 
 
 class SkillTrainer(ModelTrainer):
-    def __init__(self):
-        self.set_params()
+    def __init__(self, task_name):
+        self.set_params(task_name)
         _args = _get_args()
         _args.init_only = True
         super().__init__(args=_args)
@@ -33,8 +33,7 @@ class SkillTrainer(ModelTrainer):
         if args.resume or self.conf.ckpt_path is not None:
             self.start_epoch = self.resume(args.resume, self.conf.ckpt_path)
 
-    def set_params(self):
-        task_name = "pouring_skill_img"  # [block_stacking, kitchen, maze, office, pouring_water, pouring_water_img]
+    def set_params(self, task_name):
         mode = "hierarchical_cl"
 
         sys.argv.append("--path=" + "../configs/skill_prior_learning/{}/{}".format(task_name, mode))
@@ -72,7 +71,7 @@ class SharedAutonomyTrainer:
     """Sets up RL training loop, instantiates all components, runs training."""
     def __init__(self, args):
         cv2.namedWindow("RealSense D435", cv2.WINDOW_AUTOSIZE)
-        self.skill_trainer = SkillTrainer()
+        self.skill_trainer = SkillTrainer(task_name=args.task_name)
 
         self.args = args
         self.setup_device()
@@ -383,8 +382,8 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
-    task_name = "pouring_skill_img"
+    tasks = ["pouring_skill_img", "pick_and_place_img"]
+    task_name = "pick_and_place_img"
     mode = "spirl_cl"
 
     args = get_args()
