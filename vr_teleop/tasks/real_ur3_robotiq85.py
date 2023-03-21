@@ -87,10 +87,15 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if hasattr(self, 'cam') and obs is not None:
                 visualize(np.zeros(obs.shape), obs)
 
-            if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
-                self.shift_control_mode(move_j=True)
+            act_pos, act_quat, grip = action[:3], action[3:7], action[7:8]
+            if len(action) >= 9:
+                cmode = action[8:9]
+                if cmode[0] != 0.0:
+                    self.control_mode_to(cont_to="forward" if cmode[0] > 0 else "downward", move_j=True)
+            else:
+                if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
+                    self.shift_control_mode(move_j=True)
 
-            act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
             if len(grip) == 2:  # gripper one-hot state
                 self.move_grip_on_off(self.grip_onehot_to_bool(grip))
             elif len(grip) == 1:    # cont. control
