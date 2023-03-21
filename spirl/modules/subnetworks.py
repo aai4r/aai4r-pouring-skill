@@ -61,24 +61,28 @@ class PostPredictor(nn.Module):
         self.beta = 100.0
         self.act_dim = 7
         self.grip_dim = 1   # 2 for grip_one_hot
+        self.mode_dim = 1
 
         self.fc_act = nn.Linear(output_size, self.act_dim)
         # self.fc_grip = nn.Sequential(nn.Linear(self.grip_dim, self.grip_dim), nn.Softmax(dim=-1))
         # self.fc_grip = nn.Sequential(nn.Linear(output_size, self.grip_dim), nn.Sigmoid())
         self.fc_grip = nn.Sequential(nn.Linear(output_size, self.grip_dim), nn.Tanh())
+        self.fc_mode = nn.Sequential(nn.Linear(output_size, self.mode_dim), nn.Tanh())
 
         self.fc_grip.apply(init_weights_xavier)
+        self.fc_mode.apply(init_weights_xavier)
         self.apply(init_weights_xavier)
 
     def forward(self, *inp):
         _out = self.pred(*inp)
-        ad, gd = self.act_dim, self.grip_dim
+        ad, gd, md = self.act_dim, self.grip_dim, self.mode_dim
 
         # out_act = self.fc_act(_out[:, :ad])
         # out_grip = self.fc_grip(_out[:, ad:(ad + gd)] * self.beta)
         out_act = self.fc_act(_out)
         out_grip = self.fc_grip(_out)
-        out = torch.concat([out_act, out_grip], dim=-1).view(-1, ad + gd)
+        out_mode = self.fc_mode(_out)
+        out = torch.concat([out_act, out_grip, out_mode], dim=-1).view(-1, ad + gd + md)
         # print("out ", out.shape, out[0, ad:(ad + gd)].sum())
         return out
 
