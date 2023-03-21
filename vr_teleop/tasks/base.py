@@ -149,8 +149,8 @@ class VRWrapper:
         x, y = d["trackpad_x"], d["trackpad_y"]
         controller_status["trk_x"] = x
         controller_status["trk_y"] = y
-        controller_status["btn_gripper"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (y < -0.6)
-        controller_status["btn_control_mode"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (0.6 < y)
+        controller_status["trk_down"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (y < -0.6)
+        controller_status["trk_up"] = controller_status["btn_trackpad"] and (-0.3 < x) and (x < 0.3) and (0.6 < y)
         controller_status["btn_reset_pose"] = self.menu_btn.is_button_up(event_stream=d["menu_button"])
         controller_status["btn_reset_timeout"] = self.menu_btn.button_timeout(timeout_sec=3.0)
         return controller_status

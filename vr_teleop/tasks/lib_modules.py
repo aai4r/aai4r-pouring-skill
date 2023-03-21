@@ -121,6 +121,7 @@ class UR3ControlMode:
     def __init__(self, init_mode="forward"):
         self.cmodes = ["forward", "downward"]
         self.cmodes_d = {st: i for i, st in enumerate(self.cmodes)}
+        assert init_mode in self.cmodes
         self.CONTROL_MODE = init_mode
         print("Initial control mode: ", self.CONTROL_MODE)
 
@@ -135,11 +136,11 @@ class UR3ControlMode:
                                         ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
                                         rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
 
-        self._limits.downward = AttrDict(x_max=0.45, x_min=0.18,
+        self._limits.downward = AttrDict(x_max=0.44, x_min=0.19,
                                          y_max=0.2, y_min=-0.2,
-                                         z_max=0.15, z_min=0.04,
+                                         z_max=0.13, z_min=0.04,
                                          rx_max=deg2rad(20.0), rx_min=deg2rad(-20.0),
-                                         ry_max=deg2rad(5.0), ry_min=deg2rad(-10.0),
+                                         ry_max=deg2rad(3.0), ry_min=deg2rad(-40.0),
                                          rz_max=deg2rad(90.0), rz_min=deg2rad(-90.0))
 
         self._iposes.forward = [deg2rad(0), deg2rad(-80), deg2rad(-115), deg2rad(-165), deg2rad(-90), deg2rad(0)]
@@ -188,7 +189,7 @@ class UR3ControlMode:
         mat = tr.axis_angle_to_matrix(axis_angle if torch.is_tensor(axis_angle) else torch.FloatTensor(axis_angle))
         return tr.matrix_to_euler_angles(mat, euler)
 
-    def switching_control_mode(self):
+    def shift_control_mode(self):
         idx = self.cmodes.index(self.CONTROL_MODE)
         self.CONTROL_MODE = self.cmodes[(idx + 1) % len(self.cmodes)]
         print("CONTROL_MODE: {} --> {}".format(self.cmodes[idx], self.CONTROL_MODE))

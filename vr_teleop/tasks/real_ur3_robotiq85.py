@@ -1,4 +1,5 @@
 import copy
+import random
 
 from vr_teleop.tasks.lib_modules import *
 from vr_teleop.tasks.base import VRWrapper
@@ -6,38 +7,44 @@ from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand
 
 
 class RealUR3(BaseRTDE, UR3ControlMode):
-    def __init__(self):
+    def __init__(self, task_name):
         self.init_vr()
         BaseRTDE.__init__(self, HOST="192.168.0.75")
         UR3ControlMode.__init__(self, init_mode="forward")
 
         self.cam = RealSense()
-
-        # fwd
-        self.lim_ax = AttrDict(x_max=0.53, x_min=0.38,
-                               y_max=0.2, y_min=-0.2,
-                               z_max=0.3, z_min=0.07,
-                               rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
-                               ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
-                               rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
-
-        self.v_ax = AttrDict(x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0)   # desired velocity of each axis
-        self.spd_X_limit = 0.08
-        self.spd_R_limit = 0.1
-        self.ap = 0.9   # low-pass filter
-
         self.timer = CustomTimer(duration_sec=1.0)
+        self.rand_control_mode = True
 
-        self.rollout = RolloutManagerExpand(task_name="pouring_skill_img")
+        self.rollout = RolloutManagerExpand(task_name=task_name)
         self.collect_demo = True
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
 
-    def switching_control_mode(self):
-        super().switching_control_mode()
-        self.speed_stop()
-        self.move_j(self.iposes)
+    def random_change_control_mode(self, move_j=False):
+        idx = self.cmodes.index(self.CONTROL_MODE)
+        to = random.randrange(0, len(self.cmodes))
+        self.CONTROL_MODE = self.cmodes[to]
+        print("CONTROL_MODE: {} --> {}".format(self.cmodes[idx], self.CONTROL_MODE))
+        if move_j:
+            self.speed_stop()
+            self.move_j(self.iposes)
+
+    def shift_control_mode(self, move_j=False):
+        super().shift_control_mode()
+        if move_j:
+            self.speed_stop()
+            self.move_j(self.iposes)
+
+    def control_mode_to(self, cont_to, move_j):
+        if cont_to not in self.cmodes:
+            raise IndexError("cont_to should be one of the {}".format(self.cmodes))
+        idx = self.cmodes_d[cont_to]
+        self.CONTROL_MODE = self.cmodes[idx]
+        if move_j:
+            self.speed_stop()
+            self.move_j(self.iposes)
 
     def get_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
@@ -51,7 +58,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                             control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
 
-    def record_frame(self, observation, state, action_pos, action_quat, action_grip, done):
+    def record_frame(self, observation, state, action_pos, action_quat, action_grip, action_mode, done):
         """
         :param observation
         :param state:
@@ -62,7 +69,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         :return:
         """
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
-        action = action_pos + action_quat + action_grip
+        action = action_pos + action_quat + action_grip + action_mode
         self.rollout.append(image=observation, state=state, action=action, done=done, info=info)
 
     def play_demo(self):
@@ -81,7 +88,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 visualize(np.zeros(obs.shape), obs)
 
             if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
-                self.switching_control_mode()
+                self.shift_control_mode(move_j=True)
 
             act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
             if len(grip) == 2:  # gripper one-hot state
@@ -123,6 +130,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       action_pos=[0., 0., 0.],
                                       action_quat=[0., 0., 0., 1.],
                                       action_grip=[1.0],
+                                      action_mode=[0.0],
                                       done=1)
                     # self.play_demo()
                     self.rollout.show_rollout_summary()
@@ -130,6 +138,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     self.rollout.reset()
 
                     self.speed_stop()
+                    if self.rand_control_mode:
+                        self.random_change_control_mode()
+                        print("cont mode one hot: ", self.get_state().control_mode_one_hot)
                     _pose = self.add_noise_angle(inputs=self.iposes)
                     self.move_j(_pose.tolist())
                     self.gripper.rq_move_mm_norm(1.)
@@ -137,13 +148,19 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     continue
 
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                action_mode = [0.0]
                 if cont_status["btn_trigger"]:
                     depth, color = self.cam.get_np_images()
                     visualize(depth, color)
                     state = self.get_state()
 
-                    if cont_status["btn_control_mode"]:
-                        self.switching_control_mode()
+                    if cont_status["trk_up"]:
+                        # self.shift_control_mode(move_j=True)
+                        self.control_mode_to(cont_to="forward", move_j=True)
+                        action_mode[0] = 1.0
+                    elif cont_status["trk_down"]:
+                        self.control_mode_to(cont_to="downward", move_j=True)
+                        action_mode[0] = -1.0
 
                     if cont_status["btn_gripper"]:
                         self.move_grip_on_off_toggle()
@@ -167,6 +184,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                                             action_pos=act_pos,
                                                             action_quat=act_quat.tolist(),
                                                             action_grip=[gripper_action],
+                                                            action_mode=action_mode,
                                                             done=0)
 
                     d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -285,9 +303,10 @@ def camera_load_test(batch_idx, rollout_idx):
 
 
 if __name__ == "__main__":
-    camera_test()
+    # camera_test()
     # camera_load_test(batch_idx=1, rollout_idx=0)
     # vr_test()
-    # u = RealUR3()
-    # u.run_vr_teleop()
+    tasks = ["pouring_skill_img", "pick_and_place"]
+    u = RealUR3(task_name="pick_and_place")
+    u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=0)
