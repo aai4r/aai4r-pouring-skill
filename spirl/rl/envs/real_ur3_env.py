@@ -245,6 +245,7 @@ class ImageRtdeUR3(RtdeUR3):
         self.idx_rear = self.cam.index_from_key(key='rear')
         self.idx_front = self.cam.index_from_key(key='front')
 
+        # TODO, have to record the scene while mode changing
         self.ev_mgr = EvalVideoManager(path="eval_video", task=self.config.task_name)
 
         self.config.img_cfg = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
