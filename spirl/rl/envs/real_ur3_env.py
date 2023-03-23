@@ -1,4 +1,5 @@
 import copy
+import time
 
 from spirl.rl.components.environment import BaseEnvironment
 from spirl.utility.general_utils import AttrDict
@@ -93,6 +94,15 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         arg_max = max(range(len(list1d)), key=lambda i: list1d[i])
         one_hot[arg_max] = 1
         return one_hot
+
+    def control_mode_to(self, cont_to, move_j):
+        if cont_to not in self.cmodes:
+            raise IndexError("cont_to should be one of the {}".format(self.cmodes))
+        idx = self.cmodes_d[cont_to]
+        self.CONTROL_MODE = self.cmodes[idx]
+        if move_j:
+            self.speed_stop()
+            self.move_j(self.iposes)
 
     def step_sa(self, action):  # shared autonomy step
         cont_status = self.vr.get_controller_status()
@@ -201,7 +211,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         return obs, reward, done, info
 
     def goal_pose_from_action(self, action):
-        act_pos, act_quat, grip = action[:3], action[3:7], action[7:]
+        act_pos, act_quat, grip, mode = action[:3], action[3:7], action[7:8], action[8:9]
 
         if len(grip) == 2:
             grip_onehot = self.arg_max_one_hot(list1d=grip)
@@ -212,6 +222,11 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
             self.gripper.grasping_by_hold(step=grip[0])
         else:
             raise NotImplementedError
+
+        if mode > 0.5:
+            self.control_mode_to(cont_to="forward", move_j=True)
+        elif mode < -0.5:
+            self.control_mode_to(cont_to="downward", move_j=True)
 
         actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
         des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -235,7 +250,12 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
 
 from vr_teleop.tasks.lib_modules import visualize, noisy
+import threading
+import random
 import cv2
+
+
+loop_th = False    # global variable for thread control
 
 
 class ImageRtdeUR3(RtdeUR3):
@@ -251,15 +271,6 @@ class ImageRtdeUR3(RtdeUR3):
         self.config.img_cfg = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
         self.rollout = RolloutManagerExpand(task_name=self.config.task_name)
 
-    def control_mode_to(self, cont_to, move_j):
-        if cont_to not in self.cmodes:
-            raise IndexError("cont_to should be one of the {}".format(self.cmodes))
-        idx = self.cmodes_d[cont_to]
-        self.CONTROL_MODE = self.cmodes[idx]
-        if move_j:
-            self.speed_stop()
-            self.move_j(self.iposes)
-
     def get_robot_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
         state = RobotState2(joint=self.get_actual_q(),
@@ -269,6 +280,15 @@ class ImageRtdeUR3(RtdeUR3):
                             gripper_pos=[self.gripper.gripper_to_mm_normalize()],
                             control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
+
+    def random_change_control_mode(self, move_j=False):
+        idx = self.cmodes.index(self.CONTROL_MODE)
+        to = random.randrange(0, len(self.cmodes))
+        self.CONTROL_MODE = self.cmodes[to]
+        print("CONTROL_MODE: {} --> {}".format(self.cmodes[idx], self.CONTROL_MODE))
+        if move_j:
+            self.speed_stop()
+            self.move_j(self.iposes)
 
     def record_frame(self, image, state, action_pos, action_quat, action_grip, action_mode, done):
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
@@ -291,6 +311,28 @@ class ImageRtdeUR3(RtdeUR3):
         out = resized_img
         return out
 
+    def record_cam_thread(self):
+        global loop_th
+        while loop_th:
+            depth_f, color_f = self.cam.get_np_images(index=self.idx_front)
+            self.ev_mgr.video_stack(color_frame=color_f)
+            time.sleep(1/30)
+        print("Thread ends! ")
+
+    def record_cam_thread_start(self):
+        self.ev_mgr.stack_reset()
+        global loop_th
+        loop_th = True
+        th = threading.Thread(target=self.record_cam_thread)
+        th.start()
+
+    def record_cam_thread_stop(self, save_eval_video):
+        global loop_th
+        loop_th = False
+
+        if save_eval_video:
+            self.ev_mgr.save(ext='mp4')
+
     def render(self, mode='rgb_array'):
         depth, color = self.cam.get_np_images(index=self.idx_rear)
         depth_f, color_f = self.cam.get_np_images(index=self.idx_front)
@@ -301,10 +343,9 @@ class ImageRtdeUR3(RtdeUR3):
         color = (color / 255.0).astype(np.float32)
         return color
 
-    def reset(self, save_eval_video=False):
+    def reset(self):
+        self.random_change_control_mode()
         obs = super().reset()
-        if save_eval_video:
-            self.ev_mgr.save(ext='mp4')
         return obs
 
     def step_eval(self, action):
@@ -318,13 +359,14 @@ class ImageRtdeUR3(RtdeUR3):
             cont_status = self.vr.get_controller_status()
             if cont_status["btn_reset_timeout"]:
                 print("Discard THIS Evaluation Video...")
-                obs = self.reset(save_eval_video=False)
+                obs = self.reset()
                 reward, done, info = 0, True, ""
                 return obs, reward, done, info
 
             if cont_status["btn_reset_pose"]:
                 print("Save THIS Evaluation Video !!")
-                obs = self.reset(save_eval_video=True)
+                self.record_cam_thread_stop(save_eval_video=True)
+                obs = self.reset()
                 reward, done, info = 0, True, ""
                 return obs, reward, done, info
 
@@ -426,6 +468,14 @@ class RealUR3Env(BaseEnvironment):
     def __init__(self, config):
         self.config = config
         self._env = ImageRtdeUR3(config) if self.config.image_observation else RtdeUR3(config)
+
+    def eval_record_start(self):
+        self._env.record_cam_thread_start()
+        print("eval record start")
+
+    def eval_record_stop(self):
+        self._env.record_cam_thread_stop(save_eval_video=True)
+        print("eval record stop")
 
     def _default_hparams(self):
         pass

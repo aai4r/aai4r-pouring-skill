@@ -218,9 +218,10 @@ class SharedAutonomyTrainer:
                 # if input('{}th Eval GO?'.format(n_total)) != 'g':
                 #     continue
                 with torch.no_grad():
+                    self.sampler._env.eval_record_start()
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     n_total += 1
-                enter = input('Continue? {}/{}, YES: any, NO: q'.format(n_total, n_eval))
+                enter = input('Continue? {}/{}, YES: any, NO: q '.format(n_total, n_eval))
                 if enter == 'q':
                     break
         print("Evaluation Ends!")
@@ -394,5 +395,5 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-    args.run_mode = 'train'  # train, eval
+    args.run_mode = 'eval'  # train, eval
     SharedAutonomyTrainer(args=args)

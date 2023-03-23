@@ -129,14 +129,14 @@ class UR3ControlMode:
         self._limits = AttrDict()
         self._rpy_base = AttrDict()
 
-        self._limits.forward = AttrDict(x_max=0.53, x_min=0.38,
+        self._limits.forward = AttrDict(x_max=0.53, x_min=0.38,  # [0.53, 0.38]
                                         y_max=0.2, y_min=-0.2,
-                                        z_max=0.3, z_min=0.07,
+                                        z_max=0.3, z_min=0.07,   # [0.3, 0.07]
                                         rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
-                                        ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),
+                                        ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),     # [20, -5]
                                         rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
 
-        self._limits.downward = AttrDict(x_max=0.44, x_min=0.19,
+        self._limits.downward = AttrDict(x_max=0.44, x_min=0.2,     # [0.44, 0.2]
                                          y_max=0.2, y_min=-0.2,
                                          z_max=0.13, z_min=0.04,
                                          rx_max=deg2rad(20.0), rx_min=deg2rad(-20.0),
