@@ -49,7 +49,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         self.num_acts = data_spec.n_actions
 
     def init_vr(self):
-        self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
+        self.vr = VRWrapper(device="cpu", rot_d=(-90.0, 0.0, -90.0))
 
     def get_robot_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
