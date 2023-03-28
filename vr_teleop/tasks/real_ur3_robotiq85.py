@@ -20,7 +20,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.collect_demo = True
 
     def init_vr(self):
-        self.vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
+        self.vr = VRWrapper(device="cpu", rot_d=(-90.0, 0.0, -90.0))
 
     def random_change_control_mode(self, move_j=False):
         idx = self.cmodes.index(self.CONTROL_MODE)
@@ -139,7 +139,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       done=1)
                     # self.play_demo()
                     self.rollout.show_rollout_summary()
-                    self.rollout.save_to_file()
+                    # self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
@@ -225,7 +225,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
 
 def vr_test():
-    vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
+    # vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
+    vr = VRWrapper(device="cpu", rot_d=(0.0, 0.0, 0.0))
 
     # def robot_test():
     #     HOST = "192.168.0.75"
@@ -233,11 +234,16 @@ def vr_test():
     #     gripper = RobotiqGripperExpand(rtde_c, HOST)
     #     return gripper
 
+    start = time.time()
     while True:
         cont_status = vr.get_controller_status()
         if cont_status["btn_trigger"]:
-            print("btn_trigger on!")
-            # pq = cont_status["pose_quat"]
+            curr_time = time.time()
+            if (curr_time - start) > 1:
+                print("btn_trigger on!")
+                pq = cont_status["pose_quat"]
+                print("pq: ", pq)
+                start = curr_time
             # # pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))   # real first
             # pq = quaternion_real_first(q=torch.tensor(pq))
             # aa = tr.quaternion_to_axis_angle(pq)

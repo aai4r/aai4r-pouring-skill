@@ -188,7 +188,9 @@ class SimVR:
 
 if __name__ == "__main__":
     target = IsaacUR3   # Cube or IsaacUR3
-    rot_dict = {Cube: (-89.9, 0.0, 89.9), IsaacUR3: (-89.9, 0.0, 89.9)}
+    # rot_dict = {Cube: (-89.9, 0.0, 89.9), IsaacUR3: (-89.9, 0.0, 89.9)}
+    rot_dict = {Cube: (-90.0, 0.0, -90.0), IsaacUR3: (-90.0, 0.0, -90.0)}
+    # rot_dict = {Cube: (0.0, 0.0, 0.0), IsaacUR3: (-90.0, 0.0, -90.0)}
     cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target, rot_d=rot_dict[target])
     sv = SimVR(cfg=cfg)
     sv.run()

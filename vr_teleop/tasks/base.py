@@ -97,12 +97,13 @@ class ButtonPressedEventHandler:
 
 
 class VRWrapper:
-    def __init__(self, device, rot_d=(0.0, 0.0, 0.0)):
+    def __init__(self, device, rot_d=(0.0, 0.0, 0.0), left_to_right=True):
         assert len(rot_d) == 3 and isinstance(rot_d, tuple)
         self.device = device
         self.vr = triad_openvr.triad_openvr()
         self.rot = torch.inverse(euler_to_mat3d(deg2rad(rot_d[0]), deg2rad(rot_d[1]), deg2rad(rot_d[2])))
         print("rot: \n", self.rot)
+        self.left_to_right = left_to_right  # left-handed to right-handed coordinate
 
         self.trk_btn = ButtonPressedEventHandler()
         self.menu_btn = ButtonPressedEventHandler()
@@ -134,10 +135,17 @@ class VRWrapper:
         av = quat_apply(_rq, av).squeeze(0).numpy()
 
         _pq = torch.tensor(pq[3:]).unsqueeze(0)
-        _pq[0, 2] *= -1.0   # Left-handed --> Right-handed
+        _pq[0, 2] *= -1.0 if self.left_to_right else 1.0
         # pq = _pq.squeeze(0).numpy()  # TODO, pure rotation of controller
-        _rq_pre = mat_to_quat(euler_to_mat3d(deg2rad(90.0), deg2rad(0.0), deg2rad(0.0)).unsqueeze(0))
-        _rq_post = mat_to_quat(euler_to_mat3d(deg2rad(-90.0), deg2rad(0.0), deg2rad(-90.0)).unsqueeze(0))
+        # _rq_pre = mat_to_quat(euler_to_mat3d(deg2rad(90.0), deg2rad(0.0), deg2rad(0.0)).unsqueeze(0))
+        # _rq_post = mat_to_quat(euler_to_mat3d(deg2rad(-90.0), deg2rad(0.0), deg2rad(-90.0)).unsqueeze(0))
+
+        # pre_mul --> global fixed (ZYX) rotation
+        # post_mul --> euler (XYZ) rotation
+        _rq_pre = mat_to_quat(euler_to_mat3d(deg2rad(-90.0), deg2rad(0.0), deg2rad(179.9)).unsqueeze(0))
+        # _rq_post = mat_to_quat(euler_to_mat3d(deg2rad(-90.0), deg2rad(0.0), deg2rad(-90.0)).unsqueeze(0))
+        _rq_post = mat_to_quat(torch.inverse(self.rot).unsqueeze(0))
+
         pq = quat_mul(_rq_pre, quat_mul(_pq, _rq_post)).squeeze(0).numpy()
 
         controller_status["lin_vel"] = lv

@@ -52,16 +52,15 @@ class Cube(BaseObject):
 
     def vr_handler(self, state):
         cont_status = self.vr.get_controller_status()
-        lv = cont_status["lin_vel"] * 10.0
-        av = cont_status["ang_vel"] * 1.0
-        state['vel']['linear'].fill((lv[0], lv[1], lv[2]))
-        # state['vel']['angular'].fill((av[0], av[1], av[2]))     # relative
-
-        # orientation (absolute)
-        self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
-        self.cube_rot = self.rigid_body_states[:, self.cube_handle][:, 3:7]
-
         if cont_status["btn_trigger"]:
+            lv = cont_status["lin_vel"] * 10.0
+            av = cont_status["ang_vel"] * 1.0
+            state['vel']['linear'].fill((lv[0], lv[1], lv[2]))
+            state['vel']['angular'].fill((av[0], av[1], av[2]))     # relative
+
+            # orientation (absolute)
+            self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
+            self.cube_rot = self.rigid_body_states[:, self.cube_handle][:, 3:7]
             self.vr_q = torch.tensor(cont_status["pose_quat"], device=self.device)
         curr = self.cube_rot
 

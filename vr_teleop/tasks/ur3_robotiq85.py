@@ -378,12 +378,12 @@ class IsaacUR3(BaseObject):
     def vr_handler(self, goal):
         cont_status = self.vr.get_controller_status()
 
-        # position
-        goal[:, :3] += torch.tensor(cont_status["lin_vel"], device=self.device)
-
-        # orientation
-        self.vr_q = self.ur3_grasp_rot
         if cont_status["btn_trigger"]:
+            # position
+            goal[:, :3] += torch.tensor(cont_status["lin_vel"], device=self.device)
+
+            # orientation
+            self.vr_q = self.ur3_grasp_rot
             self.vr_q = torch.tensor(cont_status["pose_quat"], device=self.device)
         # if self.timer.timeover_active:
         #     print(cont_status)
