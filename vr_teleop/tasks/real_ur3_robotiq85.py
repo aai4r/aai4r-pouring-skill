@@ -139,7 +139,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       done=1)
                     # self.play_demo()
                     self.rollout.show_rollout_summary()
-                    # self.rollout.save_to_file()
+                    self.rollout.save_to_file()
                     self.rollout.reset()
 
                     self.speed_stop()
@@ -149,7 +149,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     _pose = self.add_noise_angle(inputs=self.iposes)
                     self.move_j(_pose.tolist())
                     self.gripper.rq_move_mm_norm(1.)
-                    # self.move_grip_on_off(grip_action=False)
+                    self.grip_on = False
                     continue
 
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -167,10 +167,10 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                         self.control_mode_to(cont_to="downward", move_j=True)
                         action_mode[0] = -1.0
 
-                    if cont_status["btn_gripper"]:
-                        self.move_grip_on_off_toggle()
+                    if cont_status["btn_grip"]:
+                        self.grip_toggle()
 
-                    gripper_action = -1.0 if cont_status["btn_grip"] else 1.0
+                    gripper_action = -1.0 if self.grip_on else 1.0
                     self.gripper.grasping_by_hold(step=gripper_action)
                     # gripper_action_norm = self.gripper.get_gripper_action(normalize=True)
 

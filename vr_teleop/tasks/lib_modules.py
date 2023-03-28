@@ -32,7 +32,7 @@ class BaseRTDE:
         self.gripper.activate()
         self.gripper.set_force(0)  # range: [0, 100]
         self.gripper.set_speed(10)  # range: [0, 100]
-        self.grip_on = None
+        self.grip_on = False
         self.move_grip_on_off(grip_action=False)
 
         self.default_control_params = AttrDict(speed=0.25, acceleration=1.2, blend=0.099, dt=1.0 / 500.0)
@@ -75,6 +75,9 @@ class BaseRTDE:
 
     def stop_script(self):
         self.rtde_c.stopScript()
+
+    def grip_toggle(self):
+        self.grip_on = not self.grip_on  # toggle
 
     def move_grip_on_off_toggle(self):
         self.grip_on = not self.grip_on  # toggle

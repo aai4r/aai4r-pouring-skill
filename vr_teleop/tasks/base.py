@@ -98,6 +98,9 @@ class ButtonPressedEventHandler:
 
 class VRWrapper:
     def __init__(self, device, rot_d=(0.0, 0.0, 0.0), left_to_right=True):
+        """
+            SteamVR linux ver: 1.14, 1.14.16
+        """
         assert len(rot_d) == 3 and isinstance(rot_d, tuple)
         self.device = device
         self.vr = triad_openvr.triad_openvr()
@@ -153,7 +156,8 @@ class VRWrapper:
         controller_status["pose_quat"] = pq
         controller_status["btn_trigger"] = d['trigger']
         controller_status["btn_trackpad"] = self.trk_btn.is_pressed(event_stream=d["trackpad_pressed"])
-        controller_status["btn_grip"] = d["grip_button"]  # self.grip_btn.is_pressed(event_stream=d["grip_button"])
+        # controller_status["btn_grip"] = d["grip_button"]
+        controller_status["btn_grip"] = self.grip_btn.is_button_up(event_stream=d["grip_button"])
         x, y = d["trackpad_x"], d["trackpad_y"]
         controller_status["trk_x"] = x
         controller_status["trk_y"] = y
