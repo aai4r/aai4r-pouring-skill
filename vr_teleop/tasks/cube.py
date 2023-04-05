@@ -77,7 +77,8 @@ class Cube(BaseObject):
     def move(self):
         self.gym.refresh_rigid_body_state_tensor(self.sim)
         state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
-        self.vr_handler(state=state)
+        if self.vr is not None:
+            self.vr_handler(state=state)
 
         self.gym.set_actor_rigid_body_states(self.env, self.cube_handle, state, gymapi.STATE_ALL)
         # print("asdasdasd")

@@ -1,7 +1,7 @@
 from math import sqrt
 import time
 
-from tasks.base import *
+from vr_teleop.tasks.base import *
 from tasks.cube import Cube
 from tasks.ur3_robotiq85 import IsaacUR3
 from spirl.utility.general_utils import AttrDict
@@ -26,7 +26,7 @@ class SimVR:
             custom_parameters=[
                 {"name": "--num_envs", "type": int, "default": 1, "help": "Number of environments to create"}])
 
-        dev_num = 1 if torch.cuda.device_count() else 0
+        dev_num = 0 if torch.cuda.device_count() else 1
         # self.args.sim_device = "cuda:{}".format(dev_num)
         self.args.sim_device = "cpu"
         self.args.compute_device_id = dev_num

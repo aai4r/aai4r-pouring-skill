@@ -2,6 +2,8 @@ import copy
 import time
 
 import isaacgym
+
+import vr_teleop.tasks.base
 from utils.utils import *
 from isaacgym import gymutil
 from isaacgym import gymapi, gymtorch
@@ -183,7 +185,7 @@ class VRElement:
 
 class BaseObject:
     def __init__(self, isaac_elem):
-        assert type(isaac_elem) is IsaacElement
+        assert type(isaac_elem) is vr_teleop.tasks.base.IsaacElement
 
         self.gym = isaac_elem.gym
         self.viewer = isaac_elem.viewer
