@@ -1,6 +1,7 @@
 from utils.utils import CustomTimer
 from spirl.utility.general_utils import AttrDict
 from .base import *
+import random
 import time
 
 
@@ -191,6 +192,18 @@ class IsaacUR3(BaseObject):
         self.ur3_hand_index = ur3_link_dict["tool0"]
         self.j_eef = jacobian[:, self.ur3_hand_index - 1, :]
         self.j_eef = self.j_eef[:, :, :6]  # up to UR3 joints
+
+        self.set_env_lights()
+
+    def set_env_lights(self):
+        l_color = gymapi.Vec3(random.uniform(1, 1), random.uniform(1, 1), random.uniform(1, 1))
+        l_ambient = gymapi.Vec3(random.uniform(0.7, 1.0), random.uniform(0.7, 1.0), random.uniform(0.7, 1.0))
+        l_direction = gymapi.Vec3(random.uniform(0., 1), random.uniform(0., 1), random.uniform(0., 1))
+        # self.gym.set_light_parameters(self.sim, 0, l_color, l_ambient, l_direction)
+        self.gym.set_light_parameters(self.sim, 0, gymapi.Vec3(1, 1, 1), gymapi.Vec3(1, 1, 1), gymapi.Vec3(1, 1, 1))
+        self.gym.set_light_parameters(self.sim, 1, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
+        self.gym.set_light_parameters(self.sim, 2, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
+        self.gym.set_light_parameters(self.sim, 3, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
 
     def set_dof_MODE_target_tensor_indexed(self):
         robot_indices32 = self.global_indices[:1].flatten()
@@ -441,6 +454,12 @@ class IsaacUR3(BaseObject):
         self.set_dof_MODE_target_tensor_indexed()
         # self.gym.set_actor_rigid_body_states(self.env, self.ur3_handle, state, gymapi.STATE_ALL)
 
-        ar_pos = [self.basisX, self.ur3_ee_pos[0].cpu().numpy(), self.ur3_grasp_pos[0].cpu().numpy()]
-        ar_rot = [self.basisR, self.ur3_ee_rot[0].cpu().numpy(), self.ur3_grasp_rot[0].cpu().numpy()]
+        ar_pos = [self.basisX,
+                  # self.ur3_ee_pos[0].cpu().numpy(),
+                  self.ur3_grasp_pos[0].cpu().numpy()
+                  ]
+        ar_rot = [self.basisR,
+                  # self.ur3_ee_rot[0].cpu().numpy(),
+                  self.ur3_grasp_rot[0].cpu().numpy()
+                  ]
         self.draw_coord(pos=ar_pos, rot=ar_rot)
