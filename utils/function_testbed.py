@@ -1,5 +1,5 @@
-import torch
 from utils import TaskPathManager
+import torch
 
 
 def function_test():
@@ -25,5 +25,103 @@ def function_test():
     task.update_step_by_checking_arrive(torch.rand_like(pos), torch.rand_like(rot), torch.rand_like(grip))
 
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+from torch_jit_utils import quat_apply, to_torch
+
+
+class CoordViz:
+    def __init__(self, elev=30, azim=-60):
+        self.fig = plt.figure()
+        self.ax1 = self.fig.add_subplot(121, projection='3d')
+        self.ax1.view_init(elev=elev, azim=azim)
+        self.ax2 = self.fig.add_subplot(122, projection='3d')
+        self.ax2.view_init(elev=elev, azim=azim)
+
+        self.dr = 1.5   # drawing range
+        self.bl = 0.5   # basis length
+        self.origin = [0, 0, 0]
+        self.basis_x = [self.bl, 0, 0]
+        self.basis_y = [0, self.bl, 0]
+        self.basis_z = [0, 0, self.bl]
+
+        self.draw_basis()
+
+    def set_viz_form(self):
+        self.ax1.set_xticks([-self.dr, 0, self.dr])
+        self.ax1.set_yticks([-self.dr, 0, self.dr])
+        self.ax1.set_zticks([-self.dr, 0, self.dr])
+        self.ax1.set_xlabel('X-Axis'), self.ax1.set_ylabel('Y-Axis'), self.ax1.set_zlabel('Z-Axis')
+        self.ax1.set_title('Source Trajectory')
+
+        self.ax2.set_xticks([-self.dr, 0, self.dr])
+        self.ax2.set_yticks([-self.dr, 0, self.dr])
+        self.ax2.set_zticks([-self.dr, 0, self.dr])
+        self.ax2.set_xlabel('X-Axis'), self.ax2.set_ylabel('Y-Axis'), self.ax2.set_zlabel('Z-Axis')
+        self.ax2.set_title('Constrained Trajectory')
+
+    def draw_basis(self):
+        self.draw_line_left(p1=self.origin, p2=self.basis_x, color='r')
+        self.draw_line_left(p1=self.origin, p2=self.basis_y, color='g')
+        self.draw_line_left(p1=self.origin, p2=self.basis_z, color='b')
+
+        self.draw_line_right(p1=self.origin, p2=self.basis_x, color='r')
+        self.draw_line_right(p1=self.origin, p2=self.basis_y, color='g')
+        self.draw_line_right(p1=self.origin, p2=self.basis_z, color='b')
+
+    def draw_line_left(self, p1, p2, color='black'):
+        self.ax1.plot(xs=[p1[0], p2[0]],
+                      ys=[p1[1], p2[1]],
+                      zs=[p1[2], p2[2]], color=color)
+
+    def draw_line_right(self, p1, p2, color='black'):
+        self.ax2.plot(xs=[p1[0], p2[0]],
+                      ys=[p1[1], p2[1]],
+                      zs=[p1[2], p2[2]], color=color)
+
+    def show(self):
+        self.set_viz_form()
+        plt.show()
+        Axes3D.plot()
+
+
+class RotCoordViz(CoordViz):
+    def __init__(self, elev, azim):
+        super().__init__(elev=elev, azim=azim)
+        self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+    def quat_to_mat(self, q):
+        _q = q if torch.is_tensor(q) else torch.tensor(q, device=self.device)
+        assert len(_q.shape) == 1   # [x, y, z, w]
+        px = quat_apply(_q, to_torch([1, 0, 0], device=self.device, dtype=torch.float32)).cpu().numpy()
+        py = quat_apply(_q, to_torch([0, 1, 0], device=self.device, dtype=torch.float32)).cpu().numpy()
+        pz = quat_apply(_q, to_torch([0, 0, 1], device=self.device, dtype=torch.float32)).cpu().numpy()
+        return np.stack((px, py, pz), axis=0)
+
+    def draw_coord_to_left(self, mat):
+        px, py, pz = mat[0], mat[1], mat[2]
+        self.draw_line_left(p1=self.origin, p2=px, color='r')
+        self.draw_line_left(p1=self.origin, p2=py, color='g')
+        self.draw_line_left(p1=self.origin, p2=pz, color='b')
+
+    def draw_coord_to_right(self, mat):
+        px, py, pz = mat[0], mat[1], mat[2]
+        self.draw_line_right(p1=self.origin, p2=px, color='r')
+        self.draw_line_right(p1=self.origin, p2=py, color='g')
+        self.draw_line_right(p1=self.origin, p2=pz, color='b')
+
+
+def viz_test():
+    print("Viz test!")
+    cv = RotCoordViz(elev=30, azim=145)
+    q = [-0.488818, -0.4917718, -0.5077382, -0.51099664]
+    mat = cv.quat_to_mat(q)
+    cv.draw_coord_to_left(mat)
+    cv.draw_coord_to_right(mat)
+    cv.show()
+
+
 if __name__ == '__main__':
-    function_test()
+    # function_test()
+    viz_test()
