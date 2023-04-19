@@ -58,7 +58,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                             control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
 
-    def record_frame(self, observation, state, action_pos, action_quat, action_grip, action_mode, done):
+    def record_frame(self, observation, state, action_pos, action_quat, action_grip, action_mode, done, extra=None):
         """
         :param observation
         :param state:
@@ -70,7 +70,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         """
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         action = action_pos + action_quat + action_grip + action_mode
-        self.rollout.append(image=observation, state=state, action=action, done=done, info=info)
+        self.rollout.append(image=observation, state=state, action=action, done=done, info=info, extra=extra)
 
     def play_demo(self):
         # go to initial state in joint space
@@ -115,6 +115,16 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             self.wait_period(start_t)
         self.speed_stop()
 
+    def robot_reset(self):
+        self.speed_stop()
+        if self.rand_control_mode:
+            self.random_change_control_mode()
+            print("cont mode one hot: ", self.get_state().control_mode_one_hot)
+        _pose = self.add_noise_angle(inputs=self.iposes)
+        self.move_j(_pose.tolist())
+        self.gripper.rq_move_mm_norm(1.)
+        self.grip_on = False
+
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
         try:
@@ -128,6 +138,13 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
+                if cont_status["btn_reset_timeout"]:
+                    self.rollout.save_to_file()
+                    self.rollout.reset()
+
+                    self.robot_reset()
+                    continue
+
                 if cont_status["btn_reset_pose"]:
                     depth, color = self.cam.get_np_images()
                     self.record_frame(observation=copy.deepcopy(color),
@@ -136,20 +153,14 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       action_quat=[0., 0., 0., 1.],
                                       action_grip=[1.0],
                                       action_mode=[0.0],
-                                      done=1)
+                                      done=1,
+                                      extra=[0., 0., 0., 1.])   # source rotation of VR controller...
                     # self.play_demo()
                     self.rollout.show_rollout_summary()
                     self.rollout.save_to_file()
                     self.rollout.reset()
 
-                    self.speed_stop()
-                    if self.rand_control_mode:
-                        self.random_change_control_mode()
-                        print("cont mode one hot: ", self.get_state().control_mode_one_hot)
-                    _pose = self.add_noise_angle(inputs=self.iposes)
-                    self.move_j(_pose.tolist())
-                    self.gripper.rq_move_mm_norm(1.)
-                    self.grip_on = False
+                    self.robot_reset()
                     continue
 
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -190,7 +201,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                                             action_quat=act_quat.tolist(),
                                                             action_grip=[gripper_action],
                                                             action_mode=action_mode,
-                                                            done=0)
+                                                            done=0,
+                                                            extra=vr_curr_quat.tolist())
 
                     d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
                     d_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori_aa)
@@ -228,11 +240,12 @@ def vr_test():
     # vr = VRWrapper(device="cpu", rot_d=(-89.9, 0.0, 89.9))
     vr = VRWrapper(device="cpu", rot_d=(0.0, 0.0, 0.0))
 
-    # def robot_test():
-    #     HOST = "192.168.0.75"
-    #     rtde_c = rtde_control.RTDEControlInterface(HOST)
-    #     gripper = RobotiqGripperExpand(rtde_c, HOST)
-    #     return gripper
+    def gripper_test():
+        HOST = "192.168.0.75"
+        rtde_c = rtde_control.RTDEControlInterface(HOST)
+        gripper = RobotiqGripperExpand(rtde_c, HOST)
+        return gripper
+    gripper = gripper_test()
 
     start = time.time()
     while True:
@@ -258,7 +271,7 @@ def vr_test():
         else:
             gripper_action = 1.0
 
-        # gripper.grasping_by_hold(step=gripper_action)
+        gripper.grasping_by_hold(step=gripper_action)
 
         # if cont_status["btn_gripper"]:
         #     print("btn_gripper")
@@ -318,6 +331,7 @@ if __name__ == "__main__":
     # camera_load_test(batch_idx=1, rollout_idx=0)
     # vr_test()
     tasks = ["pouring_skill_img", "pick_and_place_img"]
-    u = RealUR3(task_name="pick_and_place_img")
+    tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
+    u = RealUR3(task_name="pouring_skill_img")
     u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=387)
+    # u.replay_mode(batch_idx=1, rollout_idx=0)

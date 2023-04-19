@@ -30,7 +30,7 @@ class BaseRTDE:
         # gripper control
         self.gripper = RobotiqGripperExpand(self.rtde_c, self.HOST)
         self.gripper.activate()
-        self.gripper.set_force(0)  # range: [0, 100]
+        self.gripper.set_force(10)  # range: [0, 100]
         self.gripper.set_speed(10)  # range: [0, 100]
         self.grip_on = False
         self.move_grip_on_off(grip_action=False)
@@ -137,7 +137,7 @@ class UR3ControlMode:
                                         z_max=0.3, z_min=0.07,   # [0.3, 0.07]
                                         rx_max=deg2rad(135.0), rx_min=deg2rad(-135.0),
                                         ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),     # [20, -5]
-                                        rz_max=deg2rad(40.0), rz_min=deg2rad(-40.0))
+                                        rz_max=deg2rad(50.0), rz_min=deg2rad(-50.0))
 
         self._limits.downward = AttrDict(x_max=0.44, x_min=0.2,     # [0.44, 0.2]
                                          y_max=0.2, y_min=-0.2,

@@ -206,27 +206,34 @@ class RolloutManagerExpand(RolloutManager):
     def __init__(self, task_name, root_dir=None, task_desc=""):
         super().__init__(task_name=task_name, root_dir=root_dir, task_desc=task_desc)
         self._images = []
+        self._extra = []    # additional data
         self.curr_load_path = ""
 
     def isempty(self):
         return not (bool(self._images) and bool(self._states) and bool(self._actions)
-                    and bool(self._dones) and bool(self._info))
+                    and bool(self._dones) and bool(self._info) and bool(self._extra))
 
-    def append(self, image, state, action, done, info):
+    def append(self, image, state, action, done, info, extra=None):
         super().append(state, action, done, info)
         self._images.append(image)
+        self._extra.append(extra)
 
     def get(self, index):
         assert 0 <= index < self.len()
         return self._images[index], self._states[index], self._actions[index], self._dones[index], self._info[index]
 
+    def get_extra(self, index):
+        assert 0 <= index < self.len()
+        return self._extra[index]
+
     def len(self):
-        assert len(self._images) == len(self._states) == len(self._actions) == len(self._dones) # == len(self._info)
+        assert len(self._images) == len(self._states) == len(self._actions) == len(self._dones) == len(self._extra)
         return len(self._states)
 
     def reset(self):
         super().reset()
         self._images = []
+        self._extra = []
 
     def to_np_rollout(self):
         np_rollout = super().to_np_rollout()
@@ -234,6 +241,7 @@ class RolloutManagerExpand(RolloutManager):
         for obs in self._images:
             c = np.expand_dims(obs, axis=0) if c is None else np.concatenate((c, np.expand_dims(obs, axis=0)), axis=0)
         np_rollout.images = c
+        np_rollout.extra = np.array(self._extra)
         return np_rollout
 
     def show_rollout_summary(self):
@@ -243,6 +251,7 @@ class RolloutManagerExpand(RolloutManager):
         print("Rollout length: ", self.len())
         idx = 0
         sample_obs, sample_state, sample_action, sample_done, sample_info = self.get(idx)
+        sample_extra = self.get_extra(idx)
 
         print("* STEP: [{}]".format(idx))
         print("    observation shape {}".format(sample_obs.shape))
@@ -250,6 +259,7 @@ class RolloutManagerExpand(RolloutManager):
         print("    action * {} dim with {}".format(len(sample_action), sample_action))
         print("    done * {} dim with {}".format(len([sample_done]), sample_done))
         print("    info: ", sample_info)
+        print("    extra * {} dim with {}".format(len([sample_extra]), sample_extra))
 
     def save_to_file(self):
         np_episode_dict = self.to_np_rollout()
@@ -263,6 +273,7 @@ class RolloutManagerExpand(RolloutManager):
         traj.create_dataset("states", data=np_episode_dict.states)
         traj.create_dataset("actions", data=np_episode_dict.actions)
         traj.create_dataset("info", data=np_episode_dict.info)
+        traj.create_dataset("extra", data=np_episode_dict.extra)
 
         terminals = np_episode_dict.dones
         if np.sum(terminals) == 0: terminals[-1] = True
@@ -303,6 +314,8 @@ class RolloutManagerExpand(RolloutManager):
                 elif name == 'info':
                     # temp = f[key + '/' + name][()]
                     self._info = f[key + '/' + name][()]
+                elif name == 'extra':
+                    self._extra = f[key + '/' + name][()].astype(np.float32).tolist()
                 else:
                     raise ValueError("{}: Unexpected rollout element...".format(name))
         print("Load complete!")
