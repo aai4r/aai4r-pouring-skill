@@ -7,7 +7,7 @@ import rtde_control
 import rtde_receive
 from gripper.robotiq_gripper_control import RobotiqGripper
 import isaacgym
-from utils.utils import orientation_error
+from utils.utilities import orientation_error
 
 
 def rad2deg(rad): return rad * (180.0 / np.pi)

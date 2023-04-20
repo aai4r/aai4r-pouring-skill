@@ -1,8 +1,7 @@
 import time
 
 import numpy as np
-# import torch
-# from utility.torch_jit_utils import quat_conjugate, quat_mul
+import math as m
 from dataclasses import dataclass
 from isaacgym.torch_utils import *
 
@@ -38,6 +37,24 @@ def rad2deg(rad):
 
 def deg2rad(deg):
     return deg * (PI / 180.0)
+
+
+def Rx(theta):
+    return np.matrix([[1, 0, 0],
+                      [0, m.cos(theta), -m.sin(theta)],
+                      [0, m.sin(theta), m.cos(theta)]])
+
+
+def Ry(theta):
+    return np.matrix([[m.cos(theta), 0, m.sin(theta)],
+                      [0, 1, 0],
+                      [-m.sin(theta), 0, m.cos(theta)]])
+
+
+def Rz(theta):
+    return np.matrix([[m.cos(theta), -m.sin(theta), 0],
+                      [m.sin(theta), m.cos(theta), 0],
+                      [0, 0, 1]])
 
 
 def quaternion_real_first(q):

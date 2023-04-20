@@ -4,7 +4,7 @@ import time
 import isaacgym
 
 import vr_teleop.tasks.base
-from utils.utils import *
+from utils.utilities import *
 from isaacgym import gymutil
 from isaacgym import gymapi, gymtorch
 import torch

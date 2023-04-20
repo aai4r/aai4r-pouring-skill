@@ -4,7 +4,7 @@ import os
 from utils.torch_jit_utils import *
 from pytorch3d import transforms as tr
 
-from utils.utils import rad2deg, deg2rad, quaternion_real_first, quaternion_real_last, CustomTimer
+from utils.utilities import rad2deg, deg2rad, quaternion_real_first, quaternion_real_last, CustomTimer
 
 import rtde_control
 import rtde_receive

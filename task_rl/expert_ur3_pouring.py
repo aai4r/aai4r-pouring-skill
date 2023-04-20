@@ -4,7 +4,7 @@ import cv2
 import os
 
 from utils.torch_jit_utils import *
-from utils.utils import *
+from utils.utilities import *
 from torch.nn.functional import normalize
 from tasks.base.base_task import BaseTask, AttrDict
 from parents.interaction import VRInteraction

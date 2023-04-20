@@ -8,7 +8,7 @@ from isaacgym import gymapi, gymtorch
 
 from tasks.base.base_task import BaseTask
 from vr_teleop import triad_openvr
-from utils.utils import *
+from utils.utilities import *
 import cv2
 
 

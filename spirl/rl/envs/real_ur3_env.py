@@ -9,7 +9,7 @@ from vr_teleop.tasks.real_ur3_robotiq85 import BaseRTDE, UR3ControlMode
 from vr_teleop.tasks.base import VRWrapper
 from vr_teleop.tasks.lib_modules import RealSense, RealSenseMulti, EvalVideoManager
 
-from utils.utils import quaternion_real_last, quaternion_real_first, get_euler_xyz
+from utils.utilities import quaternion_real_last, quaternion_real_first, get_euler_xyz
 from utils.torch_jit_utils import quat_mul, quat_conjugate
 from pytorch3d import transforms as tr
 from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand, RobotState, RobotState2

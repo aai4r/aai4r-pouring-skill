@@ -1,4 +1,4 @@
-from utils.utils import CustomTimer
+from utils.utilities import CustomTimer
 from spirl.utility.general_utils import AttrDict
 from .base import *
 import random

@@ -1,4 +1,6 @@
-from utils import TaskPathManager
+import time
+
+from utilities import TaskPathManager
 import torch
 
 
@@ -29,6 +31,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from torch_jit_utils import quat_apply, to_torch
+from vr_teleop.tasks.rollout_manager import RolloutManagerExpand
+from spirl.utility.general_utils import AttrDict
+from utilities import Rx, Ry, Rz, deg2rad
 
 
 class CoordViz:
@@ -87,9 +92,13 @@ class CoordViz:
 
 
 class RotCoordViz(CoordViz):
-    def __init__(self, elev, azim):
+    def __init__(self, task_name, conf_mode, rot_mode):
+        assert rot_mode in ['alpha', 'beta', 'gamma']
+        elev, azim = conf_mode[rot_mode].elev, conf_mode[rot_mode].azim
         super().__init__(elev=elev, azim=azim)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.rollout = RolloutManagerExpand(task_name)
+        self.rollout.load_from_file(batch_idx=1, rollout_idx=3)
 
     def quat_to_mat(self, q):
         _q = q if torch.is_tensor(q) else torch.tensor(q, device=self.device)
@@ -107,21 +116,41 @@ class RotCoordViz(CoordViz):
 
     def draw_coord_to_right(self, mat):
         px, py, pz = mat[0], mat[1], mat[2]
-        self.draw_line_right(p1=self.origin, p2=px, color='r')
-        self.draw_line_right(p1=self.origin, p2=py, color='g')
-        self.draw_line_right(p1=self.origin, p2=pz, color='b')
+        self.draw_line_right(p1=self.origin, p2=px, color='b')  # r
+        self.draw_line_right(p1=self.origin, p2=py, color='r')  # g
+        self.draw_line_right(p1=self.origin, p2=pz, color='g')  # b
 
 
-def viz_test():
-    print("Viz test!")
-    cv = RotCoordViz(elev=30, azim=145)
-    q = [-0.488818, -0.4917718, -0.5077382, -0.51099664]
-    mat = cv.quat_to_mat(q)
-    cv.draw_coord_to_left(mat)
-    cv.draw_coord_to_right(mat)
+def coord_viz():
+    print("Coordinate Viz!")
+    fwd = AttrDict(mode="forward",
+                   alpha=AttrDict(elev=0, azim=180),
+                   beta=AttrDict(elev=0, azim=90),
+                   gamma=AttrDict(elev=90, azim=180))
+
+    dwn = AttrDict(mode="downward",
+                   alpha=AttrDict(elev=0, azim=180),
+                   beta=AttrDict(elev=0, azim=0),
+                   gamma=AttrDict(elev=0, azim=0))
+
+    task_name = "pouring_constraint"
+    cv = RotCoordViz(task_name=task_name, conf_mode=fwd, rot_mode='alpha')   # elev=30, azim=145
+    for i in range(len(cv.rollout._actions)):
+        print("quat_target: ", cv.rollout._actions[i][3:7])
+        q_source = cv.rollout._extra[i][:]
+        q_target = cv.rollout._actions[i][3:7]
+        # q = [-0.488818, -0.4917718, -0.5077382, -0.51099664]
+
+        mat_source = cv.quat_to_mat(q_source)
+        mat_target = cv.quat_to_mat(q_target)
+
+        cv.draw_coord_to_left(mat_source)
+        cv.draw_coord_to_right(mat_target)  # order change..
+        # cv.draw_coord_to_right(mat_target[:, [2, 0, 1]])    # order change..
+        # break
     cv.show()
 
 
 if __name__ == '__main__':
     # function_test()
-    viz_test()
+    coord_viz()
