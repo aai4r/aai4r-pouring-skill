@@ -50,6 +50,11 @@ class Cube(BaseObject):
             return True
         return False
 
+    def get_vr_status(self):
+        if self.vr is None: return self.vr
+        cont_status = self.vr.get_controller_status()
+        return cont_status
+
     def vr_handler(self, state):
         cont_status = self.vr.get_controller_status()
         if cont_status["btn_trigger"]:

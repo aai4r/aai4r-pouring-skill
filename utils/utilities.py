@@ -275,9 +275,3 @@ class TaskPathManager:
         print("[Data] Task Pos: \n{}".format(self._task_pos))
         print("[Data] Task Rot: \n{}".format(self._task_rot))
         print("[Data] Task Grip: \n{}".format(self._task_grip))
-
-
-# coordinate visualizer class
-class CoordViz:
-    def __init__(self):
-        pass

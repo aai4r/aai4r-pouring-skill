@@ -36,6 +36,7 @@ from spirl.utility.general_utils import AttrDict
 from utilities import Rx, Ry, Rz, deg2rad
 
 
+# TODO!
 class CoordViz:
     def __init__(self, elev=30, azim=-60):
         self.fig = plt.figure()
@@ -84,6 +85,12 @@ class CoordViz:
         self.ax2.plot(xs=[p1[0], p2[0]],
                       ys=[p1[1], p2[1]],
                       zs=[p1[2], p2[2]], color=color)
+
+    def refresh(self):
+        self.set_viz_form()
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+        plt.pause(0.1)
 
     def show(self):
         self.set_viz_form()
@@ -148,6 +155,7 @@ def coord_viz():
         cv.draw_coord_to_right(mat_target)  # order change..
         # cv.draw_coord_to_right(mat_target[:, [2, 0, 1]])    # order change..
         # break
+        cv.refresh()
     cv.show()
 
 

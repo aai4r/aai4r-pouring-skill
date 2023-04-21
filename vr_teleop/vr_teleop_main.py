@@ -6,6 +6,7 @@ from tasks.cube import Cube
 from tasks.ur3_robotiq85 import IsaacUR3
 from spirl.utility.general_utils import AttrDict
 from utils.torch_jit_utils import *
+from vr_teleop.tasks.rollout_manager import RotCoordVizRealTime
 
 import triad_openvr
 
@@ -70,6 +71,10 @@ class SimVR:
             self.threads = []
             self.events = []
             self.open_socket_server()
+
+        if self.cfg.coord_viz:
+            self.coord_viz = RotCoordVizRealTime()
+            self.count = 0
 
     def init_env(self):
         # add ground plane
@@ -170,6 +175,15 @@ class SimVR:
             self.event_handler()
             self.obj.move()
 
+            if self.cfg.coord_viz:
+                vr_st = self.obj.get_vr_status()
+                if vr_st is not None:
+                    if vr_st["btn_trigger"]:
+                        if self.count % 5 == 0:
+                            self.coord_viz.draw(vr_st["pose_quat"])
+                            self.count = 0
+                        self.count += 1
+
             # update the viewer
             self.gym.step_graphics(self.sim)
             self.gym.draw_viewer(self.viewer, self.sim, False)
@@ -187,11 +201,11 @@ class SimVR:
 
 
 if __name__ == "__main__":
-    target = IsaacUR3   # Cube or IsaacUR3
+    target = Cube   # Cube or IsaacUR3
     # rot_dict = {Cube: (-89.9, 0.0, 89.9), IsaacUR3: (-89.9, 0.0, 89.9)}
     rot_dict = {Cube: (-90.0, 0.0, -90.0), IsaacUR3: (-90.0, 0.0, -90.0)}
     # rot_dict = {Cube: (0.0, 0.0, 0.0), IsaacUR3: (-90.0, 0.0, -90.0)}
-    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target, rot_d=rot_dict[target])
+    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target, rot_d=rot_dict[target], coord_viz=True)
     sv = SimVR(cfg=cfg)
     sv.run()
 
