@@ -2,8 +2,13 @@ import triad_openvr
 import sys
 import time
 
+from isaacgym import gymapi
+
 
 def simple_controller_test():
+    # TODO,, why...?
+    gymapi.acquire_gym().create_sim(0, 0, gymapi.SIM_PHYSX, gymapi.SimParams())
+
     vr = triad_openvr.triad_openvr()
     vr.print_discovered_objects()
 

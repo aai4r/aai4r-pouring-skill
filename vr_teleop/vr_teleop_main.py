@@ -7,8 +7,9 @@ from tasks.ur3_robotiq85 import IsaacUR3
 from spirl.utility.general_utils import AttrDict
 from utils.torch_jit_utils import *
 from vr_teleop.tasks.rollout_manager import RotCoordVizRealTime
+from vr_teleop.tasks.rollout_manager import RolloutManagerExpand, RobotState2
 
-import triad_openvr
+# import triad_openvr
 
 import socket
 from threading import Event, Thread
@@ -173,22 +174,35 @@ class SimVR:
 
             # processing
             self.event_handler()
-            self.obj.move()
+            vr_st = self.obj.get_vr_status()
+            self.obj.move(vr_st=vr_st)
 
             if self.cfg.coord_viz:
-                vr_st = self.obj.get_vr_status()
                 if vr_st["btn_reset_pose"]:
-                    print("reset button!!")
+                    print("Save motion data")
+                    self.coord_viz.rollout.save_to_file()
 
                 if vr_st["btn_grip"]:
                     print("grip!!!!")
 
                 if vr_st is not None:
                     if vr_st["btn_trigger"]:
-                        print(vr_st)
+                        # print(vr_st)
                         if self.count % 5 == 0:
                             raw_q = vr_st["pose_quat"]
                             cont_q = self.coord_viz.get_constrained_quat(raw_q)
+                            _st = RobotState2.random_data(n_joint=6, n_cont_mode=2)
+                            state = RobotState2(joint=_st[:6], ee_pos=_st[6:9], ee_quat=_st[9:13],
+                                                gripper_pos=_st[13:14], control_mode_one_hot=_st[14:16])
+
+                            self.coord_viz.record_frame(observation=np.random.rand(30, 30, 3),
+                                                        state=state,
+                                                        action_pos=[0., 0., 0.],
+                                                        action_quat=raw_q.tolist(),
+                                                        action_grip=[1.0],
+                                                        action_mode=[0.0],
+                                                        done=1,
+                                                        extra=cont_q.tolist())
                             self.coord_viz.draw(raw_q, cont_q)
                             self.count = 0
                         self.count += 1
@@ -213,13 +227,14 @@ import os
 
 
 def vr_test():
+    gymapi.acquire_gym().create_sim(0, 0, gymapi.SIM_PHYSX, gymapi.SimParams())
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print("cd: ", os.getcwd())
     vr = VRWrapper(device=device, rot_d=(0.0, 0.0, 0.0))
     print("vr:: ", vr)
     while True:
         cont_status = vr.get_controller_status()
-        if cont_status["trigger"]:
+        if cont_status["btn_trigger"]:
             print("trigger!")
 
         if cont_status["btn_reset_pose"]:
@@ -227,6 +242,10 @@ def vr_test():
 
         if cont_status["btn_grip"]:
             print("grip!")
+
+
+def motion_visualization():
+    pass
 
 
 if __name__ == "__main__":

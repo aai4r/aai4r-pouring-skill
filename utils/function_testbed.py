@@ -105,7 +105,7 @@ class RotCoordViz(CoordViz):
         super().__init__(elev=elev, azim=azim)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.rollout = RolloutManagerExpand(task_name)
-        self.rollout.load_from_file(batch_idx=1, rollout_idx=3)
+        self.rollout.load_from_file(batch_idx=1, rollout_idx=7)
 
     def quat_to_mat(self, q):
         _q = q if torch.is_tensor(q) else torch.tensor(q, device=self.device)
@@ -141,7 +141,7 @@ def coord_viz():
                    gamma=AttrDict(elev=0, azim=0))
 
     task_name = "pouring_constraint"
-    cv = RotCoordViz(task_name=task_name, conf_mode=fwd, rot_mode='alpha')   # elev=30, azim=145
+    cv = RotCoordViz(task_name=task_name, conf_mode=fwd, rot_mode='gamma')   # elev=30, azim=145
     for i in range(len(cv.rollout._actions)):
         print("quat_target: ", cv.rollout._actions[i][3:7])
         q_source = cv.rollout._extra[i][:]

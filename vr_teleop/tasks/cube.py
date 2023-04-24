@@ -56,18 +56,20 @@ class Cube(BaseObject):
         cont_status = self.vr.get_controller_status()
         return cont_status
 
-    def vr_handler(self, state):
-        cont_status = self.vr.get_controller_status()
-        if cont_status["btn_trigger"]:
-            lv = cont_status["lin_vel"] * 10.0
-            av = cont_status["ang_vel"] * 1.0
+    def move(self, vr_st):
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
+
+        if vr_st["btn_trigger"]:
+            lv = vr_st["lin_vel"] * 10.0
+            av = vr_st["ang_vel"] * 1.0
             state['vel']['linear'].fill((lv[0], lv[1], lv[2]))
-            state['vel']['angular'].fill((av[0], av[1], av[2]))     # relative
+            state['vel']['angular'].fill((av[0], av[1], av[2]))  # relative
 
             # orientation (absolute)
             self.cube_pos = self.rigid_body_states[:, self.cube_handle][:, 0:3]
             self.cube_rot = self.rigid_body_states[:, self.cube_handle][:, 3:7]
-            self.vr_q = torch.tensor(cont_status["pose_quat"], device=self.device)
+            self.vr_q = torch.tensor(vr_st["pose_quat"], device=self.device)
         curr = self.cube_rot
 
         s = 10.0
@@ -79,12 +81,6 @@ class Cube(BaseObject):
         #     print("dq: ", dq)
         # self.cube_rot = quat_mul(curr, dq)
         state['vel']['angular'].fill((dq[0], dq[1], dq[2]))
-
-    def move(self):
-        self.gym.refresh_rigid_body_state_tensor(self.sim)
-        state = self.gym.get_actor_rigid_body_states(self.env, self.cube_handle, gymapi.STATE_NONE)
-        if self.vr is not None:
-            self.vr_handler(state=state)
 
         self.gym.set_actor_rigid_body_states(self.env, self.cube_handle, state, gymapi.STATE_ALL)
         # print("asdasdasd")

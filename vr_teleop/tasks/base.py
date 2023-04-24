@@ -46,7 +46,8 @@ class IsaacElement:
 
 
 class ButtonPressedEventHandler:
-    def __init__(self):
+    def __init__(self, control_id=None):
+        self.id = control_id
         self._curr = None
         self._prev = None
 
@@ -110,10 +111,10 @@ class VRWrapper:
         print("rot: \n", self.rot)
         self.left_to_right = left_to_right  # left-handed to right-handed coordinate
 
-        self.trk_btn = ButtonPressedEventHandler()
-        self.menu_btn = ButtonPressedEventHandler()
-        self.mode_btn = ButtonPressedEventHandler()
-        self.grip_btn = ButtonPressedEventHandler()
+        self.trk_btn = ButtonPressedEventHandler(control_id="track_pad")
+        self.menu_btn = ButtonPressedEventHandler(control_id="menu")
+        self.mode_btn = ButtonPressedEventHandler(control_id="mode")
+        self.grip_btn = ButtonPressedEventHandler(control_id="grip")
         self.prev_time = time.time()
 
     def get_controller_status(self):

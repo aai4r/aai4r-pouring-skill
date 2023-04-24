@@ -734,7 +734,7 @@ class RotCoordVizRealTime(CoordViz, UR3ControlMode):
         plt.pause(0.001)
 
     def record_frame(self, observation, state, action_pos, action_quat, action_grip, action_mode, done, extra=None):
-        info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
+        info = str({"gripper": False, "control_mode": self.CONTROL_MODE})   # TODO, grip on for sim..
         action = action_pos + action_quat + action_grip + action_mode
         self.rollout.append(image=observation, state=state, action=action, done=done, info=info, extra=extra)
 
