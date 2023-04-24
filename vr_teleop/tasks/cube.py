@@ -1,4 +1,5 @@
 from .base import *
+import os
 
 
 class Cube(BaseObject):
@@ -71,11 +72,11 @@ class Cube(BaseObject):
 
         s = 10.0
         dq = orientation_error(desired=self.vr_q.unsqueeze(0), current=curr).squeeze(0) * s
-        if self.get_count(50):
-            print(" -------------------- ")
-            print("des_q: ", self.vr_q)
-            print("curr_q: ", curr)
-            print("dq: ", dq)
+        # if self.get_count(50):
+        #     print(" -------------------- ")
+        #     print("des_q: ", self.vr_q)
+        #     print("curr_q: ", curr)
+        #     print("dq: ", dq)
         # self.cube_rot = quat_mul(curr, dq)
         state['vel']['angular'].fill((dq[0], dq[1], dq[2]))
 

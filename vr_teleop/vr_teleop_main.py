@@ -73,7 +73,7 @@ class SimVR:
             self.open_socket_server()
 
         if self.cfg.coord_viz:
-            self.coord_viz = RotCoordVizRealTime()
+            self.coord_viz = RotCoordVizRealTime(task_name=self.cfg.task_name)
             self.count = 0
 
     def init_env(self):
@@ -177,10 +177,19 @@ class SimVR:
 
             if self.cfg.coord_viz:
                 vr_st = self.obj.get_vr_status()
+                if vr_st["btn_reset_pose"]:
+                    print("reset button!!")
+
+                if vr_st["btn_grip"]:
+                    print("grip!!!!")
+
                 if vr_st is not None:
                     if vr_st["btn_trigger"]:
+                        print(vr_st)
                         if self.count % 5 == 0:
-                            self.coord_viz.draw(vr_st["pose_quat"])
+                            raw_q = vr_st["pose_quat"]
+                            cont_q = self.coord_viz.get_constrained_quat(raw_q)
+                            self.coord_viz.draw(raw_q, cont_q)
                             self.count = 0
                         self.count += 1
 
@@ -200,12 +209,35 @@ class SimVR:
         [e.set() for e in self.events]
 
 
+import os
+
+
+def vr_test():
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    print("cd: ", os.getcwd())
+    vr = VRWrapper(device=device, rot_d=(0.0, 0.0, 0.0))
+    print("vr:: ", vr)
+    while True:
+        cont_status = vr.get_controller_status()
+        if cont_status["trigger"]:
+            print("trigger!")
+
+        if cont_status["btn_reset_pose"]:
+            print("reset!")
+
+        if cont_status["btn_grip"]:
+            print("grip!")
+
+
 if __name__ == "__main__":
+    # vr_test()
+    # exit()
     target = Cube   # Cube or IsaacUR3
     # rot_dict = {Cube: (-89.9, 0.0, 89.9), IsaacUR3: (-89.9, 0.0, 89.9)}
     rot_dict = {Cube: (-90.0, 0.0, -90.0), IsaacUR3: (-90.0, 0.0, -90.0)}
     # rot_dict = {Cube: (0.0, 0.0, 0.0), IsaacUR3: (-90.0, 0.0, -90.0)}
-    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target, rot_d=rot_dict[target], coord_viz=True)
+    cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target, rot_d=rot_dict[target], coord_viz=True,
+                   task_name="pouring_constraint")
     sv = SimVR(cfg=cfg)
     sv.run()
 

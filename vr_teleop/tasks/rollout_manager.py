@@ -562,6 +562,9 @@ if __name__ == "__main__":
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from utils.torch_jit_utils import quat_apply, to_torch
+from vr_teleop.tasks.lib_modules import UR3ControlMode
+from utils.utilities import quaternion_real_first, quaternion_real_last
+from pytorch3d import transforms as tr
 
 
 class CoordViz:
@@ -657,18 +660,29 @@ class RotCoordViz(CoordViz):
         self.draw_line_right(p1=self.origin, p2=pz, color='g')  # b
 
 
-class RotCoordVizRealTime(CoordViz):
-    def __init__(self, elev=30, azim=-145):
-        super().__init__(elev=elev, azim=azim)
+class RotCoordVizRealTime(CoordViz, UR3ControlMode):
+    def __init__(self, task_name, elev=30, azim=-145):
+        CoordViz.__init__(self, elev=elev, azim=azim)
+        UR3ControlMode.__init__(self, init_mode="forward")
         self.l1, self.l2, self.l3 = None, None, None
         self.r1, self.r2, self.r3 = None, None, None
         plt.ion()
         plt.show()
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.rollout = RolloutManagerExpand(task_name)
 
-    def draw(self, q):
-        mat = self.quat_to_mat(q)
-        px, py, pz = mat[0], mat[1], mat[2]
+    def get_constrained_quat(self, q):
+        _q = quaternion_real_first(torch.tensor(q, device="cpu", dtype=torch.float32))
+        aa = tr.quaternion_to_axis_angle(_q)
+        des_pose = self.goal_pose(des_pos=[0, 0, 0], des_rot=aa)
+        aa = torch.tensor(des_pose[3:], device="cpu", dtype=torch.float32)
+        _q = tr.axis_angle_to_quaternion(aa)
+        _q = quaternion_real_last(_q)
+        return _q
+
+    def draw(self, rq, cq):
+        raw_mat = self.quat_to_mat(rq)  # raw quaternion
+        px, py, pz = raw_mat[0], raw_mat[1], raw_mat[2]
         if self.l1 is self.l2 is self.l3 is None:
             self.l1,  = self.draw_line_left(p1=self.origin, p2=px, color='r')
             self.l2,  = self.draw_line_left(p1=self.origin, p2=py, color='g')
@@ -688,6 +702,29 @@ class RotCoordVizRealTime(CoordViz):
             vz = np.stack((self.origin, pz))
             self.l3.set_data(vz[:, 0], vz[:, 1])
             self.l3.set_3d_properties(vz[:, 2])
+
+        cont_mat = self.quat_to_mat(cq.to(self.device))     # constrained quaternion
+        _px, _py, _pz = cont_mat[0], cont_mat[1], cont_mat[2]
+        if self.r1 is self.r2 is self.r3 is None:
+            self.r1,  = self.draw_line_right(p1=self.origin, p2=_px, color='r')
+            self.r2,  = self.draw_line_right(p1=self.origin, p2=_py, color='g')
+            self.r3,  = self.draw_line_right(p1=self.origin, p2=_pz, color='b')
+        else:
+            # x-axis
+            vx = np.stack((self.origin, _px))
+            self.r1.set_data(vx[:, 0], vx[:, 1])
+            self.r1.set_3d_properties(vx[:, 2])
+
+            # y-axis
+            vy = np.stack((self.origin, _py))
+            self.r2.set_data(vy[:, 0], vy[:, 1])
+            self.r2.set_3d_properties(vy[:, 2])
+
+            # z-axis
+            vz = np.stack((self.origin, _pz))
+            self.r3.set_data(vz[:, 0], vz[:, 1])
+            self.r3.set_3d_properties(vz[:, 2])
+
         self.refresh()
 
     def refresh(self):
@@ -695,6 +732,11 @@ class RotCoordVizRealTime(CoordViz):
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
         plt.pause(0.001)
+
+    def record_frame(self, observation, state, action_pos, action_quat, action_grip, action_mode, done, extra=None):
+        info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
+        action = action_pos + action_quat + action_grip + action_mode
+        self.rollout.append(image=observation, state=state, action=action, done=done, info=info, extra=extra)
 
     def quat_to_mat(self, q):
         _q = q if torch.is_tensor(q) else torch.tensor(q, device=self.device, dtype=torch.float32)

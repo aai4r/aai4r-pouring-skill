@@ -224,11 +224,18 @@ class UR3ControlMode:
             pitch *= 1.0 if z_xz[2] < 0 else -1.0
             pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
 
+            # # yaw
+            # z_xy = self.Pxy @ qz_axis
+            # dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
+            # yaw = torch.acos(dot_z_x)
+            # yaw *= 1.0 if z_xy[1] > 0 else -1.0
+            # yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
+
             # yaw
-            z_xy = self.Pxy @ qz_axis
-            dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
-            yaw = torch.acos(dot_z_x)
-            yaw *= 1.0 if z_xy[1] > 0 else -1.0
+            x_xy = self.Pxy @ qx_axis
+            dot_x_y = (x_xy @ self.y_axis) / (x_xy.norm() * self.y_axis.norm())
+            yaw = torch.acos(dot_x_y)
+            yaw *= 1.0 if x_xy[0] < 0 else -1.0
             yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
 
             # TCP: roll --> Fixed: Pitch
@@ -238,8 +245,8 @@ class UR3ControlMode:
             roll *= 1.0 if y_yz[1] > 0 else -1.0
             roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
 
-            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
-            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
+            # _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
+            # _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
 
             # ZYX order
             _yaw = yaw + self.rpy_base[2]
@@ -268,8 +275,8 @@ class UR3ControlMode:
             roll *= 1.0 if z_yz[1] < 0 else -1.0
             roll = max(self.limits.rx_min, min(self.limits.rx_max, roll))
 
-            _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
-            _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
+            # _roll, _pitch, _yaw = get_euler_xyz(q=q.unsqueeze(0))  # VR axis-angle --> quaternion --> rpy
+            # _roll, _pitch, _yaw = list(map(to_n_pi_pi, [_roll, _pitch, _yaw]))
 
             # ZYX order
             _yaw = yaw + self.rpy_base[2]
