@@ -53,18 +53,21 @@ class CoordViz:
         self.basis_z = [0, 0, self.bl]
 
         self.draw_basis()
+        self.set_viz_form()
 
-    def set_viz_form(self):
+    def set_viz_form(self, labels=None):
+        if labels is None:
+            labels = ['X-Axis', 'Y-Axis', 'Z-Axis']
         self.ax1.set_xticks([-self.dr, 0, self.dr])
         self.ax1.set_yticks([-self.dr, 0, self.dr])
         self.ax1.set_zticks([-self.dr, 0, self.dr])
-        self.ax1.set_xlabel('X-Axis'), self.ax1.set_ylabel('Y-Axis'), self.ax1.set_zlabel('Z-Axis')
+        self.ax1.set_xlabel(labels[0]), self.ax1.set_ylabel(labels[1]), self.ax1.set_zlabel(labels[2])
         self.ax1.set_title('Source Trajectory')
 
         self.ax2.set_xticks([-self.dr, 0, self.dr])
         self.ax2.set_yticks([-self.dr, 0, self.dr])
         self.ax2.set_zticks([-self.dr, 0, self.dr])
-        self.ax2.set_xlabel('X-Axis'), self.ax2.set_ylabel('Y-Axis'), self.ax2.set_zlabel('Z-Axis')
+        self.ax2.set_xlabel(labels[0]), self.ax2.set_ylabel(labels[1]), self.ax2.set_zlabel(labels[2])
         self.ax2.set_title('Constrained Trajectory')
 
     def draw_basis(self):
@@ -86,26 +89,30 @@ class CoordViz:
                       ys=[p1[1], p2[1]],
                       zs=[p1[2], p2[2]], color=color)
 
-    def refresh(self):
-        self.set_viz_form()
+    def refresh(self, dt=0.1, labels=None):
+        self.set_viz_form(labels)
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
-        plt.pause(0.1)
+        plt.pause(dt)
 
     def show(self):
-        self.set_viz_form()
         plt.show()
         Axes3D.plot()
 
 
 class RotCoordViz(CoordViz):
-    def __init__(self, task_name, conf_mode, rot_mode):
+    def __init__(self, task_name, conf_mode):
+        self.conf_mode = conf_mode
+        rot_mode = self.conf_mode.rot_mode
         assert rot_mode in ['alpha', 'beta', 'gamma']
         elev, azim = conf_mode[rot_mode].elev, conf_mode[rot_mode].azim
+        batch_idx, rollout_idx = conf_mode.batch_idx, conf_mode[rot_mode].rollout_idx
         super().__init__(elev=elev, azim=azim)
+        self.ax1.set_xlabel("")
+
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.rollout = RolloutManagerExpand(task_name)
-        self.rollout.load_from_file(batch_idx=1, rollout_idx=7)
+        self.rollout.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
 
     def quat_to_mat(self, q):
         _q = q if torch.is_tensor(q) else torch.tensor(q, device=self.device)
@@ -123,30 +130,33 @@ class RotCoordViz(CoordViz):
 
     def draw_coord_to_right(self, mat):
         px, py, pz = mat[0], mat[1], mat[2]
-        self.draw_line_right(p1=self.origin, p2=px, color='b')  # r
-        self.draw_line_right(p1=self.origin, p2=py, color='r')  # g
-        self.draw_line_right(p1=self.origin, p2=pz, color='g')  # b
+        self.draw_line_right(p1=self.origin, p2=px, color='r')
+        self.draw_line_right(p1=self.origin, p2=py, color='g')
+        self.draw_line_right(p1=self.origin, p2=pz, color='b')
 
 
 def coord_viz():
     print("Coordinate Viz!")
     fwd = AttrDict(mode="forward",
-                   alpha=AttrDict(elev=0, azim=180),
-                   beta=AttrDict(elev=0, azim=90),
-                   gamma=AttrDict(elev=90, azim=180))
+                   rot_mode="gamma",
+                   batch_idx=1,
+                   alpha=AttrDict(elev=0, azim=180, rollout_idx=6, labels=['', 'Y-Axis', 'Z-Axis']),
+                   beta=AttrDict(elev=0, azim=90, rollout_idx=7, labels=['X-Axis', '', 'Z-Axis']),
+                   gamma=AttrDict(elev=90, azim=180, rollout_idx=8, labels=['X-Axis', 'Y-Axis', '']))
 
     dwn = AttrDict(mode="downward",
-                   alpha=AttrDict(elev=0, azim=180),
-                   beta=AttrDict(elev=0, azim=0),
-                   gamma=AttrDict(elev=0, azim=0))
+                   rot_mode="alpha",
+                   batch_idx=1,
+                   alpha=AttrDict(elev=0, azim=180, rollout_idx=6, labels=['', 'Y-Axis', 'Z-Axis']),
+                   beta=AttrDict(elev=0, azim=-90, rollout_idx=7, labels=['X-Axis', '', 'Z-Axis']),
+                   gamma=AttrDict(elev=90, azim=180, rollout_idx=8, labels=['X-Axis', 'Y-Axis', '']))
 
-    task_name = "pouring_constraint"
-    cv = RotCoordViz(task_name=task_name, conf_mode=fwd, rot_mode='gamma')   # elev=30, azim=145
-    for i in range(len(cv.rollout._actions)):
-        print("quat_target: ", cv.rollout._actions[i][3:7])
-        q_source = cv.rollout._extra[i][:]
-        q_target = cv.rollout._actions[i][3:7]
-        # q = [-0.488818, -0.4917718, -0.5077382, -0.51099664]
+    task_name = "pick_and_place_constraint"     # [pouring_constraint, pick_and_place_constraint]
+    cv = RotCoordViz(task_name=task_name, conf_mode=dwn)   # elev=30, azim=145
+    for i in range(len(cv.rollout._actions)-1):
+        # print("quat_target: ", cv.rollout._actions[i][3:7])
+        q_source = cv.rollout._actions[i][3:7]
+        q_target = cv.rollout._extra[i][:]
 
         mat_source = cv.quat_to_mat(q_source)
         mat_target = cv.quat_to_mat(q_target)
@@ -155,7 +165,7 @@ def coord_viz():
         cv.draw_coord_to_right(mat_target)  # order change..
         # cv.draw_coord_to_right(mat_target[:, [2, 0, 1]])    # order change..
         # break
-        cv.refresh()
+        cv.refresh(dt=0.01, labels=cv.conf_mode[cv.conf_mode.rot_mode].labels)
     cv.show()
 
 

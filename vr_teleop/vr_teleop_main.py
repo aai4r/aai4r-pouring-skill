@@ -74,7 +74,7 @@ class SimVR:
             self.open_socket_server()
 
         if self.cfg.coord_viz:
-            self.coord_viz = RotCoordVizRealTime(task_name=self.cfg.task_name)
+            self.coord_viz = RotCoordVizRealTime(task_name=self.cfg.task_name, conf_mode=self.cfg.conf_mode)
             self.count = 0
 
     def init_env(self):
@@ -179,8 +179,13 @@ class SimVR:
 
             if self.cfg.coord_viz:
                 if vr_st["btn_reset_pose"]:
-                    print("Save motion data")
                     self.coord_viz.rollout.save_to_file()
+                    self.coord_viz.rollout.reset()
+                    print("Save motion data")
+
+                if vr_st["btn_reset_timeout"]:
+                    self.coord_viz.rollout.reset()
+                    print("rollout reset!")
 
                 if vr_st["btn_grip"]:
                     print("grip!!!!")
@@ -256,7 +261,7 @@ if __name__ == "__main__":
     rot_dict = {Cube: (-90.0, 0.0, -90.0), IsaacUR3: (-90.0, 0.0, -90.0)}
     # rot_dict = {Cube: (0.0, 0.0, 0.0), IsaacUR3: (-90.0, 0.0, -90.0)}
     cfg = AttrDict(vr_on=True, socket_open=True, target_obj=target, rot_d=rot_dict[target], coord_viz=True,
-                   task_name="pouring_constraint")
+                   task_name="pick_and_place_constraint", conf_mode="downward")
     sv = SimVR(cfg=cfg)
     sv.run()
 

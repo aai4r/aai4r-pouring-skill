@@ -224,18 +224,11 @@ class UR3ControlMode:
             pitch *= 1.0 if z_xz[2] < 0 else -1.0
             pitch = max(self.limits.ry_min, min(self.limits.ry_max, pitch))
 
-            # # yaw
-            # z_xy = self.Pxy @ qz_axis
-            # dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
-            # yaw = torch.acos(dot_z_x)
-            # yaw *= 1.0 if z_xy[1] > 0 else -1.0
-            # yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
-
             # yaw
-            x_xy = self.Pxy @ qx_axis
-            dot_x_y = (x_xy @ self.y_axis) / (x_xy.norm() * self.y_axis.norm())
-            yaw = torch.acos(dot_x_y)
-            yaw *= 1.0 if x_xy[0] < 0 else -1.0
+            z_xy = self.Pxy @ qz_axis
+            dot_z_x = (z_xy @ self.x_axis) / (z_xy.norm() * self.x_axis.norm())
+            yaw = torch.acos(dot_z_x)
+            yaw *= 1.0 if z_xy[1] > 0 else -1.0
             yaw = max(self.limits.rz_min, min(self.limits.rz_max, yaw))
 
             # TCP: roll --> Fixed: Pitch

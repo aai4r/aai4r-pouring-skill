@@ -661,9 +661,9 @@ class RotCoordViz(CoordViz):
 
 
 class RotCoordVizRealTime(CoordViz, UR3ControlMode):
-    def __init__(self, task_name, elev=30, azim=-145):
+    def __init__(self, task_name, conf_mode, elev=30, azim=-145):
         CoordViz.__init__(self, elev=elev, azim=azim)
-        UR3ControlMode.__init__(self, init_mode="forward")
+        UR3ControlMode.__init__(self, init_mode=conf_mode)
         self.l1, self.l2, self.l3 = None, None, None
         self.r1, self.r2, self.r3 = None, None, None
         plt.ion()
