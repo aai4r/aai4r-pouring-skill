@@ -101,17 +101,17 @@ class CoordViz:
 
 
 class RotCoordViz(CoordViz):
-    def __init__(self, task_name, conf_mode):
+    def __init__(self, conf_mode):
         self.conf_mode = conf_mode
         rot_mode = self.conf_mode.rot_mode
         assert rot_mode in ['alpha', 'beta', 'gamma']
         elev, azim = conf_mode[rot_mode].elev, conf_mode[rot_mode].azim
         batch_idx, rollout_idx = conf_mode.batch_idx, conf_mode[rot_mode].rollout_idx
         super().__init__(elev=elev, azim=azim)
-        self.ax1.set_xlabel("")
 
+        self.fig.canvas.manager.set_window_title(self.conf_mode.mode + ", " + self.conf_mode.rot_mode)
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        self.rollout = RolloutManagerExpand(task_name)
+        self.rollout = RolloutManagerExpand(self.conf_mode.task_name)
         self.rollout.load_from_file(batch_idx=batch_idx, rollout_idx=rollout_idx)
 
     def quat_to_mat(self, q):
@@ -138,21 +138,22 @@ class RotCoordViz(CoordViz):
 def coord_viz():
     print("Coordinate Viz!")
     fwd = AttrDict(mode="forward",
-                   rot_mode="gamma",
+                   task_name="pouring_constraint",
+                   rot_mode="alpha",
                    batch_idx=1,
                    alpha=AttrDict(elev=0, azim=180, rollout_idx=6, labels=['', 'Y-Axis', 'Z-Axis']),
                    beta=AttrDict(elev=0, azim=90, rollout_idx=7, labels=['X-Axis', '', 'Z-Axis']),
                    gamma=AttrDict(elev=90, azim=180, rollout_idx=8, labels=['X-Axis', 'Y-Axis', '']))
 
     dwn = AttrDict(mode="downward",
-                   rot_mode="alpha",
+                   task_name="pick_and_place_constraint",
+                   rot_mode="gamma",
                    batch_idx=1,
                    alpha=AttrDict(elev=0, azim=180, rollout_idx=6, labels=['', 'Y-Axis', 'Z-Axis']),
                    beta=AttrDict(elev=0, azim=-90, rollout_idx=7, labels=['X-Axis', '', 'Z-Axis']),
                    gamma=AttrDict(elev=90, azim=180, rollout_idx=8, labels=['X-Axis', 'Y-Axis', '']))
 
-    task_name = "pick_and_place_constraint"     # [pouring_constraint, pick_and_place_constraint]
-    cv = RotCoordViz(task_name=task_name, conf_mode=dwn)   # elev=30, azim=145
+    cv = RotCoordViz(conf_mode=dwn)   # elev=30, azim=145
     for i in range(len(cv.rollout._actions)-1):
         # print("quat_target: ", cv.rollout._actions[i][3:7])
         q_source = cv.rollout._actions[i][3:7]
