@@ -127,6 +127,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
     def run_vr_teleop(self):
         print("Run VR teleoperation mode")
+        self.robot_reset()
         try:
             for _ in range(10):
                 depth, color = self.cam.get_np_images()
@@ -331,4 +332,4 @@ if __name__ == "__main__":
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
     u = RealUR3(task_name="pouring_skill_img")
     u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=0)
+    # u.replay_mode(batch_idx=1, rollout_idx=3)

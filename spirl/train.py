@@ -424,13 +424,13 @@ def set_run_params():
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     tasks = ["pouring_skill_img", "pick_and_place_img"]
-    task_name = "pick_and_place_img"
+    task_name = "pouring_skill_img"
     mode = "hierarchical_cl"
 
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))    # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
-    sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
 
 if __name__ == '__main__':
