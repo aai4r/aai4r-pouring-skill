@@ -139,9 +139,9 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 # get velocity command from VR
                 cont_status = self.vr.get_controller_status()
                 if cont_status["btn_reset_timeout"]:
-                    self.rollout.save_to_file()
+                    print("discard current demo...")
+                    # self.rollout.save_to_file()
                     self.rollout.reset()
-
                     self.robot_reset()
                     continue
 
@@ -246,6 +246,7 @@ def vr_test():
         gripper = RobotiqGripperExpand(rtde_c, HOST)
         return gripper
     gripper = gripper_test()
+    grip = False
 
     start = time.time()
     while True:
@@ -257,9 +258,6 @@ def vr_test():
                 pq = cont_status["pose_quat"]
                 print("pq: ", pq)
                 start = curr_time
-            # # pq = torch.cat((pq[-1].unsqueeze(0), pq[:3]))   # real first
-            # pq = quaternion_real_first(q=torch.tensor(pq))
-            # aa = tr.quaternion_to_axis_angle(pq)
 
         if cont_status["btn_reset_timeout"]:
             print("btn_reset timeout")
@@ -267,10 +265,8 @@ def vr_test():
             print("btn_reset_mode")
         if cont_status["btn_grip"]:
             print("btn_grip is pressed..")
-            gripper_action = -1.0
-        else:
-            gripper_action = 1.0
-
+            grip = not grip
+        gripper_action = -1.0 if grip else 1.0
         gripper.grasping_by_hold(step=gripper_action)
 
         # if cont_status["btn_gripper"]:
@@ -330,8 +326,9 @@ if __name__ == "__main__":
     # camera_test()
     # camera_load_test(batch_idx=1, rollout_idx=0)
     # vr_test()
+    # exit()
     tasks = ["pouring_skill_img", "pick_and_place_img"]
-    tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
+    # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
     u = RealUR3(task_name="pouring_skill_img")
     u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=0)

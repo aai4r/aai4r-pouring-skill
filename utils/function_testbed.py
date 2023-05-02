@@ -170,6 +170,15 @@ def coord_viz():
     cv.show()
 
 
+from vr_teleop.tasks.lib_modules import BaseRTDE
+
+
+def grip_test():
+    rt = BaseRTDE("192.168.0.75")
+    rt.move_grip_to(0)
+
+
 if __name__ == '__main__':
     # function_test()
-    coord_viz()
+    # coord_viz()
+    grip_test()

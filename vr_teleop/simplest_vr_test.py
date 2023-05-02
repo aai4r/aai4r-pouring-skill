@@ -4,6 +4,7 @@ import time
 
 
 def simple_controller_test():
+    # test..
     vr = triad_openvr.triad_openvr()
     vr.print_discovered_objects()
 
