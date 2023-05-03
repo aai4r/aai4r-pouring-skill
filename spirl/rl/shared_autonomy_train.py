@@ -384,7 +384,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     tasks = ["pouring_skill_img", "pick_and_place_img"]
-    task_name = "pick_and_place_img"
+    task_name = "pouring_skill_img"
     mode = "spirl_cl"
 
     args = get_args()
@@ -395,5 +395,5 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-    args.run_mode = 'eval'  # train, eval
+    args.run_mode = 'train'  # train, eval
     SharedAutonomyTrainer(args=args)

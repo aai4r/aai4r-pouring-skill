@@ -116,6 +116,8 @@ class RobotiqGripperExpand(RobotiqGripper):
 
         if not self.rq_is_gripper_activated():
             self.activate()
+        self.set_force(10)
+        self.set_speed(10)
 
         self.target_grip_mm = self.gripper_to_mm_normalize()
 

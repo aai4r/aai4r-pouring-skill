@@ -222,6 +222,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         elif len(grip) == 1:
             # self.gripper.rq_move_mm_norm(grip[0] * 1.0)
             self.gripper.grasping_by_hold(step=grip[0])
+            self.grip_on = False if grip[0] > 0 else True
         else:
             raise NotImplementedError
 
@@ -293,10 +294,10 @@ class ImageRtdeUR3(RtdeUR3):
             self.speed_stop()
             self.move_j(self.iposes)
 
-    def record_frame(self, image, state, action_pos, action_quat, action_grip, action_mode, done):
+    def record_frame(self, image, state, action_pos, action_quat, action_grip, action_mode, done, extra=None):
         info = str({"gripper": self.grip_on, "control_mode": self.CONTROL_MODE})
         action = action_pos + action_quat + action_grip + action_mode
-        self.rollout.append(image=image, state=state, action=action, done=done, info=info)
+        self.rollout.append(image=image, state=state, action=action, done=done, info=info, extra=extra)
 
     def pre_processing(self, color_image):
         """
@@ -407,7 +408,8 @@ class ImageRtdeUR3(RtdeUR3):
                                   action_quat=[0., 0., 0., 1.],
                                   action_grip=[1.0],
                                   action_mode=[0.0],
-                                  done=1)
+                                  done=1,
+                                  extra=[0., 0., 0., 1.])
 
                 obs = self.reset()
                 reward, done, info = 0, True, ""
@@ -455,7 +457,8 @@ class ImageRtdeUR3(RtdeUR3):
                                       action_quat=act_quat.tolist(),
                                       action_grip=[gripper_action],
                                       action_mode=action_mode,
-                                      done=0)
+                                      done=0,
+                                      extra=vr_curr_quat.tolist())
 
                 d_pos = np.array(actual_tcp_pos) + np.array(act_pos)
                 d_rot = self.goal_axis_angle_from_act_quat(act_quat=act_quat, actual_tcp_aa=actual_tcp_ori_aa)
