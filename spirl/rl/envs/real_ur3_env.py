@@ -21,7 +21,7 @@ data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
     state_dim=16,
     n_actions=9,
-    split=AttrDict(train=0.95, val=0.05, test=0.0),
+    split=AttrDict(train=0.99, val=0.01, test=0.0),
     env_name="pick_and_place_img",   # "pouring_skill_img"  # TODO, how it is affected?
     res=224,
     crop_rand_subseq=True,
