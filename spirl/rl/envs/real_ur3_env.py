@@ -489,7 +489,7 @@ class RealUR3Env(BaseEnvironment):
         pass
 
     def step(self, action):
-        if self.config.run_mode == 'train':
+        if self.config.run_mode == 'train' or self.config.run_mode == 'sample':
             # obs, reward, done, info = self._env.step(action)
             obs, reward, done, info = self._env.step_sa(action)
         elif self.config.run_mode == 'eval':

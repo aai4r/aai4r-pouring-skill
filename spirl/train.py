@@ -430,7 +430,7 @@ def set_run_params():
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))    # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
-    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
 
 if __name__ == '__main__':
