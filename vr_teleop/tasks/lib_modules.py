@@ -29,9 +29,9 @@ class BaseRTDE:
 
         # gripper control
         self.gripper = RobotiqGripperExpand(self.rtde_c, self.HOST)
-        # self.gripper.activate()
-        # self.gripper.set_force(10)  # range: [0, 100]
-        # self.gripper.set_speed(10)  # range: [0, 100]
+        self.gripper.activate()
+        self.gripper.set_force(10)  # range: [0, 100]
+        self.gripper.set_speed(10)  # range: [0, 100]
         self.grip_on = False
         self.move_grip_on_off(grip_action=False)
 
