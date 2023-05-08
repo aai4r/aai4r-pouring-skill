@@ -131,6 +131,8 @@ class SharedAutonomyTrainer:
             self.shared_autonomy_train()
         elif args.run_mode == 'eval':
             self.evaluation(n_eval=10)
+        elif args.run_mode == 'sample':
+            self.shared_autonomy_sampling()
 
     def default_hparams(self):
         default_dict = ParamDict({
@@ -211,6 +213,15 @@ class SharedAutonomyTrainer:
         # augment the demo dataset and skill retraining (how many epochs?)
         # agent model update and skill deployment
 
+    def shared_autonomy_sampling(self):
+        n_total = 0
+        with self.agent.val_mode():
+            while True:  # keep producing rollouts until we get a valid one
+                with torch.no_grad():
+                    episode = self.sampler.sample_episode(is_train=False, render=True)
+                    n_total += 1
+                    print("n_total: ", n_total)
+
     def evaluation(self, n_eval):
         n_total = 0
         with self.agent.val_mode():
@@ -221,6 +232,7 @@ class SharedAutonomyTrainer:
                     self.sampler._env.eval_record_start()
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     n_total += 1
+                self.sampler._env.eval_record_stop()
                 enter = input('Continue? {}/{}, YES: any, NO: q '.format(n_total, n_eval))
                 if enter == 'q':
                     break
@@ -395,5 +407,5 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-    args.run_mode = 'train'  # train, eval
+    args.run_mode = 'sample'  # train, eval, sample
     SharedAutonomyTrainer(args=args)
