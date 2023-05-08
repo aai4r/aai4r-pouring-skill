@@ -1,4 +1,3 @@
-import copy
 import random
 
 from vr_teleop.tasks.lib_modules import *

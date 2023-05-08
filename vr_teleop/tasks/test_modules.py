@@ -88,7 +88,20 @@ def camera_load_test(batch_idx, rollout_idx):
 
 
 def gripper_test():
-    pass
+    HOST = "192.168.0.75"
+    rtde_c = rtde_control.RTDEControlInterface(HOST)
+    gripper = RobotiqGripperExpand(rtde_c, HOST)
+
+    # pos_in_mm = 85
+    # assert gripper
+    # max_len = 85.0
+    # val = min(max(int(pos_in_mm), 0), max_len)  # [0, 50] --> [0/50, 50/50]
+    # val = int((float(val) / max_len) * 50.0 + 0.5)
+    # gripper.move(val)
+    for i in range(500):
+        if i % 10 == 0: print("i: ", i)
+        gripper.grasping_by_hold(step=1.0)
+        time.sleep(0.01)
 
 
 if __name__ == "__main__":
