@@ -147,13 +147,13 @@ def coord_viz():
 
     dwn = AttrDict(mode="downward",
                    task_name="pick_and_place_constraint",
-                   rot_mode="alpha",
+                   rot_mode="gamma",
                    batch_idx=1,
                    alpha=AttrDict(elev=0, azim=180, rollout_idx=6, labels=['', 'Y-Axis', 'Z-Axis']),
                    beta=AttrDict(elev=0, azim=-90, rollout_idx=7, labels=['X-Axis', '', 'Z-Axis']),
                    gamma=AttrDict(elev=90, azim=180, rollout_idx=8, labels=['X-Axis', 'Y-Axis', '']))
 
-    cv = RotCoordViz(conf_mode=fwd)   # elev=30, azim=145
+    cv = RotCoordViz(conf_mode=dwn)   # elev=30, azim=145
     for i in range(len(cv.rollout._actions)-1):
         # print("quat_target: ", cv.rollout._actions[i][3:7])
         q_source = cv.rollout._actions[i][3:7]
