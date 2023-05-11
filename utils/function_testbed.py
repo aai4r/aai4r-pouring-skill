@@ -58,15 +58,15 @@ class CoordViz:
     def set_viz_form(self, labels=None):
         if labels is None:
             labels = ['X-Axis', 'Y-Axis', 'Z-Axis']
-        self.ax1.set_xticks([-self.dr, 0, self.dr])
-        self.ax1.set_yticks([-self.dr, 0, self.dr])
-        self.ax1.set_zticks([-self.dr, 0, self.dr])
+        self.ax1.set_xticks([-self.dr, 0, self.dr] if labels[0] else [])
+        self.ax1.set_yticks([-self.dr, 0, self.dr] if labels[1] else [])
+        self.ax1.set_zticks([-self.dr, 0, self.dr] if labels[2] else [])
         self.ax1.set_xlabel(labels[0]), self.ax1.set_ylabel(labels[1]), self.ax1.set_zlabel(labels[2])
         self.ax1.set_title('Source Trajectory')
 
-        self.ax2.set_xticks([-self.dr, 0, self.dr])
-        self.ax2.set_yticks([-self.dr, 0, self.dr])
-        self.ax2.set_zticks([-self.dr, 0, self.dr])
+        self.ax2.set_xticks([-self.dr, 0, self.dr] if labels[0] else [])
+        self.ax2.set_yticks([-self.dr, 0, self.dr] if labels[1] else [])
+        self.ax2.set_zticks([-self.dr, 0, self.dr] if labels[2] else [])
         self.ax2.set_xlabel(labels[0]), self.ax2.set_ylabel(labels[1]), self.ax2.set_zlabel(labels[2])
         self.ax2.set_title('Constrained Trajectory')
 
@@ -139,7 +139,7 @@ def coord_viz():
     print("Coordinate Viz!")
     fwd = AttrDict(mode="forward",
                    task_name="pouring_constraint",
-                   rot_mode="alpha",
+                   rot_mode="beta",
                    batch_idx=1,
                    alpha=AttrDict(elev=0, azim=180, rollout_idx=6, labels=['', 'Y-Axis', 'Z-Axis']),
                    beta=AttrDict(elev=0, azim=90, rollout_idx=7, labels=['X-Axis', '', 'Z-Axis']),
@@ -147,13 +147,13 @@ def coord_viz():
 
     dwn = AttrDict(mode="downward",
                    task_name="pick_and_place_constraint",
-                   rot_mode="gamma",
+                   rot_mode="alpha",
                    batch_idx=1,
                    alpha=AttrDict(elev=0, azim=180, rollout_idx=6, labels=['', 'Y-Axis', 'Z-Axis']),
                    beta=AttrDict(elev=0, azim=-90, rollout_idx=7, labels=['X-Axis', '', 'Z-Axis']),
                    gamma=AttrDict(elev=90, azim=180, rollout_idx=8, labels=['X-Axis', 'Y-Axis', '']))
 
-    cv = RotCoordViz(conf_mode=dwn)   # elev=30, azim=145
+    cv = RotCoordViz(conf_mode=fwd)   # elev=30, azim=145
     for i in range(len(cv.rollout._actions)-1):
         # print("quat_target: ", cv.rollout._actions[i][3:7])
         q_source = cv.rollout._actions[i][3:7]
@@ -180,5 +180,5 @@ def grip_test():
 
 if __name__ == '__main__':
     # function_test()
-    # coord_viz()
-    grip_test()
+    coord_viz()
+    # grip_test()
