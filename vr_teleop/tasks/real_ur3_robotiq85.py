@@ -240,5 +240,5 @@ if __name__ == "__main__":
     tasks = ["pouring_skill_img", "pick_and_place_img"]
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
     u = RealUR3(task_name="pouring_skill_img")
-    u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=3)
+    # u.run_vr_teleop()
+    u.replay_mode(batch_idx=1, rollout_idx=268)

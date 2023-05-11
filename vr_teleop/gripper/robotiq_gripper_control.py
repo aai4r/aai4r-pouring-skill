@@ -114,8 +114,9 @@ class RobotiqGripperExpand(RobotiqGripper):
         self.actual_min = 3
         self.actual_max = 227
 
-        if not self.rq_is_gripper_activated():
-            self.activate()
+        # if not self.rq_is_gripper_activated():
+        #     self.activate()
+        self.activate()
         self.set_force(10)
         self.set_speed(10)
 

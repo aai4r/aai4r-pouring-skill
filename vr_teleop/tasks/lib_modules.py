@@ -55,11 +55,11 @@ class BaseRTDE:
 
     def get_inverse_kinematics(self, tcp_pose):
         try:
-            ik_joint = self.rtde_c.getInverseKinematics(x=tcp_pose)
-            if len(ik_joint) == 0:
-                print("IK exception..! input tcp pose => ", tcp_pose)
+            if self.rtde_c.getInverseKinematicsHasSolution(x=tcp_pose):
+                ik_joint = self.rtde_c.getInverseKinematics(x=tcp_pose)
+            else:
+                print("IK exception...! input tcp pose => ", tcp_pose)
                 ik_joint = self.get_actual_q()
-                # raise ValueError
             return ik_joint
         except ValueError:
             print("IK exception..! input tcp pose => ", tcp_pose)
