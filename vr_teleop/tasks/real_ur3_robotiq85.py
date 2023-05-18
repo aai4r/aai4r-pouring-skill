@@ -237,58 +237,10 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 self.play_demo()
 
 
-class RolloutManipulation:
-    def __init__(self, task_name):
-        self.rollout = RolloutManagerExpand(task_name=task_name)
-
-    def check(self):
-        self.rollout.load_from_file(batch_idx=1, rollout_idx=4)
-        for i in range(self.rollout.len()):
-            obs, state, action, done, info = self.rollout.get(i)
-            cont_mode = ""
-            if state.control_mode_one_hot == [1.0, 0.0]:
-                cont_mode = "forward"
-            elif state.control_mode_one_hot == [0.0, 1.0]:
-                cont_mode = "downward"
-            print("control mode: [{}], action: {}, done: {}".format(cont_mode, action[-1], np.argmax(done)))
-
-    def manipulate(self):
-        n_files = 215   # TODO, automatic...
-        for j in range(n_files):
-            self.rollout.reset()
-            self.rollout.load_from_file(batch_idx=1, rollout_idx=j)
-            self.rollout.show_rollout_summary()
-
-            for i in range(self.rollout.len()):
-                obs, state, action, done, info = self.rollout.get(i)
-                visualize(np.zeros(obs.shape), obs)
-
-                self.rollout._dones[i] = float(not done)
-                # print("after done: ", done)
-                # print("done idx: ", np.argmax(done))
-                # print("before action: ", action[-1])
-                if state.control_mode_one_hot == [0.0, 1.0]:    # downward
-                    # print("downward")
-                    action[-1] = -1.0
-                elif state.control_mode_one_hot == [1.0, 0.0]:  # forward
-                    action[-1] = 1.0
-                    # print("forward")
-                # _, _, action, _, _ = self.rollout.get(i)
-                # print("after action: ", action[-1])
-                # print(action)
-                # print(state.control_mode_one_hot, state.gripper_pos)
-                time.sleep(0.001)
-            self.rollout.save_to_file(batch_idx=2)
-
-
 if __name__ == "__main__":
     tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
-    # u = RealUR3(task_name="pick_and_place_img")
-    # u.run_vr_teleop()
+    u = RealUR3(task_name="pick_and_place_img")
+    u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=268)
-
-    rm = RolloutManipulation(task_name="multi_skill_img")
-    rm.manipulate()
-    # rm.check()
 
