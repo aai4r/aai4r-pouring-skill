@@ -147,7 +147,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     continue
 
                 if cont_status["btn_reset_pose"]:
-                    depth, color = self.cam.get_np_images()
+                    depth, color = self.cam.get_np_images(resize=(320, 240))
                     self.record_frame(observation=copy.deepcopy(color),
                                       state=self.get_state(),
                                       action_pos=[0., 0., 0.],
@@ -167,7 +167,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 action_mode = [1.0] if self.CONTROL_MODE == 'forward' else [-1.0]
                 if cont_status["btn_trigger"]:
-                    depth, color = self.cam.get_np_images()
+                    depth, color = self.cam.get_np_images(resize=(320, 240))
                     visualize(depth, color)
                     state = self.get_state()
 
@@ -240,7 +240,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 if __name__ == "__main__":
     tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
-    u = RealUR3(task_name="pick_and_place_img")
+    u = RealUR3(task_name="pouring_skill_img")
     u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=268)
 

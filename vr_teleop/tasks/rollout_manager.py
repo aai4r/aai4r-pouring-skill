@@ -218,6 +218,13 @@ class RolloutManagerExpand(RolloutManager):
         self._images.append(image)
         self._extra.append(extra)
 
+    def replace(self, index, image=None, state=None, action=None, done=None, info=None):
+        if image is not None: self._images[index] = image
+        if state is not None: self._states[index] = state
+        if action is not None: self._actions[index] = action
+        if done is not None: self._dones[index] = done
+        if info is not None: self._info[index] = info
+
     def get(self, index):
         assert 0 <= index < self.len()
         return self._images[index], self._states[index], self._actions[index], self._dones[index], self._info[index]
@@ -342,7 +349,7 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])
 
-        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
+        self.config = AttrDict(crop_h=230, crop_w=230, resize_h=224, resize_w=224)
 
     def pre_processing(self, color_image):
         """

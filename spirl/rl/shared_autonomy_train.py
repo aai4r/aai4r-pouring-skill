@@ -407,5 +407,5 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-    args.run_mode = 'sample'  # train, eval, sample
+    args.run_mode = 'eval'  # train, eval, sample
     SharedAutonomyTrainer(args=args)

@@ -443,7 +443,7 @@ class RealSense(RealSenseBase):
     def stop_stream(self):
         self.pipeline.stop()
 
-    def get_np_images(self):
+    def get_np_images(self, resize=None):
         frames = self.pipeline.wait_for_frames()
         depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
@@ -453,6 +453,10 @@ class RealSense(RealSenseBase):
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
         color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
+
+        if resize:
+            color_image = cv2.resize(color_image, dsize=resize, interpolation=cv2.INTER_AREA)
+            depth_image = cv2.resize(depth_image, dsize=resize, interpolation=cv2.INTER_AREA)
         return depth_image, color_image
 
 
