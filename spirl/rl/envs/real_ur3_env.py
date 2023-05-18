@@ -272,7 +272,7 @@ class ImageRtdeUR3(RtdeUR3):
         # TODO, have to record the scene while mode changing
         self.ev_mgr = EvalVideoManager(path="eval_video", task=self.config.task_name)
 
-        self.config.img_cfg = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
+        self.config.img_cfg = AttrDict(crop_h=230, crop_w=230, resize_h=224, resize_w=224)
         self.rollout = RolloutManagerExpand(task_name=self.config.task_name)
 
     def get_robot_state(self):
@@ -401,7 +401,7 @@ class ImageRtdeUR3(RtdeUR3):
 
             if cont_status["btn_reset_pose"]:
                 self.speed_stop()
-                depth, color = self.cam.get_np_images(self.idx_rear)
+                depth, color = self.cam.get_np_images(self.idx_rear, resize=(320, 240))
                 self.record_frame(image=copy.deepcopy(color),
                                   state=self.get_robot_state(),
                                   action_pos=[0., 0., 0.],
@@ -422,7 +422,7 @@ class ImageRtdeUR3(RtdeUR3):
             diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             action_mode = [0.0]
             if cont_status["btn_trigger"]:
-                depth, color = self.cam.get_np_images(self.idx_rear)
+                depth, color = self.cam.get_np_images(self.idx_rear, resize=(320, 240))
                 visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
                 state = self.get_robot_state()
 

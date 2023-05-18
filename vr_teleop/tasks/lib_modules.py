@@ -530,7 +530,7 @@ class RealSenseMulti(RealSenseBase):
         print("    Color shape: {}, min / max: {} / {}, dtype: {}".format(color.shape, color.min(), color.max(),
                                                                           color.dtype))
 
-    def get_np_images(self, index):
+    def get_np_images(self, index, resize=None):
         frames = self.pipelines[index].wait_for_frames()
         depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
@@ -540,6 +540,10 @@ class RealSenseMulti(RealSenseBase):
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
         color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
+
+        if resize:
+            color_image = cv2.resize(color_image, dsize=resize, interpolation=cv2.INTER_AREA)
+            depth_image = cv2.resize(depth_image, dsize=resize, interpolation=cv2.INTER_AREA)
         return depth_image, color_image
 
     def stop_stream(self, index):
