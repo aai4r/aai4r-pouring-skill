@@ -227,13 +227,13 @@ class RolloutManagerExpand(RolloutManager):
         return self._extra[index]
 
     def len(self):
-        assert len(self._images) == len(self._states) == len(self._actions) == len(self._dones) == len(self._extra)
+        assert len(self._images) == len(self._states) == len(self._actions) == len(self._dones) #== len(self._extra)
         return len(self._states)
 
     def reset(self):
         super().reset()
         self._images = []
-        self._extra = []
+        # self._extra = []
 
     def to_np_rollout(self):
         np_rollout = super().to_np_rollout()
@@ -251,7 +251,7 @@ class RolloutManagerExpand(RolloutManager):
         print("Rollout length: ", self.len())
         idx = 0
         sample_obs, sample_state, sample_action, sample_done, sample_info = self.get(idx)
-        sample_extra = self.get_extra(idx)
+        # sample_extra = self.get_extra(idx)
 
         print("* STEP: [{}]".format(idx))
         print("    observation shape {}".format(sample_obs.shape))
@@ -259,11 +259,11 @@ class RolloutManagerExpand(RolloutManager):
         print("    action * {} dim with {}".format(len(sample_action), sample_action))
         print("    done * {} dim with {}".format(len([sample_done]), sample_done))
         print("    info: ", sample_info)
-        print("    extra * {} dim with {}".format(len([sample_extra]), sample_extra))
+        # print("    extra * {} dim with {}".format(len([sample_extra]), sample_extra))
 
-    def save_to_file(self):
+    def save_to_file(self, batch_idx=None):
         np_episode_dict = self.to_np_rollout()
-        save_path = self.get_final_save_path(self.batch_index)
+        save_path = self.get_final_save_path(self.batch_index if batch_idx is None else batch_idx)
 
         f = h5py.File(save_path, "w")
         f.create_dataset("traj_per_file", data=1)

@@ -396,7 +396,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
-    task_name = "multi_skill_img"
+    task_name = "pouring_skill_img"
     mode = "spirl_cl"
 
     args = get_args()
