@@ -14,7 +14,8 @@ class RolloutManipulation:
             j, i = x[:2]
             obs, state, action, done, info = x[-1]
             visualize(np.zeros(obs.shape), obs)
-            print("obs shape: ", obs.shape)
+            # print("obs shape: ", obs.shape)
+            # print("action last ", action[-1])
 
     def yield_dataset(self, src_batch_idx, target_batch_idx=None):
         n_files = len(self.rollout.get_rollout_list(batch_idx=src_batch_idx))
@@ -56,7 +57,7 @@ class RolloutManipulation:
 if __name__ == "__main__":
     tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
     rm = RolloutManipulation(task_name="multi_skill_img")
-    rm.manipulate(src_batch_idx=1, target_batch_idx=2, height=240, width=320)
+    # rm.manipulate(src_batch_idx=1, target_batch_idx=2, height=240, width=320)
     # rm.conf_action(src_batch_idx=1, target_batch_idx=2)
-    # rm.check(src_batch_idx=2)
+    rm.check(src_batch_idx=1)
 

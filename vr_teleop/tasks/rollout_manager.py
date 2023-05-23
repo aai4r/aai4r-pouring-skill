@@ -373,7 +373,7 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         resize_h, resize_w = self.config.resize_h, self.config.resize_w
         y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
 
-        zoom_pix = 50
+        zoom_pix = int(min(crop_h, crop_w) * 0.11)
         zoom = np.random.randint(0, zoom_pix)
         cropped_img = color_image[y:y+crop_h-zoom, x:x+crop_w-zoom]
         resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
@@ -557,9 +557,10 @@ if __name__ == "__main__":
     #         r_idx = r[len('rollout_'):r.find('.')]
     #         print(rollout_list)
 
-    vdc.load_from_file(batch_idx=1, rollout_idx=43)
+    vdc.load_from_file(batch_idx=1, rollout_idx=1)
     for i in range(vdc.len()):
         obs, state, action, done, info = vdc.get(i)
+        obs = vdc.pre_processing(obs)
         visualize(depth_image=np.zeros(obs.shape), color_image=obs)
     # np_rollout = vdc.to_np_rollout()
     # print(np_rollout.features.shape)

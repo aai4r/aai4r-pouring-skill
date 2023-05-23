@@ -214,6 +214,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
     def goal_pose_from_action(self, action):
         act_pos, act_quat, grip, mode = action[:3], action[3:7], action[7:8], action[8:9]
+        # print("conf mode: ", mode)
 
         if len(grip) == 2:
             grip_onehot = self.arg_max_one_hot(list1d=grip)
@@ -226,9 +227,9 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         else:
             raise NotImplementedError
 
-        if mode > 0.5:
+        if mode > 0.3:
             self.control_mode_to(cont_to="forward", move_j=self.CONTROL_MODE != 'forward')
-        elif mode < -0.5:
+        elif mode < -0.3:
             self.control_mode_to(cont_to="downward", move_j=self.CONTROL_MODE != 'downward')
 
         actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
@@ -312,6 +313,22 @@ class ImageRtdeUR3(RtdeUR3):
 
         # cropped_img = color_image[y:y + crop_h, x:x + crop_w]
         resized_img = cv2.resize(color_image, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+
+        # color_image = cv2.resize(color_image, dsize=(320, 240), interpolation=cv2.INTER_AREA)
+        # ih, iw = color_image.shape[:2]
+        # crop_h, crop_w = self.config.img_cfg.crop_h, self.config.img_cfg.crop_w
+        # resize_h, resize_w = self.config.img_cfg.resize_h, self.config.img_cfg.resize_w
+        # y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
+        #
+        # zoom_pix = 50
+        # zoom = np.random.randint(0, zoom_pix)
+        # cropped_img = color_image[y:y + crop_h - zoom, x:x + crop_w - zoom]
+        # resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+        #
+        # brightness = 50
+        # resized_img = cv2.convertScaleAbs(resized_img, resized_img, 1, np.random.randint(-brightness, brightness))
+        # noisy_img = noisy(image=resized_img, noise_type='s&p', random_noise=False)
+
         out = resized_img
         return out
 
@@ -407,7 +424,7 @@ class ImageRtdeUR3(RtdeUR3):
                                   action_pos=[0., 0., 0.],
                                   action_quat=[0., 0., 0., 1.],
                                   action_grip=[1.0],
-                                  action_mode=[0.0],
+                                  action_mode=[1.0] if self.CONTROL_MODE == 'forward' else [-1.0],
                                   done=1,
                                   extra=[0., 0., 0., 1.])
 

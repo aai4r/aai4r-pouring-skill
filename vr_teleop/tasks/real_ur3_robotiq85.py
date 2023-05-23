@@ -152,7 +152,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       state=self.get_state(),
                                       action_pos=[0., 0., 0.],
                                       action_quat=[0., 0., 0., 1.],
-                                      action_grip=[1.0],
+                                      action_grip=[1.0] if self.CONTROL_MODE == 'forward' else [-1.0],
                                       action_mode=[0.0],
                                       done=1,
                                       extra=[0., 0., 0., 1.])   # source rotation of VR controller...

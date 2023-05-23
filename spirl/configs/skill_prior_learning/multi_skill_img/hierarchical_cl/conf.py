@@ -15,7 +15,7 @@ configuration = {
                  os.path.join(os.environ["DATA_DIR"], 'pick_and_place_img'),
                  os.path.join(os.environ["DATA_DIR"], 'multi_skill_img')],
     'epoch_cycles_train': 100,
-    'num_epochs': 200,
+    'num_epochs': 300,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
