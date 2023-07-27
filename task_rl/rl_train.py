@@ -65,7 +65,7 @@ def task_rl_run():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    task_name = "pouring_water_img"     # ['pouring_water', 'pouring_water_img']
+    task_name = "pouring_water_img"     # ['pouring_skill', 'pouring_water_img']
     mode = "spirl_cl"
     sys.argv.append("--path=" + "../spirl/configs/hrl/{}/{}".format(task_name, mode))
     sys.argv.append("--seed={}".format(0))

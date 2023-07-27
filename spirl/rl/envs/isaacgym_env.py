@@ -45,7 +45,7 @@ class IsaacGymEnv(BaseEnvironment):
 
     def _default_hparams(self):
         return super()._default_hparams().overwrite(ParamDict({
-            'name': "pouring_water",
+            'name': "pouring_skill",
         }))
 
     def step(self, action):

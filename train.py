@@ -44,7 +44,7 @@ def skill_train():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    task_name = "pouring_water"
+    task_name = "pouring_skill"
     skill_mode = "hierarchical_cl"
     skillPriorCmd = ["python", "spirl/train.py",
                      "--path=spirl/configs/skill_prior_learning/{}/{}".format(task_name, skill_mode),
