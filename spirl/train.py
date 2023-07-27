@@ -424,7 +424,7 @@ def set_run_params():
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
     tasks = ["pouring_skill", "pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
-    task_name = "pouring_skill"
+    task_name = "pouring_skill_img"
     mode = "hierarchical_cl"
 
     # config path & params
