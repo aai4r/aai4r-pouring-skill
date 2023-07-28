@@ -7,6 +7,9 @@ from spirl.rl.components.environment import BaseEnvironment
 
 from task_rl.expert_ur3_pouring import DemoUR3Pouring
 from tasks.base.vec_task import VecTaskPython
+from isaacgym import gymutil
+
+args = gymutil.parse_arguments(description="IsaacGym Task ")
 
 
 def parse_task_py(args, cfg, sim_params):
@@ -18,7 +21,7 @@ def parse_task_py(args, cfg, sim_params):
             cfg=cfg,
             sim_params=sim_params,
             physics_engine=args.physics_engine,
-            device_type=args.device,
+            device_type=args.sim_device_type,
             device_id=device_id,
             headless=args.headless)
     except NameError as e:

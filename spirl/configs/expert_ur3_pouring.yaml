@@ -1,0 +1,70 @@
+# if given, will override the device setting in gym.
+env:
+  numEnvs: 1
+  envSpacing: 1
+  episodeLength: 500 # 350
+  enableDebugVis: False
+
+  startPositionNoise: 0.1
+  startRotationNoise: 0.0
+
+  aggregateMode: 3
+
+  dofVelocityScale: 0.1
+  distRewardScale: 0.5
+  rotRewardScale: 0.02
+  openRewardScale: 4.0
+  actionPenaltyScale: 0.01
+  rand_init_pos_scale: 1.5
+
+# action definition
+  drive_mode: POS  # {POS, VEL, EFFORT}
+  actionScale: 30.0
+  action_noise: False
+  action_noise_scale: 0.2
+
+  cam_width: 150
+  cam_height: 150
+
+  interaction_mode: False
+  teleoperation_mode: False
+
+  asset:
+    assetRoot: "../assets"
+    assetFileNameUR3: "urdf/ur3_description/robot/ur3_robotiq85_gripper.urdf"
+#    assetFileNameBottle: "urdf/tasks/bottle.urdf"
+
+extra:
+  skill_uncertainty_plot: False
+
+expert:
+  num_total_frames: 2000000
+  data_path: "../dataset"
+  save_data: True
+  save_resume: False
+  debug_cam: False
+  img_obs: False
+
+sim:
+  substeps: 1
+  physx:
+    num_threads: 4
+    solver_type: 1  # 0: pgs, 1: tgs
+    num_position_iterations: 12 # 12
+    num_velocity_iterations: 1
+    contact_offset: 0.005 # 0.005
+    rest_offset: 0.0
+    bounce_threshold_velocity: 0.2
+    max_depenetration_velocity: 10000.0
+    default_buffer_size_multiplier: 5.0
+    always_use_articulations: False
+
+  flex:
+    num_outer_iterations: 4
+    num_inner_iterations: 15
+    warm_start: 0.8
+    relaxation: 0.75
+
+task:
+  name: "pouring_skill"
+  randomize: False
