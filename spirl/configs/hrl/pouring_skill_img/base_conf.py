@@ -76,7 +76,7 @@ ll_model_params = AttrDict(
     n_input_frames=1,
     nz_enc=256,
     nz_mid=256,
-    nz_vae=12,
+    nz_vae=7,
     n_processing_layers=3,
     num_prior_net_layers=3,
     cond_decode=True,
@@ -163,10 +163,6 @@ data_config.dataset_spec = data_spec
 from task_rl.config import load_cfg
 from isaacgym import gymapi
 cfg = load_cfg(cfg_file_name="expert_ur3_pouring.yaml")
-
-# cfg = AttrDict()
-# cfg.extra = AttrDict()
-# cfg.extra.skill_uncertainty_plot = False
 
 sim_params = parse_sim_params(args, cfg, None)
 

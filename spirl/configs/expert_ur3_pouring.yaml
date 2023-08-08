@@ -18,7 +18,7 @@ env:
   rand_init_pos_scale: 1.5
 
 # action definition
-  drive_mode: POS  # {POS, VEL, EFFORT}
+  drive_mode: VEL  # {POS, VEL, EFFORT}
   actionScale: 30.0
   action_noise: False
   action_noise_scale: 0.2
@@ -35,7 +35,7 @@ env:
 #    assetFileNameBottle: "urdf/tasks/bottle.urdf"
 
 extra:
-  skill_uncertainty_plot: False
+  skill_uncertainty_plot: True
 
 expert:
   num_total_frames: 2000000

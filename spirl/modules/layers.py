@@ -190,6 +190,8 @@ class BaseProcessingNet(ConcatSequential):
         for i in range(num_layers):
             self.add_module('pyramid-{}'.format(i),
                             block(in_dim=mid_dim, out_dim=mid_dim, normalize=builder.normalize))
+            self.add_module('dropout-{}'.format(i),
+                            nn.Dropout(p=0.5))
 
         self.add_module('head'.format(i + 1),
                         block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation))

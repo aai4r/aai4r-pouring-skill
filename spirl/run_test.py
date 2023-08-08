@@ -153,6 +153,7 @@ class RLTrainer:
         print("Task demonstration: {}".format(self.conf.notes))
         rewards = 0
         n_total = 0
+        self.agent.eval()
         with self.agent.val_mode():
             with torch.no_grad():
                 while True:  # keep producing rollouts until we get a valid one
@@ -317,7 +318,7 @@ if __name__ == '__main__':
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     # os.environ['DISPLAY'] = ':1'
 
     # ["block_stacking", "kitchen", "office", "maze", "pouring_skill", "pouring_water_img"]

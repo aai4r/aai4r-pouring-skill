@@ -96,6 +96,7 @@ class DemoUR3Pouring(VRInteraction):
 
         # create some wrapper tensors for different slices
         print("device:: ", self.device)
+        print("drive mode:::::::::::::::::: ", self.drive_mode)
 
         # object order.
         # [0: robot, 1: bottle, 2: water drop, 3: cup, 4: ]
@@ -860,7 +861,7 @@ class DemoUR3Pouring(VRInteraction):
         for e_id in env_ids:
             self.gym.set_rigid_body_color(self.envs[e_id], self.bottles[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
                                           gymapi.Vec3(_uniform(1, 1), _uniform(0.0, 0.5), _uniform(0.0, 0.5)))
-                                          # gymapi.Vec3(_uniform(0, 0.1), _uniform(0.0, 1.0), _uniform(0.0, 1.0)))
+                                          # gymapi.Vec3(_uniform(0, 1.0), _uniform(0.0, 1.0), _uniform(0.0, 1.0)))
 
         # reset cup
         place = self.default_cup_states[env_ids]
@@ -883,14 +884,14 @@ class DemoUR3Pouring(VRInteraction):
             self.liquid_states[env_ids, i] = init_liq_pose
             init_liq_pose[:, 2] = init_liq_pose[:, 2] + offset_z
 
-        # background color
-        for e_id in env_ids:
-            self.gym.set_rigid_body_color(self.envs[e_id], self.l_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
-                                          gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
-            # self.gym.set_rigid_body_color(self.envs[e_id], self.r_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
-            #                               gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
-            self.gym.set_rigid_body_color(self.envs[e_id], self.floor_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
-                                          gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
+        # # background color
+        # for e_id in env_ids:
+        #     self.gym.set_rigid_body_color(self.envs[e_id], self.l_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+        #                                   gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
+        #     # self.gym.set_rigid_body_color(self.envs[e_id], self.r_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+        #     #                               gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
+        #     self.gym.set_rigid_body_color(self.envs[e_id], self.floor_bgs[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+        #                                   gymapi.Vec3(_uniform(0.7, 1), _uniform(0.7, 1), _uniform(0.7, 1)))
 
         # # fluid particle init.
         # for i in range(self.num_envs):
@@ -935,14 +936,14 @@ class DemoUR3Pouring(VRInteraction):
                                              _cs[2] + _uniform(low=-0.05, high=0.05, size=1))
                     self.gym.set_camera_location(self.camera_handles[i], self.envs[i], rand_pos, rand_stare)
 
-        # light params, affecting all envs
-        l_color = gymapi.Vec3(random.uniform(1, 1), random.uniform(1, 1), random.uniform(1, 1))
-        l_ambient = gymapi.Vec3(random.uniform(0.7, 1.0), random.uniform(0.7, 1.0), random.uniform(0.7, 1.0))
-        l_direction = gymapi.Vec3(random.uniform(0., 1), random.uniform(0., 1), random.uniform(0., 1))
-        self.gym.set_light_parameters(self.sim, 0, l_color, l_ambient, l_direction)
-        self.gym.set_light_parameters(self.sim, 1, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
-        self.gym.set_light_parameters(self.sim, 2, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
-        self.gym.set_light_parameters(self.sim, 3, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
+        # # light params, affecting all envs
+        # l_color = gymapi.Vec3(random.uniform(1, 1), random.uniform(1, 1), random.uniform(1, 1))
+        # l_ambient = gymapi.Vec3(random.uniform(0.7, 1.0), random.uniform(0.7, 1.0), random.uniform(0.7, 1.0))
+        # l_direction = gymapi.Vec3(random.uniform(0., 1), random.uniform(0., 1), random.uniform(0., 1))
+        # self.gym.set_light_parameters(self.sim, 0, l_color, l_ambient, l_direction)
+        # self.gym.set_light_parameters(self.sim, 1, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
+        # self.gym.set_light_parameters(self.sim, 2, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
+        # self.gym.set_light_parameters(self.sim, 3, gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0), gymapi.Vec3(0, 0, 0))
 
         # apply
         bottle_liquid_indices = self.global_indices[env_ids, 1:].flatten()

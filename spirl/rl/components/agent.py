@@ -1,4 +1,5 @@
 import os
+import math
 import threading
 import time
 
@@ -249,7 +250,7 @@ class HierarchicalAgent(BaseAgent):
 
         # perform step with low-level policy
         assert self._last_hl_output is not None
-        output.update(self.ll_agent.act(self.make_ll_obs(obs_input, self._last_hl_output.action)))
+        output.update(self.ll_agent.act(self.make_ll_obs(obs_input, self._last_hl_output.action.mean(axis=0, keepdims=True))))
 
         return self._remove_batch(output) if len(obs.shape) == 1 else output
 
@@ -339,6 +340,10 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
                            nRow=2, nCol=1, super_title="Robot Skill Plot")
             self.skill_plot = RobotSkillPlot(cfg=cfg)
 
+        # TODO, prior net mode switching
+        # self.hl_agent.policy.net.p[0].on_mc_dropout()
+        # self.hl_agent.policy.net.p[0].set_nn_eval()
+
     def _default_hparams(self):
         default_dict = ParamDict({
             'hl_interval': 3,       # temporal interval at which high-level actions are executed
@@ -350,15 +355,33 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.ll_agent.update_model_weights()
 
     def act(self, *args, **kwargs):
+        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=10)
+        # self.hl_agent.policy.net.p[0].off_mc_dropout()
+
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
             self.skill_plot.reset()
 
         output = super().act(*args, **kwargs)
         self._steps_since_hl += 1
         if self.skill_uncertainty_plot:
-            self.skill_plot.plot(uncertainty=np.exp(self._last_hl_output.dist.log_sigma).mean(),
+            print("Prior Train mode: ", self.hl_agent.policy.net.p[0].get_nn_training())
+            # z_u = output.hl_dist.mu.mean(axis=0)
+            # z_s = np.exp(output.hl_dist.log_sigma).mean(axis=0)
+
+            z = output.hl_dist.rsample()
+            z_u = z.mean(axis=0)
+            z_s = z.std(axis=0)
+
+            # z_e = 0.5 + 0.5 * math.log(2 * math.pi) + np.log(z_s)
+            # z_e = output.hl_dist.entropy()
+            # print("z_u shape: ", z_u.shape)
+            # print("z_s shape: ", z_s.shape)
+            # print("z_e shape: ", z_e.shape)
+            # np.exp(output.hl_dist.log_sigma).mean()
+            self.skill_plot.plot(mu=z_u.mean(),
+                                 sig=z_s.mean(),
                                  curr_state=args[0][:7])
-            output.action[:7] *= self.skill_plot.skill_uncertainty_binary
+            # output.action[:7] *= self.skill_plot.skill_uncertainty_binary
         return output
 
     @property
@@ -431,6 +454,10 @@ class RobotSkillPlot:
         self.refresh_freq = 5  # 1: refresh every step, 2: refresh every two steps, and so on.
         self.refresh_count = 1
 
+        self.time_step = np.array([0])
+        self.uncertainties = np.array([0])
+        self.sigs = np.array([0])
+
         self.init_plot()
 
     def init_plot(self):
@@ -463,6 +490,7 @@ class RobotSkillPlot:
         self.ax_skill.set_xlim([0.0, self.max_episode_length])
         self.time_step = np.array([0])
         self.uncertainties = np.array([0])
+        self.sigs = np.array([0])
         self.skill_uc_plot, = self.ax_skill.plot(self.time_step, self.uncertainties, color='red')
 
     def reset_robot_state(self):
@@ -479,19 +507,30 @@ class RobotSkillPlot:
             self.joint_act_plots.append(_plot)
             self.ax_joint.legend()
 
-    def plot(self, uncertainty, curr_state):
+    def plot(self, mu, sig, curr_state):
         self.time_step = np.append(self.time_step, self.time_step[-1] + 1)
-        self.uncertainty_plot(uncertainty=uncertainty)
+        self.uncertainty_plot(mu=mu, sig=sig)
         self.joint_state_plot(curr_state=curr_state)
         self.refresh()
 
-    def uncertainty_plot(self, uncertainty):
-        self.uncertainties = np.append(self.uncertainties, uncertainty.item())
-        self.skill_uc_plot.set_xdata(self.time_step)
-        self.skill_uc_plot.set_ydata(self.uncertainties)
-        self.ax_skill.set_ylim([0.8, self.uncertainties.max() * 1.1])
+    def uncertainty_plot(self, mu, sig):
+        self.ax_skill.cla()
 
-        if uncertainty > 1.1:  # simple thresholding
+        uncertainty = mu
+        self.uncertainties = np.append(self.uncertainties, uncertainty.item())
+        self.sigs = np.append(self.sigs, sig)
+
+        # self.skill_uc_plot.set_xdata(self.time_step)
+        # self.skill_uc_plot.set_ydata(self.uncertainties)
+        self.ax_skill.set_ylim([-self.sigs.max() * 1.1, self.sigs.max() * 1.1])
+        # self.ax_skill.set_ylim([-3.0, 3.0])
+
+        self.ax_skill.plot(self.time_step, self.uncertainties, color='red')
+        self.ax_skill.fill_between(self.time_step,
+                                   self.uncertainties - self.sigs, self.uncertainties + self.sigs,
+                                   alpha=0.7, color='g')
+
+        if abs(sig) > 5.0:  # simple thresholding
             self.skill_uncertainty_binary = 0.0
             self.blink(period_sec=0.3)
             self.fig.suptitle(self.super_props.text + "\nShow me your demonstration!",

@@ -18,7 +18,7 @@ env:
   rand_init_pos_scale: 1.5
 
 # action definition
-  drive_mode: POS  # {POS, VEL, EFFORT}
+  drive_mode: VEL  # {POS, VEL, EFFORT}
   actionScale: 30.0
   action_noise: False
   action_noise_scale: 0.2
