@@ -355,7 +355,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.ll_agent.update_model_weights()
 
     def act(self, *args, **kwargs):
-        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=10)
+        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=100)
         # self.hl_agent.policy.net.p[0].off_mc_dropout()
 
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
@@ -368,7 +368,8 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
             # z_u = output.hl_dist.mu.mean(axis=0)
             # z_s = np.exp(output.hl_dist.log_sigma).mean(axis=0)
 
-            z = output.hl_dist.rsample()
+            # z = output.hl_dist.rsample()
+            z = self._last_hl_output.action
             z_u = z.mean(axis=0)
             z_s = z.std(axis=0)
 
