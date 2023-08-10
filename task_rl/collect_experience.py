@@ -58,7 +58,7 @@ def task_demonstration(task):
 
     # param customization
     cfg['env']['numEnvs'] = 32
-    cfg['expert']['num_total_frames'] = 300000
+    cfg['expert']['num_total_frames'] = 500000
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB
     cfg['expert']['save_data'] = True
     cfg['expert']['save_resume'] = True

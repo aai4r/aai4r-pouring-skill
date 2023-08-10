@@ -339,6 +339,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
             cfg = AttrDict(max_episode_length=self._hp.env_params.config.cfg['env']['episodeLength'],
                            nRow=2, nCol=1, super_title="Robot Skill Plot")
             self.skill_plot = RobotSkillPlot(cfg=cfg)
+            self.avg_skill_unc = []
 
         # TODO, prior net mode switching
         # self.hl_agent.policy.net.p[0].on_mc_dropout()
@@ -370,17 +371,18 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
             # z = output.hl_dist.rsample()
             z = self._last_hl_output.action
-            z_u = z.mean(axis=0)
-            z_s = z.std(axis=0)
+            _z_u = z.mean(axis=0)
+            z_u = _z_u.mean()   # centroid
+            cm = np.cov(z - _z_u)
+            u, s, vh = np.linalg.svd(cm)
+            z_s = s.std()
+            self.avg_skill_unc.append(z_s)
+            print("z_u: {},    z_std: {} ".format(z_u, z_s))
 
             # z_e = 0.5 + 0.5 * math.log(2 * math.pi) + np.log(z_s)
             # z_e = output.hl_dist.entropy()
-            # print("z_u shape: ", z_u.shape)
-            # print("z_s shape: ", z_s.shape)
-            # print("z_e shape: ", z_e.shape)
-            # np.exp(output.hl_dist.log_sigma).mean()
-            self.skill_plot.plot(mu=z_u.mean(),
-                                 sig=z_s.mean(),
+            self.skill_plot.plot(mu=z_u,
+                                 sig=z_s,
                                  curr_state=args[0][:7])
             # output.action[:7] *= self.skill_plot.skill_uncertainty_binary
         return output
@@ -392,7 +394,10 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
     def reset(self):
         super().reset()
         self._steps_since_hl = 0     # start new episode with high-level step
-        if self.skill_uncertainty_plot: self.skill_plot.reset()
+        if self.skill_uncertainty_plot:
+            self.skill_plot.reset()
+            print("average skill uncertainty: ", np.mean(self.avg_skill_unc))
+            self.avg_skill_unc = []
 
 
 class MultiEnvFixedIntervalHierarchicalAgent(FixedIntervalHierarchicalAgent):
@@ -524,7 +529,7 @@ class RobotSkillPlot:
         # self.skill_uc_plot.set_xdata(self.time_step)
         # self.skill_uc_plot.set_ydata(self.uncertainties)
         self.ax_skill.set_ylim([-self.sigs.max() * 1.1, self.sigs.max() * 1.1])
-        # self.ax_skill.set_ylim([-3.0, 3.0])
+        # self.ax_skill.set_ylim([-1.0, 1.0])
 
         self.ax_skill.plot(self.time_step, self.uncertainties, color='red')
         self.ax_skill.fill_between(self.time_step,

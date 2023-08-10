@@ -33,7 +33,7 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
         ProbabilisticModel.__init__(self)
         self._hp = self._default_hparams()
         self._hp.overwrite(params)  # override defaults with config file
-        self._hp.builder = LayerBuilderParams(self._hp.use_convs, self._hp.normalization)
+        self._hp.builder = LayerBuilderParams(self._hp.use_convs, self._hp.normalization, self._hp.dropout, self._hp.droprate)
         self.device = self._hp.device
 
         self.build_network()
