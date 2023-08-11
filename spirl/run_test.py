@@ -66,6 +66,11 @@ class RLTrainer:
             self.conf.env.cfg['env']['teleoperation_mode'] = True
         if self.args.mode == 'val':
             self.conf.env.cfg['env']['teleoperation_mode'] = False
+
+        # get essential args
+        self.conf.env.run_mode = args.run_mode
+        self.conf.env.task_name = args.task_name
+
         self.env = self._hp.environment(self.conf.env)
         self.conf.agent.env_params = self.env      # (optional) set params from env for agent
         if self.is_chef:
@@ -318,11 +323,11 @@ if __name__ == '__main__':
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     # os.environ['DISPLAY'] = ':1'
 
-    # ["block_stacking", "kitchen", "office", "maze", "pouring_skill", "pouring_water_img"]
-    task_name = "pouring_skill_img"
+    # ["block_stacking", "kitchen", "office", "maze", "pouring_skill", "pouring_water_img", "multi_skill_img"]
+    task_name = "multi_skill_img"
     mode = "spirl_cl"
 
     args = get_args()
@@ -333,5 +338,6 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.mode = "demo"     # "train" / "val" / "demo" / "collect"
+    args.run_mode = "eval"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
     RLTrainer(args=args)

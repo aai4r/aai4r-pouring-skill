@@ -356,7 +356,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.ll_agent.update_model_weights()
 
     def act(self, *args, **kwargs):
-        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=100)
+        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=10)
         # self.hl_agent.policy.net.p[0].off_mc_dropout()
 
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:

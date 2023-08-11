@@ -32,6 +32,7 @@ model_config = AttrDict(
     kl_div_weight=5e-4,
     nz_enc=256,
     nz_mid=256,
+    nz_mid_prior=256,
     nz_vae=12,
     n_processing_layers=3,
     num_prior_net_layers=3,
@@ -45,6 +46,8 @@ model_config = AttrDict(
     prior_input_res=data_spec.res,
     weights_dir="weights",
     recurrent_prior=False,
+    dropout=True,
+    droprate=0.5,
 )
 
 # Dataset
