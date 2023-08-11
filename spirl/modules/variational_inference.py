@@ -28,7 +28,8 @@ class Gaussian:
         self._sigma = None
         
     def sample(self):
-        return self.mu + self.sigma * torch.randn_like(self.sigma)
+        randn = torch.randn_like(self.sigma) if torch.is_tensor(self.sigma) else np.random.randn(*self.sigma.shape)
+        return self.mu + self.sigma * randn
 
     def kl_divergence(self, other):
         """Here self=q and other=p and we compute KL(q, p)"""
@@ -49,7 +50,7 @@ class Gaussian:
     @property
     def sigma(self):
         if self._sigma is None:
-            self._sigma = self.log_sigma.exp()
+            self._sigma = self.log_sigma.exp() if torch.is_tensor(self.log_sigma) else np.exp(self.log_sigma)
         return self._sigma
 
     @property

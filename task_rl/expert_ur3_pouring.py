@@ -7,7 +7,7 @@ from utils.torch_jit_utils import *
 from utils.utilities import *
 from torch.nn.functional import normalize
 from tasks.base.base_task import BaseTask, AttrDict
-from parents.interaction import VRInteraction
+from task_rl.parents.interaction import VRInteraction
 from isaacgym import gymtorch
 from isaacgym import gymapi
 
@@ -36,6 +36,7 @@ class DemoUR3Pouring(VRInteraction):
         self.open_reward_scale = self.cfg["env"]["openRewardScale"]
         self.action_penalty_scale = self.cfg["env"]["actionPenaltyScale"]
         self.rand_init_pos_scale = self.cfg["env"]["rand_init_pos_scale"]
+        print("rand_init scale: ", self.rand_init_pos_scale)
 
         self.debug_viz = self.cfg["env"]["enableDebugVis"]
         self.debug_cam = self.cfg["expert"]["debug_cam"]
@@ -96,11 +97,18 @@ class DemoUR3Pouring(VRInteraction):
 
         # create some wrapper tensors for different slices
         print("device:: ", self.device)
+        print("drive mode:::::::::::::::::: ", self.drive_mode)
 
         # object order.
         # [0: robot, 1: bottle, 2: water drop, 3: cup, 4: ]
-        self.ur3_default_dof_pos = to_torch([deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
-                                             deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)], device=self.device)
+        # fwd_pose = [deg2rad(0.0), deg2rad(-110.0), deg2rad(100.0), deg2rad(0.0), deg2rad(80.0), deg2rad(0.0),
+        #             deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)]
+        fwd_pose = [deg2rad(0), deg2rad(-80), deg2rad(-115), deg2rad(-165), deg2rad(-90), deg2rad(0),
+                    deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)]
+        dwn_pose = [deg2rad(4), deg2rad(-80), deg2rad(-115), deg2rad(-74), deg2rad(-270), deg2rad(180),
+                    deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0), deg2rad(0.0)]
+
+        self.ur3_default_dof_pos = to_torch(fwd_pose, device=self.device)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.ur3_dof_state = self.dof_state.view(self.num_envs, -1, 2)[:, :self.num_ur3_dofs]
         # self.ur3_dof_pos = torch.index_select(self.ur3_dof_state[..., 0], 1, self.indices)
@@ -212,7 +220,8 @@ class DemoUR3Pouring(VRInteraction):
             bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
 
         bottle_asset = self.gym.load_asset(self.sim, self.asset_root, bottle_asset_file, asset_options)
-        return bottle_asset
+        opt = {"rand_color": True, "rand_texture": True, "scale": 1.0}
+        return bottle_asset, opt
 
     def _create_asset_gourd_bottle(self):
         self.bottle_height = 0.2
@@ -230,7 +239,17 @@ class DemoUR3Pouring(VRInteraction):
             bottle_asset_file = self.cfg["env"]["asset"].get("assetFileNameBottle", bottle_asset_file)
 
         bottle_asset = self.gym.load_asset(self.sim, self.asset_root, bottle_asset_file, asset_options)
-        return bottle_asset
+        opt = {"rand_color": True, "rand_texture": True, "scale": 1.0}
+        return bottle_asset, opt
+
+    def _create_asset_other_objects(self):
+        asset_options = gymapi.AssetOptions()
+        asset_options.use_mesh_materials = True
+        # asset_file = "urdf/objects/cube.urdf"
+        asset_file = "urdf/ycb/010_potted_meat_can/010_potted_meat_can.urdf"
+        obj_asset = self.gym.load_asset(self.sim, self.asset_root, asset_file, asset_options)
+        opt = {"rand_color": False, "rand_texture": False, "scale": 1.5}
+        return obj_asset, opt
 
     def _create_asset_cup(self):
         asset_options = gymapi.AssetOptions()
@@ -257,7 +276,17 @@ class DemoUR3Pouring(VRInteraction):
 
         self.cup_height = cup_prop_dict[target_cup_asset_name].height
         self.cup_inner_radius = cup_prop_dict[target_cup_asset_name].inner_radius
-        return cup_asset
+        opt = {"rand_color": True, "rand_texture": True, "scale": 1.0}
+        return cup_asset, opt
+
+    def _create_asset_tray(self):
+        asset_options = gymapi.AssetOptions()
+        asset_options.use_mesh_materials = True
+        asset_options.disable_gravity = True
+        asset_file = "urdf/tray/tray.urdf"
+        obj_asset = self.gym.load_asset(self.sim, self.asset_root, asset_file, asset_options)
+        opt = {"rand_color": False, "rand_texture": False, "scale": 0.5}
+        return obj_asset, opt
 
     def create_asset_water_drops(self):
         r = 0.012
@@ -305,9 +334,11 @@ class DemoUR3Pouring(VRInteraction):
         self.random_texture_handle = self.gym.create_texture_from_buffer(self.sim, 128, 128, texture)
 
         ur3_asset = self._create_asset_ur3()
-        bottle_asset = self._create_asset_bottle()
-        # bottle_asset = self._create_asset_gourd_bottle()
-        cup_asset = self._create_asset_cup()
+        bottle_asset, opt = self._create_asset_bottle()
+        # bottle_asset, opt = self._create_asset_gourd_bottle()
+        bottle_asset, opt = self._create_asset_other_objects()
+        cup_asset, opt2 = self._create_asset_cup()
+        cup_asset, opt2 = self._create_asset_tray()
         liq_asset = self.create_asset_water_drops()
         self.water_in_boundary_xy = self.cup_inner_radius - self.water_drop_radius
         self.water_in_boundary_z = self.cup_height * 0.8 - self.water_drop_radius
@@ -359,7 +390,7 @@ class DemoUR3Pouring(VRInteraction):
 
         ur3_start_pose = gymapi.Transform()
         ur3_start_pose.p = gymapi.Vec3(0.0, 0.0, 0.0)
-        ur3_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+        ur3_start_pose.r = gymapi.Quat(0.0, 0.0, 1.0, 0.0)
 
         bottle_start_pose = gymapi.Transform()
         bottle_start_pose.p = gymapi.Vec3(*get_axis_params(0.0, self.up_axis_idx))
@@ -432,12 +463,15 @@ class DemoUR3Pouring(VRInteraction):
 
             # (2) Create Bottle
             bottle_actor = self.gym.create_actor(env_ptr, bottle_asset, bottle_start_pose, "bottle", i, 0)
-            self.gym.set_rigid_body_color(env_ptr, bottle_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
-                                          gymapi.Vec3(np.random.uniform(0, 1), np.random.uniform(0, 1), np.random.uniform(0, 1)))
             self.default_bottle_states.append([bottle_start_pose.p.x, bottle_start_pose.p.y, bottle_start_pose.p.z,
-                                               bottle_start_pose.r.x, bottle_start_pose.r.y, bottle_start_pose.r.z, bottle_start_pose.r.w,
+                                               bottle_start_pose.r.x, bottle_start_pose.r.y, bottle_start_pose.r.z,
+                                               bottle_start_pose.r.w,
                                                0, 0, 0, 0, 0, 0])
-            self.gym.set_rigid_body_texture(env_ptr, bottle_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
+            if opt["rand_color"]:
+                self.gym.set_rigid_body_color(env_ptr, bottle_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                              gymapi.Vec3(_uniform(1, 1), _uniform(0.0, 0.5), _uniform(0.0, 0.5)))
+            if opt["rand_texture"]:
+                self.gym.set_rigid_body_texture(env_ptr, bottle_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, self.max_agg_bodies, self.max_agg_shapes, True)
@@ -455,7 +489,11 @@ class DemoUR3Pouring(VRInteraction):
             self.default_cup_states.append([cup_start_pose.p.x, cup_start_pose.p.y, cup_start_pose.p.z,
                                             cup_start_pose.r.x, cup_start_pose.r.y, cup_start_pose.r.z, cup_start_pose.r.w,
                                             0, 0, 0, 0, 0, 0])
-            self.gym.set_rigid_body_texture(env_ptr, cup_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
+            if opt["rand_color"]:
+                self.gym.set_rigid_body_color(env_ptr, cup_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                                              gymapi.Vec3(_uniform(0.0, 0.5), _uniform(1, 1), _uniform(0.0, 0.5)))
+            if opt2["rand_texture"]:
+                self.gym.set_rigid_body_texture(env_ptr, cup_actor, 0, gymapi.MESH_VISUAL_AND_COLLISION, self.perlin_texture_handle)
 
             # (5) Create Left Background
             l_bg_actor = self.gym.create_actor(env_ptr, bg_asset, l_bg_pose, "background_left", i, 0)
@@ -518,6 +556,10 @@ class DemoUR3Pouring(VRInteraction):
         self.cup_handle = self.gym.find_actor_rigid_body_handle(env_ptr, cup_actor, "paper_cup_broad")
         self.default_bottle_states = to_torch(self.default_bottle_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
         self.default_cup_states = to_torch(self.default_cup_states, device=self.device, dtype=torch.float).view(self.num_envs, 13)
+
+        for i in range(len(self.envs)):
+            self.gym.set_actor_scale(self.envs[i], self.bottles[i], opt["scale"])
+            self.gym.set_actor_scale(self.envs[i], self.cups[i], opt2["scale"])
         self.init_data()
 
     def init_data(self):
@@ -857,10 +899,10 @@ class DemoUR3Pouring(VRInteraction):
 
         self.bottle_states[env_ids] = pick + rand_bottle_pos
 
-        for e_id in env_ids:
-            self.gym.set_rigid_body_color(self.envs[e_id], self.bottles[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
-                                          gymapi.Vec3(_uniform(1, 1), _uniform(0.0, 0.5), _uniform(0.0, 0.5)))
-                                          # gymapi.Vec3(_uniform(0, 0.1), _uniform(0.0, 1.0), _uniform(0.0, 1.0)))
+        # for e_id in env_ids:
+        #     self.gym.set_rigid_body_color(self.envs[e_id], self.bottles[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+        #                                   gymapi.Vec3(_uniform(1, 1), _uniform(0.0, 0.5), _uniform(0.0, 0.5)))
+                                          # gymapi.Vec3(_uniform(0, 1.0), _uniform(0.0, 1.0), _uniform(0.0, 1.0)))
 
         # reset cup
         place = self.default_cup_states[env_ids]
@@ -871,9 +913,9 @@ class DemoUR3Pouring(VRInteraction):
         place[:, 3:7] = quat
         self.cup_states[env_ids] = place
 
-        for e_id in env_ids:
-            self.gym.set_rigid_body_color(self.envs[e_id], self.cups[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
-                                          gymapi.Vec3(_uniform(0.0, 0.5), _uniform(1, 1), _uniform(0.0, 0.5)))
+        # for e_id in env_ids:
+        #     self.gym.set_rigid_body_color(self.envs[e_id], self.cups[e_id], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+        #                                   gymapi.Vec3(_uniform(0.0, 0.5), _uniform(1, 1), _uniform(0.0, 0.5)))
 
         # reset liquid
         init_liq_pose = pick + rand_bottle_pos
@@ -1578,7 +1620,7 @@ def compute_ur3_reward(
     # reset_buf = torch.where(is_pouring_finish, torch.ones_like(reset_buf), reset_buf)   # pouring task anyway
     reset_buf = torch.where(is_poured, torch.ones_like(reset_buf), reset_buf)   # task success
     # reset_buf = torch.where(is_dropped > 0.0, torch.ones_like(reset_buf), reset_buf)
-    reset_buf = torch.where((liq_cup_dist_xy > 0.5) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range
+    # reset_buf = torch.where((liq_cup_dist_xy > 0.5) | (bottle_height > des_height + 0.3), torch.ones_like(reset_buf), reset_buf)    # out of range
 
     reset_buf = torch.where(progress_buf >= max_episode_length - 1, torch.ones_like(reset_buf), reset_buf)
 

@@ -46,7 +46,9 @@ class Block(nn.Sequential, HasParameters):
             normalize=True,
             activation=nn.LeakyReLU(0.2, inplace=True),
             normalization=self.builder.normalization,
-            normalization_params=AttrDict()
+            normalization_params=AttrDict(),
+            dropout=False,
+            droprate=0.2
         )
         return params
         
@@ -77,6 +79,9 @@ class Block(nn.Sequential, HasParameters):
 
         if self.params.activation is not None:
             self.add_module('activation', self.params.activation)
+
+        if self.params.dropout is not None:
+            self.add_module('dropout', nn.Dropout(p=self.params.droprate))
             
 ###
 
@@ -189,10 +194,11 @@ class BaseProcessingNet(ConcatSequential):
         self.add_module('input', block(in_dim=in_dim, out_dim=mid_dim, normalization=None))
         for i in range(num_layers):
             self.add_module('pyramid-{}'.format(i),
-                            block(in_dim=mid_dim, out_dim=mid_dim, normalize=builder.normalize))
+                            block(in_dim=mid_dim, out_dim=mid_dim, normalize=builder.normalize,
+                                  dropout=builder.dropout, droprate=builder.droprate))
 
         self.add_module('head'.format(i + 1),
-                        block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation))
+                        block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation, dropout=None))
         self.apply(init_weights_xavier)
         
         
@@ -206,11 +212,13 @@ def get_num_conv_layers(img_sz):
 class LayerBuilderParams:
     """ This class holds general parameters for all subnetworks, such as whether to use convolutional networks, etc """
     
-    def __init__(self, use_convs, normalization='batch'):
+    def __init__(self, use_convs, normalization='batch', dropout=False, droprate=0.2):
         self.use_convs = use_convs
         self.init_fn = init_weights_xavier
         self.normalize = normalization != 'none'
         self.normalization = normalization
+        self.dropout = dropout
+        self.droprate = droprate
 
     @property
     def get_num_layers(self):

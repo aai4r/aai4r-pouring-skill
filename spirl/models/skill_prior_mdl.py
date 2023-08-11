@@ -33,7 +33,7 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
         ProbabilisticModel.__init__(self)
         self._hp = self._default_hparams()
         self._hp.overwrite(params)  # override defaults with config file
-        self._hp.builder = LayerBuilderParams(self._hp.use_convs, self._hp.normalization)
+        self._hp.builder = LayerBuilderParams(self._hp.use_convs, self._hp.normalization, self._hp.dropout, self._hp.droprate)
         self.device = self._hp.device
 
         self.build_network()
@@ -562,6 +562,27 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         super().__init__(hp=hp, enc_params=enc_params)
         self.img_encoder = copy.deepcopy(img_encoder)
 
+        self.nn_mc_dropout = False
+        self.n_stack = 50
+
+    def on_mc_dropout(self, n_stack=50):
+        if self.nn_mc_dropout:
+            return
+        print("nn train!!!!!!")
+        self.n_stack = n_stack
+        self.nn_mc_dropout = True
+        self.nn.train()
+
+    def off_mc_dropout(self):
+        if not self.nn_mc_dropout:
+            return
+        print("nn eval!!!!!!")
+        self.nn_mc_dropout = False
+        self.nn.eval()
+
+    def get_nn_training(self):
+        return self.nn.training
+
     def build_network(self):
         resnet_mid = 512   # resnet 18 feature size
         input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
@@ -586,6 +607,14 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         out = self.img_encoder(inputs.images)
         out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
-        z = self.nn(out)
-        z = z.squeeze(1) if self.recurrent else z
-        return z
+
+        if not self.nn_mc_dropout:
+            z = self.nn(out)
+            zs = z.squeeze(1) if self.recurrent else z
+        else:
+            zs = torch.zeros(self.n_stack, self._hp.nz_vae * 2)
+            for i in range(self.n_stack):
+                z = self.nn(out)
+                zs[i] = z
+            zs = zs.squeeze(1) if self.recurrent else zs
+        return zs
