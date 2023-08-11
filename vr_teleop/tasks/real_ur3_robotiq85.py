@@ -9,7 +9,7 @@ from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand
 class RealUR3(BaseRTDE, UR3ControlMode):
     def __init__(self, task_name):
         self.init_vr()
-        BaseRTDE.__init__(self, HOST="192.168.0.75")
+        BaseRTDE.__init__(self, HOST="192.168.4.31")
         UR3ControlMode.__init__(self, init_mode="forward")
 
         self.cam = RealSense()

@@ -36,7 +36,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
     def __init__(self, config):
         self.config = config
         self.init_vr()  # TODO, for safe test..
-        BaseRTDE.__init__(self, HOST="192.168.0.75")
+        BaseRTDE.__init__(self, HOST="192.168.4.31")
         UR3ControlMode.__init__(self, init_mode="forward")
 
         # shared autonomy control params
