@@ -1,4 +1,4 @@
-from spirl.configs.hrl.pouring_skill_img.spirl.conf import *
+from spirl.configs.hrl.pick_and_place_img.spirl.conf import *
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.rl.policies.cl_model_policies import ACClModelPolicy
 

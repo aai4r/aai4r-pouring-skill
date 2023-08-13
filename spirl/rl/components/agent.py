@@ -356,7 +356,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.ll_agent.update_model_weights()
 
     def act(self, *args, **kwargs):
-        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=10)
+        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=100)
         # self.hl_agent.policy.net.p[0].off_mc_dropout()
 
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
@@ -364,8 +364,10 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
         output = super().act(*args, **kwargs)
         self._steps_since_hl += 1
-        if self.skill_uncertainty_plot:
-            print("Prior Train mode: ", self.hl_agent.policy.net.p[0].get_nn_training())
+
+        mc_dropout_train_mode = self.hl_agent.policy.net.p[0].get_nn_training()
+        if self.skill_uncertainty_plot and mc_dropout_train_mode:
+            print("Prior Train mode: ", mc_dropout_train_mode)
             # z_u = output.hl_dist.mu.mean(axis=0)
             # z_s = np.exp(output.hl_dist.log_sigma).mean(axis=0)
 
@@ -373,9 +375,10 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
             z = self._last_hl_output.action
             _z_u = z.mean(axis=0)
             z_u = _z_u.mean()   # centroid
-            cm = np.cov(z - _z_u)
+            cm = np.cov(z)
             u, s, vh = np.linalg.svd(cm)
-            z_s = s.std()
+            # z_s = s.std()   # std, mean, trace(sum)
+            z_s = s.sum()
             self.avg_skill_unc.append(z_s)
             print("z_u: {},    z_std: {} ".format(z_u, z_s))
 

@@ -323,11 +323,11 @@ if __name__ == '__main__':
 
     # with multi-GPU env, using only single GPU
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     # os.environ['DISPLAY'] = ':1'
 
-    # ["block_stacking", "kitchen", "office", "maze", "pouring_skill", "pouring_water_img", "multi_skill_img"]
-    task_name = "multi_skill_img"
+    # ["block_stacking", "kitchen", "office", "maze", "pouring_skill", "pouring_water_img", "pick_and_place_img", "multi_skill_img"]
+    task_name = "pick_and_place_img"
     mode = "spirl_cl"
 
     args = get_args()

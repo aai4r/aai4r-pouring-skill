@@ -21,7 +21,6 @@ class ClSPiRLMdl(SkillPriorMdl):
                                  mid_size=self._hp.nz_mid_prior,
                                  final_activation=nn.LeakyReLU(0.2, inplace=True))
         self.p = self._build_prior_ensemble()
-        print("Prior Model: ", self.p)
         self.log_sigma = get_constant_parameter(0., learnable=False)
 
     def decode(self, z, cond_inputs, steps, inputs=None):

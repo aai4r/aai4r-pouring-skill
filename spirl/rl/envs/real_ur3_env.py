@@ -20,7 +20,7 @@ import numpy as np
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
     state_dim=16,   # 47 in sim
-    n_actions=9,
+    n_actions=8,    # lv(3), rv_quat(4), gripper(1)
     split=AttrDict(train=0.99, val=0.01, test=0.0),
     env_name="pick_and_place_img",   # "pouring_skill_img"  # TODO, how it is affected?
     res=224,
