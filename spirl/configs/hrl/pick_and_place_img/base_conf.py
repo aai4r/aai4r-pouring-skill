@@ -150,7 +150,11 @@ data_config.dataset_spec = data_spec
 
 cfg = AttrDict()
 cfg.extra = AttrDict()
-cfg.extra.skill_uncertainty_plot = False
+cfg.env = AttrDict()
+
+cfg.extra.skill_uncertainty_plot = True
+cfg.env.episodeLength = 500
+
 env_config = AttrDict(
     reward_norm=1.,
     image_observation=True,

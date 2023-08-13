@@ -76,7 +76,7 @@ ll_model_params = AttrDict(
     weights_dir="weights",
     recurrent_prior=False,   # D
     dropout=True,
-    droprate=0.5,
+    droprate=0.2,
 )
 
 # LL Agent
