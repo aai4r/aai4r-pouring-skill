@@ -248,7 +248,7 @@ class DemoUR3Pouring(VRInteraction):
         # asset_file = "urdf/objects/cube.urdf"
         asset_file = "urdf/ycb/010_potted_meat_can/010_potted_meat_can.urdf"
         obj_asset = self.gym.load_asset(self.sim, self.asset_root, asset_file, asset_options)
-        opt = {"rand_color": False, "rand_texture": False, "scale": 1.5}
+        opt = {"rand_color": False, "rand_texture": False, "scale": 1.0}
         return obj_asset, opt
 
     def _create_asset_cup(self):
@@ -336,9 +336,9 @@ class DemoUR3Pouring(VRInteraction):
         ur3_asset = self._create_asset_ur3()
         bottle_asset, opt = self._create_asset_bottle()
         # bottle_asset, opt = self._create_asset_gourd_bottle()
-        bottle_asset, opt = self._create_asset_other_objects()
+        # bottle_asset, opt = self._create_asset_other_objects()
         cup_asset, opt2 = self._create_asset_cup()
-        cup_asset, opt2 = self._create_asset_tray()
+        # cup_asset, opt2 = self._create_asset_tray()
         liq_asset = self.create_asset_water_drops()
         self.water_in_boundary_xy = self.cup_inner_radius - self.water_drop_radius
         self.water_in_boundary_z = self.cup_height * 0.8 - self.water_drop_radius

@@ -337,7 +337,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
         if self.skill_uncertainty_plot:
             cfg = AttrDict(max_episode_length=self._hp.env_params.config.cfg['env']['episodeLength'],
-                           nRow=2, nCol=1, super_title="Robot Skill Plot")
+                           nRow=2, nCol=1, super_title="Robot Skill Uncertainty")
             self.skill_plot = RobotSkillPlot(cfg=cfg)
             self.avg_skill_unc = []
 
@@ -356,7 +356,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.ll_agent.update_model_weights()
 
     def act(self, *args, **kwargs):
-        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=100)
+        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=24)
         # self.hl_agent.policy.net.p[0].off_mc_dropout()
 
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
@@ -364,23 +364,22 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
         output = super().act(*args, **kwargs)
         self._steps_since_hl += 1
-
-        mc_dropout_train_mode = self.hl_agent.policy.net.p[0].get_nn_training()
-        if self.skill_uncertainty_plot and mc_dropout_train_mode:
-            print("Prior Train mode: ", mc_dropout_train_mode)
-            # z_u = output.hl_dist.mu.mean(axis=0)
+        if self.skill_uncertainty_plot:
+            print("Prior Train mode: ", self.hl_agent.policy.net.p[0].get_nn_training())
+            # z = output.hl_dist.mu
+            # z = output.hl_dist.sigma
             # z_s = np.exp(output.hl_dist.log_sigma).mean(axis=0)
 
             # z = output.hl_dist.rsample()
             z = self._last_hl_output.action
             _z_u = z.mean(axis=0)
             z_u = _z_u.mean()   # centroid
-            cm = np.cov(z)
+            cm = np.cov(z.T)
             u, s, vh = np.linalg.svd(cm)
-            # z_s = s.std()   # std, mean, trace(sum)
-            z_s = s.sum()
+            # z_s = np.sqrt(s.sum())   # mean, std, sum
+            z_s = np.linalg.det(cm)
             self.avg_skill_unc.append(z_s)
-            print("z_u: {},    z_std: {} ".format(z_u, z_s))
+            print("z_u: {},    z_std: {}, cm shape: {} ".format(z_u, z_s, cm.shape))
 
             # z_e = 0.5 + 0.5 * math.log(2 * math.pi) + np.log(z_s)
             # z_e = output.hl_dist.entropy()
@@ -540,10 +539,11 @@ class RobotSkillPlot:
                                    alpha=0.7, color='g')
 
         if abs(sig) > 5.0:  # simple thresholding
-            self.skill_uncertainty_binary = 0.0
-            self.blink(period_sec=0.3)
-            self.fig.suptitle(self.super_props.text + "\nShow me your demonstration!",
-                              fontsize=self.super_props.fontsize, color=self.b_color)
+            pass
+            # self.skill_uncertainty_binary = 0.0
+            # self.blink(period_sec=0.3)
+            # self.fig.suptitle(self.super_props.text + "\nShow me your demonstration!",
+            #                   fontsize=self.super_props.fontsize, color=self.b_color)
         else:
             self.skill_uncertainty_binary = 1.0
             self.fig.suptitle(self.super_props.text, fontsize=self.super_props.fontsize, color=self.super_props.color)

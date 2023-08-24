@@ -44,7 +44,7 @@ model_config = AttrDict(
     weights_dir="weights",
     recurrent_prior=False,
     dropout=True,
-    droprate=0.5,
+    droprate=0.2,
 )
 
 # Dataset
