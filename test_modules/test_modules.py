@@ -106,6 +106,6 @@ def gripper_test():
 
 if __name__ == "__main__":
     # vr_test()
-    gripper_test()
-    # camera_test()
+    # gripper_test()
+    camera_test()
     # camera_load_test(batch_idx=1, rollout_idx=0)

@@ -152,7 +152,7 @@ cfg = AttrDict()
 cfg.extra = AttrDict()
 cfg.env = AttrDict()
 
-cfg.extra.skill_uncertainty_plot = True
+cfg.extra.skill_uncertainty_plot = False
 cfg.env.episodeLength = 500
 
 env_config = AttrDict(

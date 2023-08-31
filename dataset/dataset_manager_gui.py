@@ -9,6 +9,10 @@ from PyQt5.QtWidgets import *
 from PyQt5 import uic, QtGui, QtCore
 from PIL import Image, ImageQt
 
+parent_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = parent_dir[:parent_dir.find(parent_dir.split('/')[-1])-1]
+sys.path.append(parent_dir)
+
 from spirl.utility.general_utils import AttrDict
 
 #UI파일 연결 단, UI파일은 Python 코드 파일과 같은 디렉토리에 위치해야한다.

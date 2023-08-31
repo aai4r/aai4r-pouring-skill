@@ -560,7 +560,8 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
     def __init__(self, hp, enc_params, img_encoder):
         self.recurrent = hp.recurrent_prior
         super().__init__(hp=hp, enc_params=enc_params)
-        self.img_encoder = copy.deepcopy(img_encoder)
+        # self.img_encoder = copy.deepcopy(img_encoder)
+        self.img_encoder = img_encoder
 
         self.n_stack = 50
 
@@ -606,7 +607,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         # out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
 
-        if not self.nn_mc_dropout:
+        if not self.get_nn_training_status():
             _z = self.nn(out)
             _z = torch.cat((_z, inputs.states), dim=-1)
             z = self.nn_head(_z)
