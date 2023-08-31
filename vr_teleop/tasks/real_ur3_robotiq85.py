@@ -7,17 +7,19 @@ from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand
 
 
 class RealUR3(BaseRTDE, UR3ControlMode):
-    def __init__(self, task_name):
+    def __init__(self, task):
         self.init_vr()
         BaseRTDE.__init__(self, HOST="192.168.4.31")
         UR3ControlMode.__init__(self, init_mode="forward")
 
         self.cam = RealSense()
         self.timer = CustomTimer(duration_sec=1.0)
-        self.rand_control_mode = True
+        self.rand_control_mode = task.rand_control_mode
 
-        self.rollout = RolloutManagerExpand(task_name=task_name)
-        self.collect_demo = True
+        self.rollout = RolloutManagerExpand(task_name=task.task_name)
+        self.collect_demo = task.collect_demo
+
+        self.control_mode_to(cont_to=task.init_conf, move_j=self.CONTROL_MODE != task.init_conf)
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-90.0, 0.0, -90.0))
@@ -238,9 +240,12 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
 
 if __name__ == "__main__":
-    tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
+    pouring = AttrDict(task_name="pouring_skill_img", rand_control_mode=False, collect_demo=True, init_conf="forward")
+    pick_place = AttrDict(task_name="pick_and_place_img", rand_control_mode=False, collect_demo=True, init_conf="downward")
+    multi = AttrDict(task_name="multi_skill_img", rand_control_mode=True, collect_demo=True, init_conf="downward")
+    # tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
-    u = RealUR3(task_name="pouring_skill_img")
+    u = RealUR3(task=pick_place)
     u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=268)
 
