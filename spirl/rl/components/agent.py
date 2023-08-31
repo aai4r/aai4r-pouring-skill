@@ -356,13 +356,14 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.ll_agent.update_model_weights()
 
     def act(self, *args, **kwargs):
-        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=24)
+        self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=1024)
         # self.hl_agent.policy.net.p[0].off_mc_dropout()
 
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
             self.skill_plot.reset()
 
         output = super().act(*args, **kwargs)
+        output.unc = 0.0
         self._steps_since_hl += 1
         if self.skill_uncertainty_plot:
             print("Prior Train mode: ", self.hl_agent.policy.net.p[0].get_nn_training())
@@ -372,12 +373,19 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
             # z = output.hl_dist.rsample()
             z = self._last_hl_output.action
-            _z_u = z.mean(axis=0)
-            z_u = _z_u.mean()   # centroid
-            cm = np.cov(z.T)
+            # z = ((z - z.mean(axis=0)) / z.std(axis=0))  # mean/std normalization
+            z = z.T
+            # _z_u = z.mean(axis=0)
+            # z_u = _z_u.mean()   # centroid
+            cm = np.cov(z)
             u, s, vh = np.linalg.svd(cm)
+            z_u = np.matmul(u[:, 0], z).mean() * 0.0     # (1, N) X (N, dim) --> (1, dim)
+
             # z_s = np.sqrt(s.sum())   # mean, std, sum
             z_s = np.linalg.det(cm)
+
+            z_s = 1.0 - np.exp(-1e-3 * z_s)
+            output.unc = z_s
             self.avg_skill_unc.append(z_s)
             print("z_u: {},    z_std: {}, cm shape: {} ".format(z_u, z_s, cm.shape))
 
@@ -530,8 +538,8 @@ class RobotSkillPlot:
 
         # self.skill_uc_plot.set_xdata(self.time_step)
         # self.skill_uc_plot.set_ydata(self.uncertainties)
-        self.ax_skill.set_ylim([-self.sigs.max() * 1.1, self.sigs.max() * 1.1])
-        # self.ax_skill.set_ylim([-1.0, 1.0])
+        # self.ax_skill.set_ylim([-self.sigs.max() * 1.1, self.sigs.max() * 1.1])
+        self.ax_skill.set_ylim([-1.0, 1.0])
 
         self.ax_skill.plot(self.time_step, self.uncertainties, color='red')
         self.ax_skill.fill_between(self.time_step,

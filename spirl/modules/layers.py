@@ -184,7 +184,7 @@ class BaseProcessingNet(ConcatSequential):
     Builds an MLP or CNN, depending on the builder. Alternatively uses custom blocks """
     
     def __init__(self, in_dim, mid_dim, out_dim, num_layers, builder, block=None, detached=False,
-                 final_activation=None):
+                 final_activation=None, final_head=True):
         super().__init__(detached)
 
         if block is None:
@@ -197,11 +197,12 @@ class BaseProcessingNet(ConcatSequential):
                             block(in_dim=mid_dim, out_dim=mid_dim, normalize=builder.normalize,
                                   dropout=builder.dropout, droprate=builder.droprate))
 
-        self.add_module('head'.format(i + 1),
-                        block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation, dropout=None))
+        if final_head:
+            self.add_module('head'.format(i + 1),
+                            block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation, dropout=None))
         self.apply(init_weights_xavier)
-        
-        
+
+
 def get_num_conv_layers(img_sz):
     n = math.log2(img_sz)
     assert n == round(n), 'imageSize must be a power of 2'

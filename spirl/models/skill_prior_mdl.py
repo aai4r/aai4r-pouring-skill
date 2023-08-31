@@ -585,7 +585,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
 
     def build_network(self):
         resnet_mid = 512   # resnet 18 feature size
-        input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
+        input_size = resnet_mid  # + self._hp.state_cond_size  # * self._hp.n_input_frames
         if self.recurrent:
             # Recurrent structure
             self.nn = torch.nn.Sequential(
@@ -600,21 +600,26 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
             )
         else:
             self.nn = Predictor(self._hp, input_size=input_size,
-                                output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
-                                mid_size=self._hp.nz_mid_prior)
+                                output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers,
+                                mid_size=self._hp.nz_mid_prior, final_head=False)
+            self.nn_head = nn.Linear(self._hp.nz_mid_prior + self._hp.state_cond_size, self._hp.nz_vae * 2)
 
     def forward(self, inputs):
         out = self.img_encoder(inputs.images)
-        out = torch.cat((out, inputs.states), dim=-1)
+        # out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
 
         if not self.nn_mc_dropout:
-            z = self.nn(out)
+            _z = self.nn(out)
+            _z = torch.cat((_z, inputs.states), dim=-1)
+            z = self.nn_head(_z)
             zs = z.squeeze(1) if self.recurrent else z
         else:
             zs = torch.zeros(self.n_stack, self._hp.nz_vae * 2)
             for i in range(self.n_stack):
-                z = self.nn(out)
+                _z = self.nn(out)
+                _z = torch.cat((_z, inputs.states), dim=-1)
+                z = self.nn_head(_z)
                 zs[i] = z
             zs = zs.squeeze(1) if self.recurrent else zs
         return zs
