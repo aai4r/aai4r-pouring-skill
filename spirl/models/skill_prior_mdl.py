@@ -607,7 +607,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
         # out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
 
-        if not self.get_nn_training_status():
+        if self.training:
             _z = self.nn(out)
             _z = torch.cat((_z, inputs.states), dim=-1)
             z = self.nn_head(_z)

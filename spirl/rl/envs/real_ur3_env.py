@@ -95,12 +95,13 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         one_hot[arg_max] = 1
         return one_hot
 
-    def control_mode_to(self, cont_to, move_j):
+    def control_mode_to(self, cont_to):
+        convert = cont_to != self.CONTROL_MODE
         if cont_to not in self.cmodes:
             raise IndexError("cont_to should be one of the {}".format(self.cmodes))
         idx = self.cmodes_d[cont_to]
         self.CONTROL_MODE = self.cmodes[idx]
-        if move_j:
+        if convert:
             self.speed_stop()
             self.move_j(self.iposes)
 
@@ -228,9 +229,9 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
             raise NotImplementedError
 
         if mode > 0.3:
-            self.control_mode_to(cont_to="forward", move_j=self.CONTROL_MODE != 'forward')
+            self.control_mode_to(cont_to="forward")
         elif mode < -0.3:
-            self.control_mode_to(cont_to="downward", move_j=self.CONTROL_MODE != 'downward')
+            self.control_mode_to(cont_to="downward")
 
         actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
         des_pos = np.array(actual_tcp_pos) + np.array(act_pos)
@@ -269,6 +270,9 @@ class ImageRtdeUR3(RtdeUR3):
         self.cam = RealSenseMulti()
         self.idx_rear = self.cam.index_from_key(key='rear')
         self.idx_front = self.cam.index_from_key(key='front')
+
+        self.rand_joint_config = config.rand_joint_config
+        self.control_mode_to(cont_to=config.config_mode)
 
         # TODO, have to record the scene while mode changing
         self.ev_mgr = EvalVideoManager(path="eval_video", task=self.config.task_name)
@@ -365,7 +369,8 @@ class ImageRtdeUR3(RtdeUR3):
         return color
 
     def reset(self):
-        self.random_change_control_mode()
+        if self.rand_joint_config:
+            self.random_change_control_mode()
         obs = super().reset()
         return obs
 
@@ -432,7 +437,7 @@ class ImageRtdeUR3(RtdeUR3):
                 reward, done, info = 0, True, ""
 
                 self.rollout.show_rollout_summary()
-                self.rollout.save_to_file()
+                self.rollout.save_to_file(batch_idx=2)
                 self.rollout.reset()
                 return obs, reward, done, info
 
@@ -445,10 +450,10 @@ class ImageRtdeUR3(RtdeUR3):
 
                 if cont_status["trk_up"]:
                     # self.shift_control_mode(move_j=True)
-                    self.control_mode_to(cont_to="forward", move_j=True)
+                    self.control_mode_to(cont_to="forward")
                     action_mode[0] = 1.0
                 elif cont_status["trk_down"]:
-                    self.control_mode_to(cont_to="downward", move_j=True)
+                    self.control_mode_to(cont_to="downward")
                     action_mode[0] = -1.0
 
                 if cont_status["btn_grip"]:

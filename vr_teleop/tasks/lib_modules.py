@@ -399,6 +399,9 @@ class RealSense(RealSenseBase):
         self.config.enable_device(self.cam_id.rear)
         self.args = args if args is not None else AttrDict(width=640, height=480, fps=30)
 
+        self.depth_buf = []
+        self.color_buf = []
+
         # Get device product line for setting a supporting resolution
         pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
         pipeline_profile = self.config.resolve(pipeline_wrapper)
@@ -453,11 +456,15 @@ class RealSense(RealSenseBase):
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
         color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
+        self.depth_buf, self.color_buf = depth_image, color_image
 
         if resize:
             color_image = cv2.resize(color_image, dsize=resize, interpolation=cv2.INTER_AREA)
             depth_image = cv2.resize(depth_image, dsize=resize, interpolation=cv2.INTER_AREA)
         return depth_image, color_image
+
+    def get_np_images_buf(self):
+        return self.depth_buf, self.color_buf
 
 
 class RealSenseMulti(RealSenseBase):
@@ -540,6 +547,8 @@ class RealSenseMulti(RealSenseBase):
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
         color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
+
+
 
         if resize:
             color_image = cv2.resize(color_image, dsize=resize, interpolation=cv2.INTER_AREA)

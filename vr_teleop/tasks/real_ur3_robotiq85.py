@@ -19,7 +19,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.rollout = RolloutManagerExpand(task_name=task.task_name)
         self.collect_demo = task.collect_demo
 
-        self.control_mode_to(cont_to=task.init_conf, move_j=self.CONTROL_MODE != task.init_conf)
+        self.control_mode_to(cont_to=task.init_conf)
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-90.0, 0.0, -90.0))
@@ -39,25 +39,24 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             self.speed_stop()
             self.move_j(self.iposes)
 
-    def control_mode_to(self, cont_to, move_j):
+    def control_mode_to(self, cont_to):
+        convert = cont_to != self.CONTROL_MODE
         if cont_to not in self.cmodes:
             raise IndexError("cont_to should be one of the {}".format(self.cmodes))
         idx = self.cmodes_d[cont_to]
         self.CONTROL_MODE = self.cmodes[idx]
-        if move_j:
+        if convert:
             self.speed_stop()
             self.move_j(self.iposes)
 
     def get_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
-        target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
-        state = RobotState2(joint=self.get_actual_q(),
-                            ee_pos=tcp_pos,
-                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
-                            target_diff=target_diff.tolist(),
+        state = RobotState2(joint=self.get_actual_q(),                              # [0, 0, 0, 0, 0, 0]  (6-dim)
+                            ee_pos=tcp_pos,                                         # [0, 0, 0]           (3-dim)
+                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),          # [0, 0, 0, 1]        (4-dim)
                             # gripper_one_hot=self.grip_one_hot_state(),    # for RobotState
-                            gripper_pos=[self.gripper.gripper_to_mm_normalize()],
-                            control_mode_one_hot=self.cont_mode_one_hot_state())
+                            gripper_pos=[self.gripper.gripper_to_mm_normalize()],   # [1],                (1-dim)
+                            control_mode_one_hot=self.cont_mode_one_hot_state())    # [0, 1],             (2-dim)
         return state
 
     def record_frame(self, observation, state, action_pos, action_quat, action_grip, action_mode, done, extra=None):
@@ -93,7 +92,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if len(action) >= 9:
                 cmode = action[8:9]
                 if cmode[0] != 0.0:
-                    self.control_mode_to(cont_to="forward" if cmode[0] > 0 else "downward", move_j=True)
+                    self.control_mode_to(cont_to="forward" if cmode[0] > 0 else "downward")
             else:
                 if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
                     self.shift_control_mode(move_j=True)
@@ -170,15 +169,15 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 action_mode = [1.0] if self.CONTROL_MODE == 'forward' else [-1.0]
                 if cont_status["btn_trigger"]:
                     depth, color = self.cam.get_np_images(resize=(320, 240))
-                    visualize(depth, color)
+                    visualize(*self.cam.get_np_images_buf())
                     state = self.get_state()
 
                     if cont_status["trk_up"]:
                         # self.shift_control_mode(move_j=True)
-                        self.control_mode_to(cont_to="forward", move_j=self.CONTROL_MODE != 'forward')
+                        self.control_mode_to(cont_to="forward")
                         action_mode[0] = 1.0
                     elif cont_status["trk_down"]:
-                        self.control_mode_to(cont_to="downward", move_j=self.CONTROL_MODE != 'downward')
+                        self.control_mode_to(cont_to="downward")
                         action_mode[0] = -1.0
 
                     if cont_status["btn_grip"]:

@@ -161,5 +161,7 @@ env_config = AttrDict(
     img_debug=False,
     img_disp_delay=1,
     cfg=cfg,
-    task_name="pick_and_place_img"
+    task_name="pick_and_place_img",
+    rand_joint_config=False,
+    config_mode="downward",
 )
