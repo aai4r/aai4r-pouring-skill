@@ -13,27 +13,29 @@ class Gaussian:
     # TODO: implement a dict conversion function
     def __init__(self, mu, log_sigma=None):
         """
-        
+
         :param mu:
         :param log_sigma: If none, mu is divided into two chunks, mu and log_sigma
         """
         if log_sigma is None:
             if not isinstance(mu, torch.Tensor):
-                import pdb; pdb.set_trace()
+                import pdb;
+                pdb.set_trace()
             mu, log_sigma = torch.chunk(mu, 2, -1)
-            
+
         self.mu = mu
         self.log_sigma = torch.clamp(log_sigma, min=-10, max=2) if isinstance(log_sigma, torch.Tensor) else \
-                            np.clip(log_sigma, a_min=-10, a_max=2)
+            np.clip(log_sigma, a_min=-10, a_max=2)
         self._sigma = None
-        
+
     def sample(self):
-        return self.mu + self.sigma * torch.randn_like(self.sigma)
+        randn = torch.randn_like(self.sigma) if torch.is_tensor(self.sigma) else np.random.randn(*self.sigma.shape)
+        return self.mu + self.sigma * randn
 
     def kl_divergence(self, other):
         """Here self=q and other=p and we compute KL(q, p)"""
         return (other.log_sigma - self.log_sigma) + (self.sigma ** 2 + (self.mu - other.mu) ** 2) \
-               / (2 * other.sigma ** 2) - 0.5
+            / (2 * other.sigma ** 2) - 0.5
 
     def nll(self, x):
         # Negative log likelihood (probability)
@@ -41,7 +43,7 @@ class Gaussian:
 
     def log_prob(self, val):
         """Computes the log-probability of a value under the Gaussian distribution."""
-        return -1 * ((val - self.mu) ** 2) / (2 * self.sigma**2) - self.log_sigma - math.log(math.sqrt(2*math.pi))
+        return -1 * ((val - self.mu) ** 2) / (2 * self.sigma ** 2) - self.log_sigma - math.log(math.sqrt(2 * math.pi))
 
     def entropy(self):
         return 0.5 + 0.5 * math.log(2 * math.pi) + torch.log(self.sigma)
@@ -49,7 +51,7 @@ class Gaussian:
     @property
     def sigma(self):
         if self._sigma is None:
-            self._sigma = self.log_sigma.exp()
+            self._sigma = self.log_sigma.exp() if torch.is_tensor(self.log_sigma) else np.exp(self.log_sigma)
         return self._sigma
 
     @property
@@ -77,7 +79,7 @@ class Gaussian:
     def average(self, dists):
         """Fits single Gaussian to a list of Gaussians."""
         mu_avg = torch.stack([d.mu for d in dists]).sum(0) / len(dists)
-        sigma_avg = torch.stack([d.mu ** 2 + d.sigma ** 2 for d in dists]).sum(0) - mu_avg**2
+        sigma_avg = torch.stack([d.mu ** 2 + d.sigma ** 2 for d in dists]).sum(0) - mu_avg ** 2
         return type(self)(mu_avg, torch.log(sigma_avg))
 
     def chunk(self, *args, **kwargs):
@@ -91,7 +93,7 @@ class Gaussian:
 
     def __getitem__(self, item):
         return Gaussian(self.mu[item], self.log_sigma[item])
- 
+
     def tensor(self):
         return torch.cat([self.mu, self.log_sigma], dim=-1)
 
@@ -144,7 +146,7 @@ class SequentialGaussian_SharedPQ:
         self.g2 = g2
         self.z1 = z1
         assert z1.shape == g1.shape
-        self.shared_dims = None     # how many shape dimensions are shared
+        self.shared_dims = None  # how many shape dimensions are shared
         self._update_shared_dims()
 
     def sample(self):
@@ -213,20 +215,20 @@ class SequentialGaussian_SharedPQ:
 class ProbabilisticModel:
     def __init__(self):
         self._sample_prior = False
-        
+
     def switch_to_prior(self):
         self._sample_prior = True
 
     def switch_to_inference(self):
         self._sample_prior = False
-    
+
 
 def get_fixed_prior(tensor, bs=None, dim=None):
     if dim is not None:
         return Gaussian(tensor.new_zeros(bs, dim, 1, 1), tensor.new_zeros(bs, dim, 1, 1))
     else:
         return Gaussian(torch.zeros_like(tensor.mu), torch.zeros_like(tensor.log_sigma))
-    
+
 
 def stack(inp, dim):
     if isinstance(inp[0], Gaussian):

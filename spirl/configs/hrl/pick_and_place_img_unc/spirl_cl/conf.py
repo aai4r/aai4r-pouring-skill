@@ -1,4 +1,4 @@
-from spirl.configs.hrl.pick_and_place_img.spirl.conf import *
+from spirl.configs.hrl.pick_and_place_img_unc.spirl.conf import *
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.rl.policies.cl_model_policies import ACClModelPolicy
 
@@ -10,7 +10,7 @@ ll_policy_params = AttrDict(
     policy_model=ImageClSPiRLMdl,
     policy_model_params=ll_model_params,
     policy_model_checkpoint=os.path.join(os.environ["EXP_DIR"],
-                                         "skill_prior_learning/pick_and_place_img/hierarchical_cl"),
+                                         "skill_prior_learning/pick_and_place_img_unc/hierarchical_cl"),
     policy_model_epoch='latest',  # default: latest
 )
 ll_policy_params.update(ll_model_params)

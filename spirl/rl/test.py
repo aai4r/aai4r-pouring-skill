@@ -320,7 +320,9 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     # os.environ['DISPLAY'] = ':0'
 
-    # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img", "pick_and_place_img"]
+    tasks = ["pouring_water",
+             "pouring_water_img",
+             "pick_and_place_img", "pick_and_place_img_unc"]
     task_name = "pick_and_place_img"
     mode = "spirl_cl"
 

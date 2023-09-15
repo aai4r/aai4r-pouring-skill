@@ -46,7 +46,8 @@ class Block(nn.Sequential, HasParameters):
             normalize=True,
             activation=nn.LeakyReLU(0.2, inplace=True),
             normalization=self.builder.normalization,
-            normalization_params=AttrDict()
+            normalization_params=AttrDict(),
+            dropout=self.builder.dropout
         )
         return params
         
@@ -77,6 +78,9 @@ class Block(nn.Sequential, HasParameters):
 
         if self.params.activation is not None:
             self.add_module('activation', self.params.activation)
+
+        if self.params.dropout:
+            self.add_module('dropout', nn.Dropout(p=0.2))
             
 ###
 
@@ -179,7 +183,7 @@ class BaseProcessingNet(ConcatSequential):
     Builds an MLP or CNN, depending on the builder. Alternatively uses custom blocks """
     
     def __init__(self, in_dim, mid_dim, out_dim, num_layers, builder, block=None, detached=False,
-                 final_activation=None):
+                 final_activation=None, dropout=False):
         super().__init__(detached)
 
         if block is None:
@@ -189,7 +193,7 @@ class BaseProcessingNet(ConcatSequential):
         self.add_module('input', block(in_dim=in_dim, out_dim=mid_dim, normalization=None))
         for i in range(num_layers):
             self.add_module('pyramid-{}'.format(i),
-                            block(in_dim=mid_dim, out_dim=mid_dim, normalize=builder.normalize))
+                            block(in_dim=mid_dim, out_dim=mid_dim, normalize=builder.normalize, dropout=dropout))
 
         self.add_module('head'.format(i + 1),
                         block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation))
@@ -206,11 +210,12 @@ def get_num_conv_layers(img_sz):
 class LayerBuilderParams:
     """ This class holds general parameters for all subnetworks, such as whether to use convolutional networks, etc """
     
-    def __init__(self, use_convs, normalization='batch'):
+    def __init__(self, use_convs, normalization='batch', dropout=False):
         self.use_convs = use_convs
         self.init_fn = init_weights_xavier
         self.normalize = normalization != 'none'
         self.normalization = normalization
+        self.dropout = dropout
 
     @property
     def get_num_layers(self):

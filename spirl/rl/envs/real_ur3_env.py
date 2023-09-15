@@ -227,10 +227,10 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         else:
             raise NotImplementedError
 
-        if mode > 0.5:
-            self.control_mode_to(cont_to="forward", move_j=True)
-        elif mode < -0.5:
-            self.control_mode_to(cont_to="downward", move_j=True)
+        # if mode > 0.5:
+        #     self.control_mode_to(cont_to="forward", move_j=True)
+        # elif mode < -0.5:
+        #     self.control_mode_to(cont_to="downward", move_j=True)
 
         actual_tcp_pos, actual_tcp_ori = self.get_actual_tcp_pos_ori()
         des_pos = np.array(actual_tcp_pos) + np.array(act_pos)

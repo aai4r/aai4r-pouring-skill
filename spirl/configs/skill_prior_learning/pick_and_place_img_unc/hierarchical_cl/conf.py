@@ -43,7 +43,8 @@ model_config = AttrDict(
     prior_input_res=data_spec.res,
     weights_dir="weights",
     recurrent_prior=False,
-    mc_dropout=True,
+    dropout=True,
+    mc_dropout=False,
 )
 
 # Dataset
