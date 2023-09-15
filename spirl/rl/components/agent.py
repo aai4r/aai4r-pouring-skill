@@ -336,7 +336,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
         if self.skill_uncertainty_plot:
             cfg = AttrDict(max_episode_length=self._hp.env_params.config.cfg['env']['episodeLength'],
-                           nRow=2, nCol=1, super_title="Robot Skill Plot")
+                           nRow=1, nCol=2, super_title="Robot Skill Plot")
             self.skill_plot = RobotSkillPlot(cfg=cfg)
 
     def _default_hparams(self):
@@ -356,7 +356,7 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         output = super().act(*args, **kwargs)
         self._steps_since_hl += 1
         if self.skill_uncertainty_plot:
-            self.skill_plot.plot(uncertainty=np.exp(self._last_hl_output.dist.log_sigma).mean(),
+            self.skill_plot.plot(uncertainty=np.array([0.0]),  # np.exp(self._last_hl_output.dist.log_sigma).mean()
                                  curr_state=args[0][:7])
             output.action[:7] *= self.skill_plot.skill_uncertainty_binary
         return output

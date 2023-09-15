@@ -36,12 +36,13 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
     def __init__(self, config):
         self.config = config
         self.init_vr()  # TODO, for safe test..
-        BaseRTDE.__init__(self, HOST="192.168.0.75")
-        UR3ControlMode.__init__(self, init_mode="forward")
+        BaseRTDE.__init__(self, HOST="192.168.4.31")
+        UR3ControlMode.__init__(self, init_mode=self.config.init_conf_mode)
 
         # shared autonomy control params
         self.user_control_authority = False
         self.rollout = RolloutManager(task_name=self.config.task_name)
+        self.rand_control_mode = self.config.rand_control_mode
         self.collect_demo = True
 
         # using VR and its trigger for safety
@@ -348,7 +349,8 @@ class ImageRtdeUR3(RtdeUR3):
         return color
 
     def reset(self):
-        self.random_change_control_mode()
+        if self.rand_control_mode:
+            self.random_change_control_mode()
         obs = super().reset()
         return obs
 

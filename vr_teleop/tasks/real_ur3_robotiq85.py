@@ -6,16 +6,16 @@ from vr_teleop.tasks.rollout_manager import RolloutManager, RolloutManagerExpand
 
 
 class RealUR3(BaseRTDE, UR3ControlMode):
-    def __init__(self, task_name):
+    def __init__(self, task):
         self.init_vr()
-        BaseRTDE.__init__(self, HOST="192.168.0.75")
-        UR3ControlMode.__init__(self, init_mode="forward")
+        BaseRTDE.__init__(self, HOST="192.168.4.31")
+        UR3ControlMode.__init__(self, init_mode=task.init_mode)
 
         self.cam = RealSense()
         self.timer = CustomTimer(duration_sec=1.0)
-        self.rand_control_mode = True
+        self.rand_control_mode = task.rand_control_mode
 
-        self.rollout = RolloutManagerExpand(task_name=task_name)
+        self.rollout = RolloutManagerExpand(task_name=task.task_name)
         self.collect_demo = True
 
     def init_vr(self):
@@ -238,7 +238,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
 if __name__ == "__main__":
     tasks = ["pouring_skill_img", "pick_and_place_img"]
+    task = AttrDict(task_name="pick_and_place_img", init_mode="downward", rand_control_mode=False)
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
-    u = RealUR3(task_name="pouring_skill_img")
-    # u.run_vr_teleop()
-    u.replay_mode(batch_idx=1, rollout_idx=268)
+    u = RealUR3(task=task)
+    u.run_vr_teleop()
+    # u.replay_mode(batch_idx=1, rollout_idx=0)

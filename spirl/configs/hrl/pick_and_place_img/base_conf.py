@@ -147,12 +147,18 @@ data_config.dataset_spec = data_spec
 
 cfg = AttrDict()
 cfg.extra = AttrDict()
-cfg.extra.skill_uncertainty_plot = False
+cfg.env = AttrDict()
+
+cfg.env.episodeLength = 500
+cfg.extra.skill_uncertainty_plot = True
 env_config = AttrDict(
     reward_norm=1.,
     image_observation=True,
     img_debug=False,
     img_disp_delay=1,
     cfg=cfg,
-    task_name="pick_and_place_img"
+    task_name="pick_and_place_img",
+    init_conf_mode="downward",
+    rand_control_mode=False,
+    run_mode="train",   # ["train", "sample", "eval"]
 )

@@ -1,4 +1,4 @@
-from spirl.configs.hrl.pouring_skill_img.base_conf import *
+from spirl.configs.hrl.pick_and_place_img.base_conf import *
 from spirl.rl.policies.prior_policies import ACLearnedPriorAugmentedPIPolicy
 from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 
