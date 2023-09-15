@@ -44,7 +44,7 @@ class Block(nn.Sequential, HasParameters):
     def get_default_params(self):
         params = AttrDict(
             normalize=True,
-            activation=nn.LeakyReLU(0.2, inplace=True),
+            activation=nn.ReLU(),  # nn.LeakyReLU(0.2, inplace=True),
             normalization=self.builder.normalization,
             normalization_params=AttrDict(),
             dropout=self.builder.dropout
