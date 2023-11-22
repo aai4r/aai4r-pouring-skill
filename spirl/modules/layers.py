@@ -44,7 +44,7 @@ class Block(nn.Sequential, HasParameters):
     def get_default_params(self):
         params = AttrDict(
             normalize=True,
-            activation=nn.LeakyReLU(0.2, inplace=True),
+            activation=nn.ReLU(),  # nn.LeakyReLU(0.2, inplace=True),
             normalization=self.builder.normalization,
             normalization_params=AttrDict(),
             dropout=self.builder.dropout
@@ -184,6 +184,7 @@ class BaseProcessingNet(ConcatSequential):
     
     def __init__(self, in_dim, mid_dim, out_dim, num_layers, builder, block=None, detached=False,
                  final_activation=None, dropout=False):
+
         super().__init__(detached)
 
         if block is None:
@@ -195,11 +196,12 @@ class BaseProcessingNet(ConcatSequential):
             self.add_module('pyramid-{}'.format(i),
                             block(in_dim=mid_dim, out_dim=mid_dim, normalize=builder.normalize, dropout=dropout))
 
-        self.add_module('head'.format(i + 1),
-                        block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation))
+        if final_head:
+            self.add_module('head'.format(i + 1),
+                            block(in_dim=mid_dim, out_dim=out_dim, normalization=None, activation=final_activation, dropout=None))
         self.apply(init_weights_xavier)
-        
-        
+
+
 def get_num_conv_layers(img_sz):
     n = math.log2(img_sz)
     assert n == round(n), 'imageSize must be a power of 2'

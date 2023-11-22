@@ -193,7 +193,16 @@ class SharedAutonomyTrainer:
         print("****************************************")
         self.agent.update_model_weights()
 
-    def skill_deployment(self):
+    def shared_autonomy_train(self):
+        self.warmup_skill_train(epoch=0)
+
+        """
+        1) skill load and deployment
+        2) interrupt by user triggering and collect demo dataset
+        3) augment the demo dataset and skill retraining (how many epochs?)
+        4) agent model update and skill deployment again
+        """
+
         n_total = 0
         with self.agent.val_mode():
             while True:  # keep producing rollouts until we get a valid one
@@ -203,15 +212,8 @@ class SharedAutonomyTrainer:
                     print("n_total: ", n_total)
 
                 self.skill_trainer.train_loader_update()
-                # self.skill_trainer.skill_train(num_epochs=1)
-                # self.agent.update_model_weights()
-
-    def shared_autonomy_train(self):
-        self.warmup_skill_train(epoch=0)
-        self.skill_deployment()
-        # interrupt by user triggering and collect demo dataset
-        # augment the demo dataset and skill retraining (how many epochs?)
-        # agent model update and skill deployment
+                self.skill_trainer.skill_train(num_epochs=1)
+                self.agent.update_model_weights()
 
     def shared_autonomy_sampling(self):
         n_total = 0
@@ -396,7 +398,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
-    task_name = "multi_skill_img"
+    task_name = "pick_and_place_img"
     mode = "spirl_cl"
 
     args = get_args()
@@ -407,5 +409,5 @@ if __name__ == '__main__':
     args.n_val_samples = 100
     # args.resume = "latest"
     args.save_root = os.environ["DATA_DIR"]  # os.path.join(os.environ["DATA_DIR"], task_name)
-    args.run_mode = 'sample'  # train, eval, sample
+    args.run_mode = 'train'  # train, eval, sample
     SharedAutonomyTrainer(args=args)

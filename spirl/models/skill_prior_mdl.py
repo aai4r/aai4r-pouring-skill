@@ -33,7 +33,7 @@ class SkillPriorMdl(BaseModel, ProbabilisticModel):
         ProbabilisticModel.__init__(self)
         self._hp = self._default_hparams()
         self._hp.overwrite(params)  # override defaults with config file
-        self._hp.builder = LayerBuilderParams(self._hp.use_convs, self._hp.normalization)
+        self._hp.builder = LayerBuilderParams(self._hp.use_convs, self._hp.normalization, self._hp.dropout, self._hp.droprate)
         self.device = self._hp.device
 
         self.build_network()
@@ -560,14 +560,33 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
     def __init__(self, hp, enc_params, img_encoder):
         self.recurrent = hp.recurrent_prior
         super().__init__(hp=hp, enc_params=enc_params)
-        self.img_encoder = copy.deepcopy(img_encoder)
+        # self.img_encoder = copy.deepcopy(img_encoder)
+        self.img_encoder = img_encoder
+
+        self.n_stack = 50
+
+    def on_mc_dropout(self, n_stack=50):
+        if self.get_nn_training_status():
+            return
+        self.n_stack = n_stack
+        self.nn.train()
+        print("nn train? ", self.get_nn_training_status())
+
+    def off_mc_dropout(self):
+        if not self.get_nn_training_status():
+            return
+        self.nn.eval()
+        print("nn eval!!!!!!")
+
+    def get_nn_training_status(self):
+        return self.nn.training
 
         self.mc_dropout = self._hp.mc_dropout
         self.n_sample = 64
 
     def build_network(self):
         resnet_mid = 512   # resnet 18 feature size
-        input_size = resnet_mid + self._hp.state_cond_size  # * self._hp.n_input_frames
+        input_size = resnet_mid  # + self._hp.state_cond_size  # * self._hp.n_input_frames
         if self.recurrent:
             # Recurrent structure
             self.nn = torch.nn.Sequential(
@@ -587,7 +606,7 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
 
     def forward(self, inputs):
         out = self.img_encoder(inputs.images)
-        out = torch.cat((out, inputs.states), dim=-1)
+        # out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
 
         if self.mc_dropout:

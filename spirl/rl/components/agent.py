@@ -1,5 +1,6 @@
 import copy
 import os
+import math
 import threading
 import time
 
@@ -219,7 +220,6 @@ class HierarchicalAgent(BaseAgent):
         self.hl_agent = self._hp.hl_agent(self._hp.overwrite(self._hp.hl_agent_params))
         self.ll_agent = self._hp.ll_agent(self._hp.overwrite(self._hp.ll_agent_params))
         self._last_hl_output = None     # stores last high-level output to feed to low-level during intermediate steps
-
         self._prev_hl_action = None  # stores previous high-level action to blend it with current high-level action for conservative skill inference
         self.uncertainty = 0
 
@@ -365,6 +365,11 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
         self.ll_agent.update_model_weights()
 
     def act(self, *args, **kwargs):
+        if self.skill_uncertainty_plot:
+            self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=64)  # TODO, doesn't work in init
+        else:
+            self.hl_agent.policy.net.p[0].off_mc_dropout()
+
         if self.skill_uncertainty_plot and self._steps_since_hl <= 0:
             self.skill_plot.reset()
 
@@ -411,7 +416,10 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
     def reset(self):
         super().reset()
         self._steps_since_hl = 0     # start new episode with high-level step
-        if self.skill_uncertainty_plot: self.skill_plot.reset()
+        if self.skill_uncertainty_plot:
+            self.skill_plot.reset()
+            print("{}, ".format(np.mean(self.avg_skill_unc)))   # average skill uncertainty:
+            self.avg_skill_unc = []
 
 
 class MultiEnvFixedIntervalHierarchicalAgent(FixedIntervalHierarchicalAgent):
@@ -510,6 +518,7 @@ class RobotSkillPlot:
         self.ax_skill.set_xlim([0.0, self.max_episode_length])
         self.time_step = np.array([0])
         self.uncertainties = np.array([0])
+        self.sigs = np.array([0])
         self.skill_uc_plot, = self.ax_skill.plot(self.time_step, self.uncertainties, color='red')
 
     def reset_robot_state(self):

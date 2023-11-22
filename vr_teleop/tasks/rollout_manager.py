@@ -218,6 +218,13 @@ class RolloutManagerExpand(RolloutManager):
         self._images.append(image)
         self._extra.append(extra)
 
+    def replace(self, index, image=None, state=None, action=None, done=None, info=None):
+        if image is not None: self._images[index] = image
+        if state is not None: self._states[index] = state
+        if action is not None: self._actions[index] = action
+        if done is not None: self._dones[index] = done
+        if info is not None: self._info[index] = info
+
     def get(self, index):
         assert 0 <= index < self.len()
         return self._images[index], self._states[index], self._actions[index], self._dones[index], self._info[index]
@@ -227,13 +234,13 @@ class RolloutManagerExpand(RolloutManager):
         return self._extra[index]
 
     def len(self):
-        assert len(self._images) == len(self._states) == len(self._actions) == len(self._dones) == len(self._extra)
+        assert len(self._images) == len(self._states) == len(self._actions) == len(self._dones) #== len(self._extra)
         return len(self._states)
 
     def reset(self):
         super().reset()
         self._images = []
-        self._extra = []
+        # self._extra = []
 
     def to_np_rollout(self):
         np_rollout = super().to_np_rollout()
@@ -251,7 +258,7 @@ class RolloutManagerExpand(RolloutManager):
         print("Rollout length: ", self.len())
         idx = 0
         sample_obs, sample_state, sample_action, sample_done, sample_info = self.get(idx)
-        sample_extra = self.get_extra(idx)
+        # sample_extra = self.get_extra(idx)
 
         print("* STEP: [{}]".format(idx))
         print("    observation shape {}".format(sample_obs.shape))
@@ -259,11 +266,11 @@ class RolloutManagerExpand(RolloutManager):
         print("    action * {} dim with {}".format(len(sample_action), sample_action))
         print("    done * {} dim with {}".format(len([sample_done]), sample_done))
         print("    info: ", sample_info)
-        print("    extra * {} dim with {}".format(len([sample_extra]), sample_extra))
+        # print("    extra * {} dim with {}".format(len([sample_extra]), sample_extra))
 
-    def save_to_file(self):
+    def save_to_file(self, batch_idx=None):
         np_episode_dict = self.to_np_rollout()
-        save_path = self.get_final_save_path(self.batch_index)
+        save_path = self.get_final_save_path(self.batch_index if batch_idx is None else batch_idx)
 
         f = h5py.File(save_path, "w")
         f.create_dataset("traj_per_file", data=1)
@@ -342,7 +349,7 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         self.tr = transforms.Compose([transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                            std=[0.229, 0.224, 0.225])])
 
-        self.config = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
+        self.config = AttrDict(crop_h=230, crop_w=230, resize_h=224, resize_w=224)
 
     def pre_processing(self, color_image):
         """
@@ -366,7 +373,7 @@ class VideoDatasetCompressor(RolloutManagerExpand):
         resize_h, resize_w = self.config.resize_h, self.config.resize_w
         y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
 
-        zoom_pix = 50
+        zoom_pix = int(min(crop_h, crop_w) * 0.11)
         zoom = np.random.randint(0, zoom_pix)
         cropped_img = color_image[y:y+crop_h-zoom, x:x+crop_w-zoom]
         resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
@@ -550,9 +557,10 @@ if __name__ == "__main__":
     #         r_idx = r[len('rollout_'):r.find('.')]
     #         print(rollout_list)
 
-    vdc.load_from_file(batch_idx=1, rollout_idx=43)
+    vdc.load_from_file(batch_idx=1, rollout_idx=1)
     for i in range(vdc.len()):
         obs, state, action, done, info = vdc.get(i)
+        obs = vdc.pre_processing(obs)
         visualize(depth_image=np.zeros(obs.shape), color_image=obs)
     # np_rollout = vdc.to_np_rollout()
     # print(np_rollout.features.shape)

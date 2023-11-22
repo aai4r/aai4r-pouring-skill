@@ -5,7 +5,7 @@ import isaacgym
 import torch
 from init_conf import project_home_path
 
-from spirl.utility.general_utils import AttrDict
+from spirl.utils.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent, MultiEnvFixedIntervalHierarchicalAgent
 from spirl.rl.components.critic import SplitObsMLPCritic
 from spirl.rl.envs.isaacgym_env import PouringWaterEnv
@@ -16,7 +16,7 @@ from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 from spirl.rl.agents.ac_agent import SACAgent
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
 from spirl.configs.default_data_configs.isaacgym_envs import data_spec_img
-from spirl.utility.remote_server_utils import WeightNaming
+from spirl.utils.remote_server_utils import WeightNaming
 
 from utils.config import parse_sim_params
 from task_rl.config import load_cfg
@@ -51,7 +51,7 @@ obs_norm_params = AttrDict(
 )
 
 base_agent_params = AttrDict(
-    batch_size=32,
+    batch_size=128,
     update_iterations=1,        # replay buffer
     replay=UniformReplayBuffer,
     replay_params=replay_params,
@@ -66,7 +66,7 @@ ftp_params = AttrDict(
     pw="your_server_password",
     ip_addr="your_server_ip_addr",
     skill_weight_path="your_path_to_save_in_the_server",
-    epoch="300",    # target epoch number of weight to download
+    epoch="100",    # target epoch number of weight to download
 )
 
 import yaml
@@ -93,12 +93,12 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec_img.res,
     nz_vae=12,
     n_rollout_steps=10,
-    nz_enc=256,     # will automatically be set to 512(resnet18) if use_pretrain=True
-    nz_mid_prior=256,
-    n_processing_layers=5,
+    nz_enc=128,     # will automatically be set to 512(resnet18) if use_pretrain=True
+    nz_mid_prior=128,
+    n_processing_layers=3,
     num_prior_net_layers=3,
-    state_cond=False,        # B
-    state_cond_size=7,
+    state_cond=True,        # B
+    state_cond_size=6,
     use_pretrain=True,      # A
     layer_freeze=-1,    # 5: freeze for skill train, -1: freeze all layers of pre-trained net
     model_download=False,
@@ -195,7 +195,7 @@ args.headless = False
 args.test = False
 
 dev_num = 0
-if torch.cuda.device_count() > 1: dev_num = 1
+# if torch.cuda.device_count() > 1: dev_num = 1
 assert torch.cuda.get_device_name(dev_num)
 args.compute_device_id = dev_num
 args.device_id = dev_num

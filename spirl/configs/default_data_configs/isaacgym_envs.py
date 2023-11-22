@@ -7,7 +7,7 @@ data_spec = AttrDict(
     dataset_class=IsaacGymSequenceDataLoader,
     n_actions=7,
     state_dim=24,
-    env_name="pouring_water",
+    env_name="pouring_skill",
     res=128,
     crop_rand_subseq=True,
 )
