@@ -141,6 +141,10 @@ class SkillDatasetManager(QMainWindow, form_class):
         self.update_image()
         self.update_pad_mask()
         self.step_progress_label_update()
+        step = self.data.step
+        self.textEdit_log.append("step: {}".format(step))
+        self.textEdit_log.append("state: {}, \naction: {}".format(self.data.states[step],
+                                                                  self.data.actions[step]))
 
     def step_progress_label_update(self):
         self.lb_step_prog.setText(" {} / {} ".format(self.data.step, self.data.max_step))

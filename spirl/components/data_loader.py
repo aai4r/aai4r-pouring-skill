@@ -1,3 +1,4 @@
+import cv2
 import glob
 import imp
 import os
@@ -10,6 +11,8 @@ import itertools
 from spirl.utility.general_utils import AttrDict, map_dict, maybe_retrieve, shuffle_with_seed
 from spirl.utility.pytorch_utils import RepeatedDataLoader
 from spirl.utility.video_utils import resize_video
+
+from vr_teleop.tasks.lib_modules import noisy
 
 
 class Dataset(data.Dataset):
@@ -114,6 +117,8 @@ class VideoDataset(Dataset):
         self.crop_subseq = 'crop_rand_subseq' in self.spec and self.spec.crop_rand_subseq
         self.img_sz = resolution
         self.subsampler = self._get_subsampler()
+
+        self.crop_ratio = 0.96
 
     def __getitem__(self, index):
         data = self._get_raw_data(index)
@@ -246,11 +251,55 @@ class VideoDataset(Dataset):
 
     def _preprocess_images(self, images):
         assert images.dtype == np.uint8, 'image need to be uint8!'
-        images = resize_video(images, (self.img_sz, self.img_sz))
-        images = np.transpose(images, [0, 3, 1, 2])  # convert to channel-first
-        images = images.astype(np.float32) / 255 * 2 - 1
-        assert images.dtype == np.float32, 'image need to be float32!'
-        return images
+        proc_images = np.zeros((len(images), self.img_sz, self.img_sz, 3), dtype=np.float32)
+        for i in range(len(images)):
+            proc_images[i] = self._pre_processing(images[i])
+        # self._visualize(proc_images)
+
+        # images = resize_video(images, (self.img_sz, self.img_sz))
+        proc_images = np.transpose(proc_images, [0, 3, 1, 2])  # convert to channel-first
+        # images = images.astype(np.float32) / 255 * 2 - 1
+        # proc_images = proc_images.astype(np.float32)
+        assert proc_images.dtype == np.float32, 'image need to be float32!'
+        return proc_images
+
+    def _pre_processing(self, color_image):
+        """
+        In:
+        1) random crop
+        2) resize
+        3) photometric distortion
+            - zoom
+            - brightness
+            - noises(gaussian, salt-pepper, poisson, speckle)
+            - candidates(affine transformation, rotation, )
+        :param resize_w:
+        :param resize_h:
+        :param crop_w: crop width size
+        :param crop_h: crop height size
+        :param color_image:
+        :return:
+        """
+        ih, iw = color_image.shape[:2]
+        crop_h = crop_w = int(min(ih, iw) * self.crop_ratio)
+        resize_h, resize_w = self.img_sz, self.img_sz
+        y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
+
+        zoom_pix = int(min(crop_h, crop_w) * 0.11)
+        zoom = np.random.randint(0, zoom_pix)
+        cropped_img = color_image[y:y+crop_h-zoom, x:x+crop_w-zoom]
+        resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+
+        brightness = 50
+        resized_img = cv2.convertScaleAbs(resized_img, resized_img, 1, np.random.randint(-brightness, brightness))
+        noisy_img = noisy(image=resized_img, noise_type='s&p', random_noise=False)
+        out = noisy_img
+        return out
+
+    def _visualize(self, images):   # (h, w, c)
+        for i in range(len(images)):
+            cv2.imshow("images", images[i])
+            cv2.waitKey(1)
 
 
 class PreloadVideoDataset(VideoDataset):

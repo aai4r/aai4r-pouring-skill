@@ -300,7 +300,10 @@ class HierarchicalSampler(Sampler):
 class ImageAugmentedSampler(Sampler):
     """Appends image rendering to raw observation."""
     def _postprocess_obs(self, obs):
-        img = self._env.render().transpose(2, 0, 1) * 2. - 1.0
+        # img = self._env.render().transpose(2, 0, 1) * 2. - 1.0
+        img = self._env.render().transpose(2, 0, 1)
+        state_dim = self._agent._hp.policy_params.state_dim
+        obs = obs[:state_dim]
         return np.concatenate((obs, img.flatten()))
 
 

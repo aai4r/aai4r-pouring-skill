@@ -19,7 +19,7 @@ import numpy as np
 
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
-    state_dim=16,   # 47 in sim
+    state_dim=14,   # [joints(6), ee_pos(3), ee_rot(4), grip(1), cont_mode(2)], 47 in sim
     n_actions=8,    # lv(3), rv_quat(4), gripper(1)
     split=AttrDict(train=0.99, val=0.01, test=0.0),
     env_name="pick_and_place_img",   # "pouring_skill_img"  # TODO, how it is affected?
@@ -211,7 +211,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         obs = self.get_obs()    # next state / observation
         reward = 0
         done = False
-        info = ""
+        info = {"sap": False}
         return obs, reward, done, info
 
     def goal_pose_from_action(self, action):
@@ -418,13 +418,13 @@ class ImageRtdeUR3(RtdeUR3):
                 print("***** Discard current demo data *****")
                 self.speed_stop()
                 obs = self.reset()
-                reward, done, info = 0, True, ""
+                reward, done, info = 0, True, {"sap": True}     # shared autonomy process
                 self.rollout.reset()
                 return obs, reward, done, info
 
             if cont_status["btn_reset_pose"]:
                 self.speed_stop()
-                depth, color = self.cam.get_np_images(self.idx_rear, resize=(320, 240))
+                depth, color = self.cam.get_np_images(self.idx_rear)
                 self.record_frame(image=copy.deepcopy(color),
                                   state=self.get_robot_state(),
                                   action_pos=[0., 0., 0.],
@@ -435,7 +435,7 @@ class ImageRtdeUR3(RtdeUR3):
                                   extra=[0., 0., 0., 1.])
 
                 obs = self.reset()
-                reward, done, info = 0, True, ""
+                reward, done, info = 0, True, {"sap": True}
 
                 self.rollout.show_rollout_summary()
                 self.rollout.save_to_file(batch_idx=2)
@@ -445,7 +445,7 @@ class ImageRtdeUR3(RtdeUR3):
             diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             action_mode = [0.0]
             if cont_status["btn_trigger"]:
-                depth, color = self.cam.get_np_images(self.idx_rear, resize=(320, 240))
+                depth, color = self.cam.get_np_images(self.idx_rear)
                 visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
                 state = self.get_robot_state()
 

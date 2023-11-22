@@ -130,10 +130,13 @@ class PreTrainEncoder(nn.Module):
             # freeze_modules([self.net])
             freeze_model_until(model=self.net, until=self._hp.layer_freeze)  # resnet 18 has 9 layers except for the last fc layer
 
+        self.crop_ratio = 0.96
+        self.resize_h, self.resize_w = 224, 224
+
         if self._hp.layer_freeze == -1:
             self.net.eval()
         self.tr = transforms.Compose([
-            transforms.Resize((224, 224)),  # (224, 224)
+            transforms.Resize((self.resize_h, self.resize_w)),  # (224, 224)
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])])
 
@@ -141,14 +144,15 @@ class PreTrainEncoder(nn.Module):
         # w = self._hp.prior_input_res if self._hp.n_input_frames > 1 else 224    # Resnet resize value
         w = self._hp.prior_input_res
         img = (unroll[index, :, :, :w].cpu().numpy()).transpose(1, 2, 0)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        # img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         for i in range(1, self._hp.n_input_frames):
             start, end = i * w, (i + 1) * w
             temp = (unroll[index, :, :, start:end].cpu().numpy()).transpose(1, 2, 0)
-            temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
+            # temp = cv2.cvtColor(temp, cv2.COLOR_RGB2BGR)
             img = np.concatenate((img, temp), axis=-2)
 
-        img = ((img + 1) * (255/2)).astype(np.uint8)
+        # img = ((img + 1) * (255/2)).astype(np.uint8)
+        img = (img * 255).astype(np.uint8)
         cv2.imshow("stacked images", img)
         cv2.waitKey(1)
 
@@ -158,11 +162,15 @@ class PreTrainEncoder(nn.Module):
         unroll = torch.tensor([]).to(self._hp.device)
         for i in range(self._hp.n_input_frames):
             start, end = i * n_channel, (i + 1) * n_channel
-            unroll = torch.cat((unroll, input[:, start:end]), dim=-1)
+            img = input[:, start:end]
+            unroll = torch.cat((unroll, img), dim=-1)
 
+        # unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later. it takes some time..
         # self.visualize(unroll, 0)
-        unroll = self.tr((unroll + 1.0) / 2.0)  # should be moved to dataloader later. it takes some time..
-        out = self.net(unroll)
+        unroll = self.tr(unroll)
+        self.visualize(unroll, 0)
+        with torch.no_grad():
+            out = self.net(unroll)
         # if self._hp.layer_freeze == -1:
         #     with torch.no_grad(): out = self.net(unroll)
         # else:

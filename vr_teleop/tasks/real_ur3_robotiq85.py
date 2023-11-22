@@ -148,7 +148,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     continue
 
                 if cont_status["btn_reset_pose"]:
-                    depth, color = self.cam.get_np_images(resize=(320, 240))
+                    depth, color = self.cam.get_np_images()
                     self.record_frame(observation=copy.deepcopy(color),
                                       state=self.get_state(),
                                       action_pos=[0., 0., 0.],
@@ -168,7 +168,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 action_mode = [1.0] if self.CONTROL_MODE == 'forward' else [-1.0]
                 if cont_status["btn_trigger"]:
-                    depth, color = self.cam.get_np_images(resize=(320, 240))
+                    depth, color = self.cam.get_np_images()
                     visualize(*self.cam.get_np_images_buf())
                     state = self.get_state()
 

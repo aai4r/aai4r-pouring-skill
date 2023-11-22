@@ -94,12 +94,12 @@ class ModelTrainer(BaseTrainer):
             'logger_test': None,
             'evaluator': None,
             'data_dir': None,  # directory where dataset is in
-            'batch_size': 32,
+            'batch_size': 64,
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
             'optimizer': 'radam',    # supported: 'adam', 'radam', 'rmsprop', 'sgd'
-            'lr': 3e-4,
+            'lr': 1e-3,
             'gradient_clip': None,
             'init_grad_clip': 0.001,
             'init_grad_clip_step': 100,     # clip gradients in initial N steps to avoid NaNs
@@ -147,6 +147,9 @@ class ModelTrainer(BaseTrainer):
     def sample_pre_proc(self, inputs):
         action_dim = self.conf.model.action_dim
         inputs.actions = inputs.actions[:, :, :action_dim]
+
+        state_dim = self.conf.model.state_dim
+        inputs.states = inputs.states[:, :, :state_dim]
 
     def train_epoch(self, epoch):
         self.model.train()

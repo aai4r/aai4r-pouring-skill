@@ -40,10 +40,10 @@ class SkillTrainer(ModelTrainer):
         # sys.argv.append("--val_data_size={}".format(160))  # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
         sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
-    def train_loader_update(self):
+    def train_loader_update(self, epoch_cycles_train=None):
         params = AttrDict(logger_class=self._hp.logger,
                           model_class=self._hp.model,
-                          n_repeat=self._hp.epoch_cycles_train,
+                          n_repeat=self._hp.epoch_cycles_train if epoch_cycles_train is None else epoch_cycles_train,
                           dataset_size=-1)
         self.train_loader = self.get_dataset(self.args, self.model, self.conf.data, 'train', params.n_repeat, params.dataset_size)
         print("Augmented # of Samples: ", self.train_loader.sampler.num_samples)
@@ -203,17 +203,23 @@ class SharedAutonomyTrainer:
         4) agent model update and skill deployment again
         """
 
+        n_samples = self.skill_trainer.train_loader.sampler.num_samples
+        print("init n_samples: ", n_samples)
         n_total = 0
+        last_n_samples = n_samples
         with self.agent.val_mode():
             while True:  # keep producing rollouts until we get a valid one
                 with torch.no_grad():
                     episode = self.sampler.sample_episode(is_train=False, render=True)
                     n_total += 1
-                    print("n_total: ", n_total)
 
-                self.skill_trainer.train_loader_update()
-                self.skill_trainer.skill_train(num_epochs=1)
-                self.agent.update_model_weights()
+                n_samples += 1 if episode.info[-1][0]["sap"] else 0
+                if n_samples % 1 == 0 and n_samples > last_n_samples:
+                    print("n_samples: ", n_samples)
+                    self.skill_trainer.train_loader_update(epoch_cycles_train=10)
+                    self.skill_trainer.skill_train(num_epochs=1)
+                    self.agent.update_model_weights()
+                    last_n_samples = n_samples
 
     def shared_autonomy_sampling(self):
         n_total = 0
