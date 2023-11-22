@@ -436,7 +436,7 @@ def set_run_params():
     tasks = ["pouring_skill_img",
              "pick_and_place_img", "pick_and_place_img_unc",
              "multi_skill_img"]
-    task_name = "pouring_skill_img"
+    task_name = "pick_and_place_img_unc"
     mode = "hierarchical_cl"
 
     # config path & params
