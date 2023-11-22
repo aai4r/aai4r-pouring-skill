@@ -392,7 +392,7 @@ class ImageSkillPriorMdl(SkillPriorMdl):
             input_nc=3*self._hp.n_input_frames,  # number of input feature maps
             ngf=self._hp.encoder_ngf,         # number of feature maps in shallowest level
             nz_enc=self.prior_input_size,     # size of image encoder output feature
-            builder=LayerBuilderParams(use_convs=True, normalization=self._hp.normalization)
+            builder=LayerBuilderParams(use_convs=True, normalization=self._hp.normalization, dropout=self._hp.dropout)
         ))
 
     def _build_prior_net(self):
@@ -581,6 +581,9 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
     def get_nn_training_status(self):
         return self.nn.training
 
+        self.mc_dropout = self._hp.mc_dropout
+        self.n_sample = 64
+
     def build_network(self):
         resnet_mid = 512   # resnet 18 feature size
         input_size = resnet_mid  # + self._hp.state_cond_size  # * self._hp.n_input_frames
@@ -598,26 +601,26 @@ class PreTrainImageSkillPriorNet(StateCondImageSkillPriorNet):
             )
         else:
             self.nn = Predictor(self._hp, input_size=input_size,
-                                output_size=self._hp.nz_mid_prior, num_layers=self._hp.num_prior_net_layers,
-                                mid_size=self._hp.nz_mid_prior, final_head=False)
-            self.nn_head = nn.Linear(self._hp.nz_mid_prior + self._hp.state_cond_size, self._hp.nz_vae * 2)
+                                output_size=self._hp.nz_vae * 2, num_layers=self._hp.num_prior_net_layers,
+                                mid_size=self._hp.nz_mid_prior, dropout=self._hp.dropout)
 
     def forward(self, inputs):
         out = self.img_encoder(inputs.images)
         # out = torch.cat((out, inputs.states), dim=-1)
         out = out.unsqueeze(1) if self.recurrent else out
 
-        if self.training:
-            _z = self.nn(out)
-            _z = torch.cat((_z, inputs.states), dim=-1)
-            z = self.nn_head(_z)
-            zs = z.squeeze(1) if self.recurrent else z
-        else:
-            zs = torch.zeros(self.n_stack, self._hp.nz_vae * 2)
-            for i in range(self.n_stack):
+        if self.mc_dropout:
+            if not self.nn.training:
+                self.nn.train()
+
+            z = torch.zeros(self.n_sample, self._hp.nz_vae * 2)
+            for i in range(self.n_sample):
                 _z = self.nn(out)
-                _z = torch.cat((_z, inputs.states), dim=-1)
-                z = self.nn_head(_z)
-                zs[i] = z
-            zs = zs.squeeze(1) if self.recurrent else zs
-        return zs
+                # _z = torch.cat((_z, inputs.states), dim=-1)
+                # z = self.nn_head(_z)
+                z[i] = _z
+            z = z.squeeze(1) if self.recurrent else z
+        else:
+            z = self.nn(out)
+            z = z.squeeze(1) if self.recurrent else z
+        return z

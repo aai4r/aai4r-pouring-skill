@@ -37,14 +37,14 @@ class ParamLayer(nn.Module):
 
 class Predictor(BaseProcessingNet):
     def __init__(self, hp, input_size, output_size, num_layers=None, detached=False, spatial=True,
-                 final_activation=None, mid_size=None, final_head=True):
+                 final_activation=None, mid_size=None, dropout=False):
         self.spatial = spatial
         mid_size = hp.nz_mid if mid_size is None else mid_size
         if num_layers is None:
             num_layers = hp.n_processing_layers
 
         super().__init__(input_size, mid_size, output_size, num_layers=num_layers, builder=hp.builder,
-                         detached=detached, final_activation=final_activation, final_head=final_head)
+                         detached=detached, final_activation=final_activation, dropout=dropout)
 
     def forward(self, *inp):
         out = super().forward(*inp)

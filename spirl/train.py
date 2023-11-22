@@ -80,6 +80,7 @@ class ModelTrainer(BaseTrainer):
         if args.val_sweep:
             self.run_val_sweep()
         elif args.train:
+            print(self.model)
             # self.train(start_epoch)
             self.train_wo_val(start_epoch)
         else:
@@ -429,8 +430,10 @@ def set_run_params():
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-    tasks = ["pouring_skill", "pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
-    task_name = "pick_and_place_img"
+    tasks = ["pouring_skill_img",
+             "pick_and_place_img", "pick_and_place_img_unc",
+             "multi_skill_img"]
+    task_name = "pick_and_place_img_unc"
     mode = "hierarchical_cl"
 
     # config path & params

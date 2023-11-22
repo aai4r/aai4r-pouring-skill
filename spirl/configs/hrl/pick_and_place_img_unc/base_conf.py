@@ -62,8 +62,8 @@ ll_model_params = AttrDict(
     nz_enc=256,
     nz_mid=256,
     nz_vae=12,
-    n_processing_layers=4,
-    num_prior_net_layers=4,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
     cond_decode=True,
     use_pretrain=True,
     layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
@@ -74,8 +74,8 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec.res,
     weights_dir="weights",
     recurrent_prior=False,   # D
-    dropout=False,
-    mc_dropout=False,
+    dropout=True,
+    mc_dropout=True,
 )
 
 # LL Agent
@@ -83,7 +83,7 @@ ll_agent_config = copy.deepcopy(base_agent_params)
 ll_agent_config.update(AttrDict(
     model=ImageClSPiRLMdl,
     model_params=ll_model_params,
-    model_checkpoint=os.path.join(os.environ["EXP_DIR"], "skill_prior_learning/pick_and_place_img/hierarchical"),
+    model_checkpoint=os.path.join(os.environ["EXP_DIR"], "skill_prior_learning/pick_and_place_img_unc/hierarchical"),
 ))
 
 
@@ -152,14 +152,14 @@ cfg.extra = AttrDict()
 cfg.env = AttrDict()
 
 cfg.env.episodeLength = 500
-cfg.extra.skill_uncertainty_plot = False
+cfg.extra.skill_uncertainty_plot = True
 env_config = AttrDict(
     reward_norm=1.,
     image_observation=True,
     img_debug=False,
     img_disp_delay=1,
     cfg=cfg,
-    task_name="pick_and_place_img",
+    task_name="pick_and_place_img_unc",
     init_conf_mode="downward",
     rand_control_mode=False,
     run_mode="train",   # ["train", "sample", "eval"]

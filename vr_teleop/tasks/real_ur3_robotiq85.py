@@ -10,7 +10,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
     def __init__(self, task):
         self.init_vr()
         BaseRTDE.__init__(self, HOST="192.168.4.31")
-        UR3ControlMode.__init__(self, init_mode="forward")
+        UR3ControlMode.__init__(self, init_mode=task.init_mode)
 
         self.cam = RealSense()
         self.timer = CustomTimer(duration_sec=1.0)
@@ -247,4 +247,3 @@ if __name__ == "__main__":
     u = RealUR3(task=pick_place)
     u.run_vr_teleop()
     # u.replay_mode(batch_idx=1, rollout_idx=268)
-

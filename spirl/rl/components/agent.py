@@ -220,10 +220,8 @@ class HierarchicalAgent(BaseAgent):
         self.hl_agent = self._hp.hl_agent(self._hp.overwrite(self._hp.hl_agent_params))
         self.ll_agent = self._hp.ll_agent(self._hp.overwrite(self._hp.ll_agent_params))
         self._last_hl_output = None     # stores last high-level output to feed to low-level during intermediate steps
-
-        self._prev_hl_action = None     # stores previous high-level action to blend it with current high-level action for conservative skill inference
+        self._prev_hl_action = None  # stores previous high-level action to blend it with current high-level action for conservative skill inference
         self.uncertainty = 0
-        self.prev_time = time.time()
 
     def _default_hparams(self):
         default_dict = ParamDict({
@@ -259,16 +257,12 @@ class HierarchicalAgent(BaseAgent):
         # perform step with low-level policy
         assert self._last_hl_output is not None
         if self._prev_hl_action is not None:
-            dt = time.time() - self.prev_time
-            self.prev_time = time.time()
             current_hl_action = self._last_hl_output.action.mean(axis=0, keepdims=True)
-            diff_hl_action = (current_hl_action - self._prev_hl_action) / dt
-            hl_action = (1.0 - self.uncertainty) * current_hl_action + self.uncertainty * self._prev_hl_action \
-                        + (1.0 - self.uncertainty) * (np.random.rand(*self._prev_hl_action.shape) * 2.0 - 1.0)
-                        # - self.uncertainty * diff_hl_action
-                        # + self.uncertainty * np.random.randn(*self._prev_hl_action.shape)
+            # hl_action = current_hl_action
+            hl_action = (1.0 - self.uncertainty) * current_hl_action + self.uncertainty * self._prev_hl_action
         else:
             hl_action = self._last_hl_output.action.mean(axis=0, keepdims=True)
+        # output.update(self.ll_agent.act(self.make_ll_obs(obs_input, self._last_hl_output.action)))
         output.update(self.ll_agent.act(self.make_ll_obs(obs_input, hl_action)))
 
         return self._remove_batch(output) if len(obs.shape) == 1 else output
@@ -356,15 +350,9 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
         if self.skill_uncertainty_plot:
             cfg = AttrDict(max_episode_length=self._hp.env_params.config.cfg['env']['episodeLength'],
-                           nRow=2, nCol=1, super_title="Robot Skill Uncertainty")
+                           nRow=1, nCol=2, super_title="Robot Skill Plot")
             self.skill_plot = RobotSkillPlot(cfg=cfg)
             self.avg_skill_unc = []
-
-        # TODO, prior net mode switching
-        if self.skill_uncertainty_plot:
-            self.hl_agent.policy.net.p[0].on_mc_dropout(n_stack=64)
-        else:
-            self.hl_agent.policy.net.p[0].off_mc_dropout()
 
     def _default_hparams(self):
         default_dict = ParamDict({
@@ -386,9 +374,10 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
             self.skill_plot.reset()
 
         output = super().act(*args, **kwargs)
+        self.uncertainty = 0.0
         self._steps_since_hl += 1
         if self.skill_uncertainty_plot:
-            z = output.hl_dist.sigma    # (24, 12)
+            z = output.hl_dist.sigma  # (24, 12)
 
             # make covariance matrix and its determinant
             dets = np.zeros(len(z))
@@ -400,16 +389,23 @@ class FixedIntervalHierarchicalAgent(HierarchicalAgent):
 
             z_s = dets.std(axis=0)
             output.unc = z_s
-            self.uncertainty = output.n_ucn = 1.0 - np.exp(-0.005 * z_s)
+            ep = -0.005
+            self.uncertainty = \
+                output.normalized_ucn = \
+                1.0 - np.exp(ep * z_s)
             output._action = copy.deepcopy(output.action)
-            output.action *= ((output.n_ucn - 1.0) * -1.0)
-            # output.action *= np.exp(-0.01 * z_s)
+            output.action = (1 / (1 + output.normalized_ucn)) * output.action
+            # output.action *= np.exp(ep * z_s)
             self.avg_skill_unc.append(z_s)
             # print("z_u: {},    z_std: {}, cm shape: {} ".format(z_u, z_s, cm.shape))
             # print("z_u: {},    z_std: {} ".format(z_u, z_s))
             self.skill_plot.plot(mu=z_u,
-                                 sig=output.unc,
+                                 sig=output.normalized_ucn,
                                  curr_state=args[0][:7])
+            # output.action[:7] *= self.skill_plot.skill_uncertainty_binary
+
+            # self.skill_plot.plot(uncertainty=np.array([0.0]),  # np.exp(self._last_hl_output.dist.log_sigma).mean()
+            #                      curr_state=args[0][:7])
             # output.action[:7] *= self.skill_plot.skill_uncertainty_binary
         return output
 
