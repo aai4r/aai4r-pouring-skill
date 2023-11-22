@@ -15,7 +15,7 @@ configuration = {
                  os.path.join(os.environ["DATA_DIR"], 'pick_and_place_img'),
                  os.path.join(os.environ["DATA_DIR"], 'multi_skill_img')],
     'epoch_cycles_train': 100,
-    'num_epochs': 200,
+    'num_epochs': 300,
     'evaluator': TopOfNSequenceEvaluator,
     'top_of_n_eval': 100,
     'top_comp_metric': 'mse',
@@ -32,9 +32,10 @@ model_config = AttrDict(
     kl_div_weight=5e-4,
     nz_enc=256,
     nz_mid=256,
+    nz_mid_prior=256,
     nz_vae=12,
-    n_processing_layers=4,
-    num_prior_net_layers=4,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
     cond_decode=True,
     use_pretrain=True,
     layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
@@ -45,6 +46,8 @@ model_config = AttrDict(
     prior_input_res=data_spec.res,
     weights_dir="weights",
     recurrent_prior=False,
+    dropout=True,
+    droprate=0.5,
 )
 
 # Dataset

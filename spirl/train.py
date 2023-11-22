@@ -55,6 +55,7 @@ class ModelTrainer(BaseTrainer):
                                 n_repeat=self._hp.epoch_cycles_train,
                                 dataset_size=-1)
         self.logger, self.model, self.train_loader = self.build_phase(train_params, 'train')
+        print("model network structure:: ", self.model)
 
         test_params = AttrDict(logger_class=self._hp.logger if self._hp.logger_test is None else self._hp.logger_test,
                                model_class=self._hp.model if self._hp.model_test is None else self._hp.model_test,
@@ -93,7 +94,7 @@ class ModelTrainer(BaseTrainer):
             'logger_test': None,
             'evaluator': None,
             'data_dir': None,  # directory where dataset is in
-            'batch_size': 64,
+            'batch_size': 32,
             'exp_path': None,  # Path to the folder with experiments
             'num_epochs': 300,
             'epoch_cycles_train': 1,
@@ -143,6 +144,10 @@ class ModelTrainer(BaseTrainer):
                                                                             "weights_dir") else self.conf.model.weights_dir),
                     CheckpointHandler.get_ckpt_name(epoch))
 
+    def sample_pre_proc(self, inputs):
+        action_dim = self.conf.model.action_dim
+        inputs.actions = inputs.actions[:, :, :action_dim]
+
     def train_epoch(self, epoch):
         self.model.train()
         epoch_len = len(self.train_loader)
@@ -158,6 +163,7 @@ class ModelTrainer(BaseTrainer):
         for self.batch_idx, sample_batched in enumerate(self.train_loader):
             data_load_time.update(time.time() - end)
             inputs = AttrDict(map_dict(lambda x: x.to(self.device), sample_batched))
+            self.sample_pre_proc(inputs)
             with self.training_context():
                 self.optimizer.zero_grad()
                 output = self.model(inputs)
@@ -433,7 +439,7 @@ def set_run_params():
     # config path & params
     sys.argv.append("--path=" + "./configs/skill_prior_learning/{}/{}".format(task_name, mode))
     sys.argv.append("--val_data_size={}".format(160))    # TODO, automatic.. batch_size < val_data_size < (total_data * val_ratio)
-    sys.argv.append("--resume={}".format('latest'))     # latest or number..
+    # sys.argv.append("--resume={}".format('latest'))     # latest or number..
 
 
 if __name__ == '__main__':

@@ -121,7 +121,7 @@ class BatchRolloutFolder(object):
 
 if __name__ == "__main__":
     # test code
-    task_name = "pouring_water"
+    task_name = "pouring_skill"
     # d = BatchRolloutRepo(root_dir=os.getcwd(), task_name=task_name)
     #
     # dataset = RolloutManager()

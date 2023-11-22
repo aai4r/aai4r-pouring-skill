@@ -19,8 +19,8 @@ import numpy as np
 
 data_spec = AttrDict(
     dataset_class=GlobalSplitVideoDataset,
-    state_dim=16,
-    n_actions=9,
+    state_dim=16,   # 47 in sim
+    n_actions=8,    # lv(3), rv_quat(4), gripper(1)
     split=AttrDict(train=0.99, val=0.01, test=0.0),
     env_name="pick_and_place_img",   # "pouring_skill_img"  # TODO, how it is affected?
     res=224,
@@ -96,12 +96,13 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
         one_hot[arg_max] = 1
         return one_hot
 
-    def control_mode_to(self, cont_to, move_j):
+    def control_mode_to(self, cont_to):
+        convert = cont_to != self.CONTROL_MODE
         if cont_to not in self.cmodes:
             raise IndexError("cont_to should be one of the {}".format(self.cmodes))
         idx = self.cmodes_d[cont_to]
         self.CONTROL_MODE = self.cmodes[idx]
-        if move_j:
+        if convert:
             self.speed_stop()
             self.move_j(self.iposes)
 
@@ -215,6 +216,7 @@ class RtdeUR3(BaseRTDE, UR3ControlMode):
 
     def goal_pose_from_action(self, action):
         act_pos, act_quat, grip, mode = action[:3], action[3:7], action[7:8], action[8:9]
+        # print("conf mode: ", mode)
 
         if len(grip) == 2:
             grip_onehot = self.arg_max_one_hot(list1d=grip)
@@ -270,10 +272,13 @@ class ImageRtdeUR3(RtdeUR3):
         self.idx_rear = self.cam.index_from_key(key='rear')
         self.idx_front = self.cam.index_from_key(key='front')
 
+        self.rand_joint_config = config.rand_joint_config
+        self.control_mode_to(cont_to=config.config_mode)
+
         # TODO, have to record the scene while mode changing
         self.ev_mgr = EvalVideoManager(path="eval_video", task=self.config.task_name)
 
-        self.config.img_cfg = AttrDict(crop_h=460, crop_w=460, resize_h=224, resize_w=224)
+        self.config.img_cfg = AttrDict(crop_h=230, crop_w=230, resize_h=224, resize_w=224)
         self.rollout = RolloutManagerExpand(task_name=self.config.task_name)
 
     def get_robot_state(self):
@@ -313,6 +318,22 @@ class ImageRtdeUR3(RtdeUR3):
 
         # cropped_img = color_image[y:y + crop_h, x:x + crop_w]
         resized_img = cv2.resize(color_image, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+
+        # color_image = cv2.resize(color_image, dsize=(320, 240), interpolation=cv2.INTER_AREA)
+        # ih, iw = color_image.shape[:2]
+        # crop_h, crop_w = self.config.img_cfg.crop_h, self.config.img_cfg.crop_w
+        # resize_h, resize_w = self.config.img_cfg.resize_h, self.config.img_cfg.resize_w
+        # y, x = (np.random.rand(2) * np.array([ih - crop_h, iw - crop_w])).astype(np.int16)
+        #
+        # zoom_pix = 50
+        # zoom = np.random.randint(0, zoom_pix)
+        # cropped_img = color_image[y:y + crop_h - zoom, x:x + crop_w - zoom]
+        # resized_img = cv2.resize(cropped_img, dsize=(resize_h, resize_w), interpolation=cv2.INTER_AREA)
+        #
+        # brightness = 50
+        # resized_img = cv2.convertScaleAbs(resized_img, resized_img, 1, np.random.randint(-brightness, brightness))
+        # noisy_img = noisy(image=resized_img, noise_type='s&p', random_noise=False)
+
         out = resized_img
         return out
 
@@ -403,13 +424,13 @@ class ImageRtdeUR3(RtdeUR3):
 
             if cont_status["btn_reset_pose"]:
                 self.speed_stop()
-                depth, color = self.cam.get_np_images(self.idx_rear)
+                depth, color = self.cam.get_np_images(self.idx_rear, resize=(320, 240))
                 self.record_frame(image=copy.deepcopy(color),
                                   state=self.get_robot_state(),
                                   action_pos=[0., 0., 0.],
                                   action_quat=[0., 0., 0., 1.],
                                   action_grip=[1.0],
-                                  action_mode=[0.0],
+                                  action_mode=[1.0] if self.CONTROL_MODE == 'forward' else [-1.0],
                                   done=1,
                                   extra=[0., 0., 0., 1.])
 
@@ -417,23 +438,23 @@ class ImageRtdeUR3(RtdeUR3):
                 reward, done, info = 0, True, ""
 
                 self.rollout.show_rollout_summary()
-                self.rollout.save_to_file()
+                self.rollout.save_to_file(batch_idx=2)
                 self.rollout.reset()
                 return obs, reward, done, info
 
             diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             action_mode = [0.0]
             if cont_status["btn_trigger"]:
-                depth, color = self.cam.get_np_images(self.idx_rear)
+                depth, color = self.cam.get_np_images(self.idx_rear, resize=(320, 240))
                 visualize(depth_image=depth, color_image=color, disp_name="RealSense D435")
                 state = self.get_robot_state()
 
                 if cont_status["trk_up"]:
                     # self.shift_control_mode(move_j=True)
-                    self.control_mode_to(cont_to="forward", move_j=True)
+                    self.control_mode_to(cont_to="forward")
                     action_mode[0] = 1.0
                 elif cont_status["trk_down"]:
-                    self.control_mode_to(cont_to="downward", move_j=True)
+                    self.control_mode_to(cont_to="downward")
                     action_mode[0] = -1.0
 
                 if cont_status["btn_grip"]:

@@ -369,7 +369,7 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
 
-    # ["block_stacking", "kitchen", "office", "maze", "pouring_water", "pouring_water_img"]
+    # ["block_stacking", "kitchen", "office", "maze", "pouring_skill", "pouring_water_img"]
     task_name = "pouring_water_img"
     mode = "spirl_cl"
 

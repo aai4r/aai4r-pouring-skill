@@ -195,6 +195,11 @@ class IsaacUR3(BaseObject):
 
         self.set_env_lights()
 
+    def get_vr_status(self):
+        if self.vr is None: return self.vr
+        cont_status = self.vr.get_controller_status()
+        return cont_status
+
     def set_env_lights(self):
         l_color = gymapi.Vec3(random.uniform(1, 1), random.uniform(1, 1), random.uniform(1, 1))
         l_ambient = gymapi.Vec3(random.uniform(0.7, 1.0), random.uniform(0.7, 1.0), random.uniform(0.7, 1.0))

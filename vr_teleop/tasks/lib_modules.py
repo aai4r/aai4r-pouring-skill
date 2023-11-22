@@ -139,7 +139,7 @@ class UR3ControlMode:
                                         ry_max=deg2rad(20.0), ry_min=deg2rad(-5.0),     # [20, -5]
                                         rz_max=deg2rad(50.0), rz_min=deg2rad(-50.0))
 
-        self._limits.downward = AttrDict(x_max=0.44, x_min=0.2,     # [0.44, 0.2]
+        self._limits.downward = AttrDict(x_max=0.44, x_min=0.25,     # [0.44, 0.2]
                                          y_max=0.2, y_min=-0.2,
                                          z_max=0.13, z_min=0.04,
                                          rx_max=deg2rad(20.0), rx_min=deg2rad(-20.0),
@@ -399,6 +399,9 @@ class RealSense(RealSenseBase):
         self.config.enable_device(self.cam_id.rear)
         self.args = args if args is not None else AttrDict(width=640, height=480, fps=30)
 
+        self.depth_buf = []
+        self.color_buf = []
+
         # Get device product line for setting a supporting resolution
         pipeline_wrapper = rs.pipeline_wrapper(self.pipeline)
         pipeline_profile = self.config.resolve(pipeline_wrapper)
@@ -443,7 +446,7 @@ class RealSense(RealSenseBase):
     def stop_stream(self):
         self.pipeline.stop()
 
-    def get_np_images(self):
+    def get_np_images(self, resize=None):
         frames = self.pipeline.wait_for_frames()
         depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
@@ -453,7 +456,15 @@ class RealSense(RealSenseBase):
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
         color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
+        self.depth_buf, self.color_buf = depth_image, color_image
+
+        if resize:
+            color_image = cv2.resize(color_image, dsize=resize, interpolation=cv2.INTER_AREA)
+            depth_image = cv2.resize(depth_image, dsize=resize, interpolation=cv2.INTER_AREA)
         return depth_image, color_image
+
+    def get_np_images_buf(self):
+        return self.depth_buf, self.color_buf
 
 
 class RealSenseMulti(RealSenseBase):
@@ -526,7 +537,7 @@ class RealSenseMulti(RealSenseBase):
         print("    Color shape: {}, min / max: {} / {}, dtype: {}".format(color.shape, color.min(), color.max(),
                                                                           color.dtype))
 
-    def get_np_images(self, index):
+    def get_np_images(self, index, resize=None):
         frames = self.pipelines[index].wait_for_frames()
         depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
@@ -536,6 +547,12 @@ class RealSenseMulti(RealSenseBase):
         # Convert images to numpy arrays
         depth_image = np.asanyarray(depth_frame.get_data())  # (h, w, 1)
         color_image = np.asanyarray(color_frame.get_data())  # (h, w, 3)
+
+
+
+        if resize:
+            color_image = cv2.resize(color_image, dsize=resize, interpolation=cv2.INTER_AREA)
+            depth_image = cv2.resize(depth_image, dsize=resize, interpolation=cv2.INTER_AREA)
         return depth_image, color_image
 
     def stop_stream(self, index):

@@ -9,6 +9,10 @@ from PyQt5.QtWidgets import *
 from PyQt5 import uic, QtGui, QtCore
 from PIL import Image, ImageQt
 
+parent_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = parent_dir[:parent_dir.find(parent_dir.split('/')[-1])-1]
+sys.path.append(parent_dir)
+
 from spirl.utility.general_utils import AttrDict
 
 #UI파일 연결 단, UI파일은 Python 코드 파일과 같은 디렉토리에 위치해야한다.
@@ -161,6 +165,8 @@ class SkillDatasetManager(QMainWindow, form_class):
     def update_image(self):
         if hasattr(self.data, "images"):
             img = Image.fromarray(self.data.images[self.data.step], mode='RGB')
+            b, g, r = img.split()
+            img = Image.merge("RGB", (r, g, b))
             qt_img = ImageQt.ImageQt(img)
             _size = self.lb_img.size()
             _val = min(_size.width(), _size.height())
@@ -190,10 +196,14 @@ class SkillDatasetManager(QMainWindow, form_class):
                     self.data = AttrDict()
                     key = 'traj{}'.format(0)
                     for name in f[key].keys():
-                        if name in ['actions', 'states', 'rewards', 'terminals', 'pad_mask']:
+                        if name in ['actions', 'states', 'rewards', 'terminals', 'pad_mask', 'extra']:
                             self.data[name] = f[key + '/' + name][()].astype(np.float32)
                         elif name in ['images']:
                             self.data[name] = f[key + '/' + name][()].astype(np.uint8)
+                        else:
+                            self.data[name] = f[key + '/' + name][()]
+                            self.textEdit_data_info.append(info)
+                            continue
                         info = "{}: \n    shape: {}, \n    type: {}, \n    min / max: {:.2f} / {:.2f}".\
                             format(name, self.data[name].shape, self.data[name].dtype,
                                    self.data[name].min(), self.data[name].max())

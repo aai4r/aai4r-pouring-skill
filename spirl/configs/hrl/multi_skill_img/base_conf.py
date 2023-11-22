@@ -61,9 +61,10 @@ ll_model_params = AttrDict(
     n_input_frames=1,
     nz_enc=256,
     nz_mid=256,
+    nz_mid_prior=256,
     nz_vae=12,
-    n_processing_layers=4,
-    num_prior_net_layers=4,
+    n_processing_layers=3,
+    num_prior_net_layers=3,
     cond_decode=True,
     use_pretrain=True,
     layer_freeze=-1,             # 5: freeze for skill train, -1: freeze all layers
@@ -74,6 +75,8 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec.res,
     weights_dir="weights",
     recurrent_prior=False,   # D
+    dropout=True,
+    droprate=0.2,
 )
 
 # LL Agent
@@ -147,7 +150,10 @@ data_config.dataset_spec = data_spec
 
 cfg = AttrDict()
 cfg.extra = AttrDict()
-cfg.extra.skill_uncertainty_plot = False
+cfg.env = AttrDict()
+
+cfg.extra.skill_uncertainty_plot = True
+cfg.env.episodeLength = 500
 env_config = AttrDict(
     reward_norm=1.,
     image_observation=True,
