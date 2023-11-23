@@ -1,6 +1,13 @@
 """
 Collection of experience in isaacgym environment
 """
+import os
+import sys
+from pathlib import Path
+parent_dir = os.path.dirname(os.path.realpath(__file__))
+grandparent_dir = str(Path(parent_dir).parent)
+sys.path.append(grandparent_dir)
+
 import numpy as np
 from isaacgym import gymutil
 from task_rl.config import load_cfg
@@ -57,8 +64,8 @@ def task_demonstration(task):
     sim_params = parse_sim_params(args, cfg, None)
 
     # param customization
-    cfg['env']['numEnvs'] = 1
-    cfg['expert']['num_total_frames'] = 12000
+    cfg['env']['numEnvs'] = 30
+    cfg['expert']['num_total_frames'] = 2 ** 14
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB
     cfg['expert']['save_data'] = True
     cfg['expert']['save_resume'] = True

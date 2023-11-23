@@ -1,6 +1,8 @@
 # Learning manipulation skills from Human demonstration
-On-going project for learning pouring skill.
+This is our on-going project for learning pouring skill from human demonstration.
 
+## Overall System
+<img src="./assets/imgs/system.png"/>
 
 ## Required Hardware
 * UR3
@@ -9,15 +11,8 @@ On-going project for learning pouring skill.
 * Robotiq 2F-85
 
 ## Tested Environment
-* Ubuntu 20.04
-* python 3.8
-
-## Dataset Generation from GPU-accelerated Parallel Environment
-* Isaac Gym preview-release 4 must be installed in advance.
-* [IsaacGym Download](https://developer.nvidia.com/isaac-gym)
-```commandline
-run task_rl/collect_experience.py
-``` 
+* Ubuntu 20.04 and 22.04
+* python 3.8 >=
 
 ## Installation
 * steam: https://store.steampowered.com/about/
@@ -27,6 +22,15 @@ run task_rl/collect_experience.py
 * openvr
 * triad_openvr (openvr wrapper)
 * sudo apt install libsdl2-dev
+
+
+## Dataset Generation from GPU-accelerated Parallel Environment
+* Isaac Gym preview-release 4 must be installed in advance ([Download](https://developer.nvidia.com/isaac-gym))
+* To generate the demonstration dataset, run following command
+```commandline
+cd task_rl/
+python collect_experience.py
+```
 
 ## SPiRL on isaacgym environment
 * Main train code
