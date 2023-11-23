@@ -1,6 +1,23 @@
-# aai4r-pouring-skill
+# Learning manipulation skills from Human demonstration
 On-going project for learning pouring skill.
 
+
+## Required Hardware
+* UR3
+* HTC-VIVE Pro2
+* RealSense D435 x 2
+* Robotiq 2F-85
+
+## Tested Environment
+* Ubuntu 20.04
+* python 3.8
+
+## Dataset Generation from GPU-accelerated Parallel Environment
+* Isaac Gym preview-release 4 must be installed in advance.
+* [IsaacGym Download](https://developer.nvidia.com/isaac-gym)
+```commandline
+run task_rl/collect_experience.py
+``` 
 
 ## Installation
 * steam: https://store.steampowered.com/about/
