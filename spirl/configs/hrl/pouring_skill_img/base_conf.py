@@ -74,6 +74,8 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec.res,
     weights_dir="weights",
     recurrent_prior=False,   # D
+    dropout=False,
+    mc_dropout=False,
 )
 
 # LL Agent
@@ -153,5 +155,8 @@ env_config = AttrDict(
     image_observation=True,
     img_debug=False,
     img_disp_delay=1,
+    task_name="pouring_skill_img",
+    init_conf_mode="forward",
+    rand_control_mode=False,
     cfg=cfg,
 )
