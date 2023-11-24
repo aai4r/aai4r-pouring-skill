@@ -786,7 +786,8 @@ class DemoUR3Pouring(VRInteraction):
                 camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
                                                                      self.camera_handles[i], gymapi.IMAGE_COLOR)
                 torch_camera_tensor = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
-                self.obs_buf[i, :] = torch_camera_tensor
+                bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
+                self.obs_buf[i, :] = torch.tensor(bgr_cam).to(self.device)
                 if self.debug_cam:
                     bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
                     cv2.imshow("camera sensor", bgr_cam)

@@ -111,10 +111,11 @@ class ExpertRolloutStorage(RolloutSaverIsaac):
 
                 total_size = sum([sum(val['size']) for _, val in self.summary.items()])
                 batch_thres = (total_size + self.pre_size) / (self.DESIRED_BATCH_SIZE * self.batch_count)
-                if batch_thres > 1.0:
-                    print("batch up!!")
-                    self.batch_count += 1
-                    self.counter = 0
+                # TODO, debug the batch cound system!
+                # if batch_thres > 1.0:
+                #     print("batch up!!")
+                #     self.batch_count += 1
+                #     self.counter = 0
         print("trim last lengths: ", trim_last)
 
     def save(self):

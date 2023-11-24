@@ -39,7 +39,7 @@ extra:
 
 expert:
   num_total_frames: 2000000
-  data_path: "../data"
+  data_path: "../dataset"
   save_data: True
   save_resume: False
   debug_cam: False
@@ -66,5 +66,5 @@ sim:
     relaxation: 0.75
 
 task:
-  name: "pouring_water"
+  name: "pouring_skill"
   randomize: False
