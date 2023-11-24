@@ -69,14 +69,14 @@ def task_demonstration(task):
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB
     cfg['expert']['save_data'] = True
     cfg['expert']['save_resume'] = True
-    cfg['expert']['debug_cam'] = False
+    cfg['expert']['debug_cam'] = True
     cfg['expert']['img_obs'] = True
 
     if torch.cuda.device_count() > 1:
         args.task = task_list[task]['task']
         args.device = args.sim_device_type
         args.compute_device_id = 1
-        args.device_id = 1
+        args.device_id = 0
         args.graphics_device_id = 1
         args.rl_device = 'cuda:1'
         args.sim_device = 'cuda:1'
