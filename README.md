@@ -15,9 +15,13 @@ This is our on-going project for learning manipulation skills from human demonst
 * python 3.8 >=
 
 ## Installation
+```commandline
+pip install -r requirements.txt
+```
+
 * steam: https://store.steampowered.com/about/
+* Isaac Gym preview-release 4 must be installed in advance ([Download](https://developer.nvidia.com/isaac-gym))
 * VR libs: https://github.com/ankurhanda/HTC-Vive-Setup-Ubuntu
-* steam
 * steamVR
 * openvr
 * triad_openvr (openvr wrapper)
@@ -34,7 +38,6 @@ This is our on-going project for learning manipulation skills from human demonst
 ## Dataset Generation from GPU-accelerated Parallel Environment
 <img src="./assets/imgs/parallel_env_dataset_gen.png">
 
-* Isaac Gym preview-release 4 must be installed in advance ([Download](https://developer.nvidia.com/isaac-gym))
 * To generate the demonstration dataset, run following command
 ```commandline
 cd task_rl/
@@ -42,6 +45,23 @@ python collect_experience.py
 ```
 * The generated demonstration dataset can be found in dataset/{TASK_NAME}
 
+## Dataset Viewer UI
+<img src="./assets/imgs/dataset_viewer_ui.png">
+
+* We provide dataset viewer which is created by PyQt
+* Run following command to open the dataset viewer and select rollout_N.h5 file in the batch folder.
+
+```commandline
+cd dataset/
+python dataset_manager_gui.py 
+```
+
+## VR Teleoperation Test using Isaac Gym
+
+* Before run following command, HTC-VIVE controller must be activated.
+```commandline
+sdsd
+```
 
 ## References
 <a id="1">[1]</a> 
