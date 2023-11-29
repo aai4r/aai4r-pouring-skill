@@ -167,6 +167,7 @@ class SimVR:
                 print("r: ", tr.r)
 
     def run(self):
+        self.obj.reset()
         while not self.gym.query_viewer_has_closed(self.viewer):
             if not self.loop_on: break
             self.gym.simulate(self.sim)
@@ -256,7 +257,7 @@ def motion_visualization():
 if __name__ == "__main__":
     # vr_test()
     # exit()
-    target = Cube   # Cube or IsaacUR3
+    target = IsaacUR3   # Cube or IsaacUR3
     # rot_dict = {Cube: (-89.9, 0.0, 89.9), IsaacUR3: (-89.9, 0.0, 89.9)}
     rot_dict = {Cube: (-90.0, 0.0, -90.0), IsaacUR3: (-90.0, 0.0, -90.0)}
     # rot_dict = {Cube: (0.0, 0.0, 0.0), IsaacUR3: (-90.0, 0.0, -90.0)}

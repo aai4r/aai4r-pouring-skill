@@ -195,6 +195,11 @@ class IsaacUR3(BaseObject):
 
         self.set_env_lights()
 
+    def get_vr_status(self):
+        if self.vr is None: return self.vr
+        cont_status = self.vr.get_controller_status()
+        return cont_status
+
     def set_env_lights(self):
         l_color = gymapi.Vec3(random.uniform(1, 1), random.uniform(1, 1), random.uniform(1, 1))
         l_ambient = gymapi.Vec3(random.uniform(0.7, 1.0), random.uniform(0.7, 1.0), random.uniform(0.7, 1.0))
@@ -409,7 +414,7 @@ class IsaacUR3(BaseObject):
         if cont_status["btn_gripper"]: self.grip_toggle ^= 1
         goal[:, 7] = self.grip_toggle
 
-    def move(self):
+    def move(self, vr_st):
         self.compute_obs()
         # relX: [dx, dy, dz] + absR: [x, y, z, w] + absG: [g]
         goal = torch.zeros(1, 8, device=self.device)
