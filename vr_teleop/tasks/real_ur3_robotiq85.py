@@ -238,7 +238,8 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
 if __name__ == "__main__":
     tasks = ["pouring_skill_img", "pick_and_place_img"]
-    task = AttrDict(task_name="pick_and_place_img", init_mode="downward", rand_control_mode=False)
+    # task = AttrDict(task_name="pick_and_place_img", init_mode="downward", rand_control_mode=False)
+    task = AttrDict(task_name="pouring_skill_img", init_mode="forward", rand_control_mode=False)
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
     u = RealUR3(task=task)
     u.run_vr_teleop()

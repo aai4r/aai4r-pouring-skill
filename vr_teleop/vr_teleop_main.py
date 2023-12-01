@@ -1,5 +1,12 @@
 from math import sqrt
 import time
+import os
+import sys
+from pathlib import Path
+
+parent_dir = os.path.dirname(os.path.realpath(__file__))
+grandparent_dir = str(Path(parent_dir).parent)
+sys.path.append(grandparent_dir)
 
 from vr_teleop.tasks.base import *
 from tasks.cube import Cube

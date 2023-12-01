@@ -57,10 +57,12 @@ python dataset_manager_gui.py
 ```
 
 ## VR Teleoperation Test using Isaac Gym
-
+<img src="./assets/imgs/vr_teleop_isaacgym.png">
 * Before run following command, HTC-VIVE controller must be activated.
+
 ```commandline
-sdsd
+cd vr_teleop/
+python vr_teleop_main.py
 ```
 
 ## References
