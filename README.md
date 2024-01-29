@@ -53,7 +53,7 @@ https://drive.google.com/drive/folders/1lKXeFPIOF-kFaDk7mrzxcbKWtLMORgqx?usp=dri
 ## Dataset Viewer UI
 <img src="./assets/imgs/dataset_viewer_ui.png">
 
-* We provide dataset viewer which is created by PyQt
+* We provide dataset viewer which is created by PyQt.
 * Run following command to open the dataset viewer and select rollout_N.h5 file in the batch folder.
 
 ```commandline
