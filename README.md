@@ -45,6 +45,11 @@ python collect_experience.py
 ```
 * The generated demonstration dataset can be found in dataset/{TASK_NAME}
 
+
+## Dataset
+Our demonstration dataset is accessible via Google drive:
+https://drive.google.com/drive/folders/1lKXeFPIOF-kFaDk7mrzxcbKWtLMORgqx?usp=drive_link
+
 ## Dataset Viewer UI
 <img src="./assets/imgs/dataset_viewer_ui.png">
 
