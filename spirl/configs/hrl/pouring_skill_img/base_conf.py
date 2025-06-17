@@ -4,36 +4,21 @@ import copy
 from spirl.utility.general_utils import AttrDict
 from spirl.rl.components.agent import FixedIntervalHierarchicalAgent
 from spirl.rl.components.critic import SplitObsMLPCritic
+from spirl.rl.envs.real_ur3_env import RealUR3Env
 from spirl.rl.components.sampler import ACMultiImageAugmentedHierarchicalSampler, ACImageAugmentedSampler
 from spirl.rl.components.replay_buffer import UniformReplayBuffer
 from spirl.rl.policies.prior_policies import ACLearnedPriorAugmentedPIPolicy
 from spirl.rl.agents.prior_sac_agent import ActionPriorSACAgent
 from spirl.rl.agents.ac_agent import SACAgent
 from spirl.models.closed_loop_spirl_mdl import ImageClSPiRLMdl
-from spirl.components.data_loader import GlobalSplitVideoDataset
-
-from spirl.rl.envs.real_ur3_env import RealUR3Env
-from spirl.rl.envs.isaacgym_env import PouringWaterEnv, IsaacGymEnv, args
-from utils.config import parse_sim_params
-
-
-data_spec = AttrDict(
-    dataset_class=GlobalSplitVideoDataset,
-    state_dim=47,
-    n_actions=7,
-    split=AttrDict(train=0.99, val=0.01, test=0.0),
-    env_name="pouring_skill_img",   # "pouring_skill_img"  # TODO, how it is affected?
-    res=150,
-    crop_rand_subseq=True,
-)
-
+from spirl.rl.envs.real_ur3_env import data_spec
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 
 configuration = {
     'seed': 42,
     'agent': FixedIntervalHierarchicalAgent,
-    'environment': PouringWaterEnv,
+    'environment': RealUR3Env,
     'sampler': ACImageAugmentedSampler,
     'data_dir': '.',
     'num_epochs': 50,
@@ -89,8 +74,8 @@ ll_model_params = AttrDict(
     prior_input_res=data_spec.res,
     weights_dir="weights",
     recurrent_prior=False,   # D
-    dropout=True,
-    droprate=0.5,
+    dropout=False,
+    mc_dropout=False,
 )
 
 # LL Agent
@@ -158,30 +143,20 @@ agent_config.ll_agent_params.replay_params.unused_obs_size = ll_model_params.pri
 agent_config.ll_agent_params.replay_params.dump_replay = False
 agent_config.hl_agent_params.replay_params.dump_replay = False
 
-# Dataset
+# Dataset - Random data
 data_config = AttrDict()
 data_config.dataset_spec = data_spec
 
-from task_rl.config import load_cfg
-from isaacgym import gymapi
-cfg = load_cfg(cfg_file_name="expert_ur3_pouring.yaml")
-
-sim_params = parse_sim_params(args, cfg, None)
-
-dev_num = 0
-args.device_id = dev_num
-args.rl_device = "cuda:{}".format(dev_num)
-args.device = "cuda:{}".format(dev_num)
-args.task = "DemoUR3Pouring"
-args.physics_engine = gymapi.SIM_PHYSX
-args.headless = False
-
+cfg = AttrDict()
+cfg.extra = AttrDict()
+cfg.extra.skill_uncertainty_plot = False
 env_config = AttrDict(
     reward_norm=1.,
     image_observation=True,
-    img_debug=True,
+    img_debug=False,
     img_disp_delay=1,
+    task_name="pouring_skill_img",
+    init_conf_mode="forward",
+    rand_control_mode=False,
     cfg=cfg,
-    args=args,
-    sim_params=sim_params
 )

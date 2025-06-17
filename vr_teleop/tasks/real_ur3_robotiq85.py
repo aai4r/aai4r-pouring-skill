@@ -1,5 +1,4 @@
 import random
-import time
 
 from vr_teleop.tasks.lib_modules import *
 from vr_teleop.tasks.base import VRWrapper
@@ -17,9 +16,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
         self.rand_control_mode = task.rand_control_mode
 
         self.rollout = RolloutManagerExpand(task_name=task.task_name)
-        self.collect_demo = task.collect_demo
-
-        self.control_mode_to(cont_to=task.init_conf)
+        self.collect_demo = True
 
     def init_vr(self):
         self.vr = VRWrapper(device="cpu", rot_d=(-90.0, 0.0, -90.0))
@@ -39,24 +36,25 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             self.speed_stop()
             self.move_j(self.iposes)
 
-    def control_mode_to(self, cont_to):
-        convert = cont_to != self.CONTROL_MODE
+    def control_mode_to(self, cont_to, move_j):
         if cont_to not in self.cmodes:
             raise IndexError("cont_to should be one of the {}".format(self.cmodes))
         idx = self.cmodes_d[cont_to]
         self.CONTROL_MODE = self.cmodes[idx]
-        if convert:
+        if move_j:
             self.speed_stop()
             self.move_j(self.iposes)
 
     def get_state(self):
         tcp_pos, tcp_aa = self.get_actual_tcp_pos_ori()
-        state = RobotState2(joint=self.get_actual_q(),                              # [0, 0, 0, 0, 0, 0]  (6-dim)
-                            ee_pos=tcp_pos,                                         # [0, 0, 0]           (3-dim)
-                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),          # [0, 0, 0, 1]        (4-dim)
+        target_diff = np.array([0.5196, -0.1044, 0.088]) - np.array(tcp_pos)
+        state = RobotState2(joint=self.get_actual_q(),
+                            ee_pos=tcp_pos,
+                            ee_quat=self.quat_from_tcp_axis_angle(tcp_aa),
+                            target_diff=target_diff.tolist(),
                             # gripper_one_hot=self.grip_one_hot_state(),    # for RobotState
-                            gripper_pos=[self.gripper.gripper_to_mm_normalize()],   # [1],                (1-dim)
-                            control_mode_one_hot=self.cont_mode_one_hot_state())    # [0, 1],             (2-dim)
+                            gripper_pos=[self.gripper.gripper_to_mm_normalize()],
+                            control_mode_one_hot=self.cont_mode_one_hot_state())
         return state
 
     def record_frame(self, observation, state, action_pos, action_quat, action_grip, action_mode, done, extra=None):
@@ -92,7 +90,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
             if len(action) >= 9:
                 cmode = action[8:9]
                 if cmode[0] != 0.0:
-                    self.control_mode_to(cont_to="forward" if cmode[0] > 0 else "downward")
+                    self.control_mode_to(cont_to="forward" if cmode[0] > 0 else "downward", move_j=True)
             else:
                 if self.cont_mode_to_str(state.control_mode_one_hot) != self.CONTROL_MODE:
                     self.shift_control_mode(move_j=True)
@@ -153,7 +151,7 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                                       state=self.get_state(),
                                       action_pos=[0., 0., 0.],
                                       action_quat=[0., 0., 0., 1.],
-                                      action_grip=[1.0] if self.CONTROL_MODE == 'forward' else [-1.0],
+                                      action_grip=[1.0],
                                       action_mode=[0.0],
                                       done=1,
                                       extra=[0., 0., 0., 1.])   # source rotation of VR controller...
@@ -166,18 +164,18 @@ class RealUR3(BaseRTDE, UR3ControlMode):
                     continue
 
                 diff_j = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-                action_mode = [1.0] if self.CONTROL_MODE == 'forward' else [-1.0]
+                action_mode = [0.0]
                 if cont_status["btn_trigger"]:
                     depth, color = self.cam.get_np_images()
-                    visualize(*self.cam.get_np_images_buf())
+                    visualize(depth, color)
                     state = self.get_state()
 
                     if cont_status["trk_up"]:
                         # self.shift_control_mode(move_j=True)
-                        self.control_mode_to(cont_to="forward")
+                        self.control_mode_to(cont_to="forward", move_j=True)
                         action_mode[0] = 1.0
                     elif cont_status["trk_down"]:
-                        self.control_mode_to(cont_to="downward")
+                        self.control_mode_to(cont_to="downward", move_j=True)
                         action_mode[0] = -1.0
 
                     if cont_status["btn_grip"]:
@@ -239,11 +237,10 @@ class RealUR3(BaseRTDE, UR3ControlMode):
 
 
 if __name__ == "__main__":
-    pouring = AttrDict(task_name="pouring_skill_img", rand_control_mode=False, collect_demo=True, init_conf="forward")
-    pick_place = AttrDict(task_name="pick_and_place_img", rand_control_mode=False, collect_demo=True, init_conf="downward")
-    multi = AttrDict(task_name="multi_skill_img", rand_control_mode=True, collect_demo=True, init_conf="downward")
-    # tasks = ["pouring_skill_img", "pick_and_place_img", "multi_skill_img"]
+    tasks = ["pouring_skill_img", "pick_and_place_img"]
+    # task = AttrDict(task_name="pick_and_place_img", init_mode="downward", rand_control_mode=False)
+    task = AttrDict(task_name="pouring_skill_img", init_mode="forward", rand_control_mode=False)
     # tasks2 = ["pouring_constraint", "pick_and_place_constraint"]
-    u = RealUR3(task=pick_place)
+    u = RealUR3(task=task)
     u.run_vr_teleop()
-    # u.replay_mode(batch_idx=1, rollout_idx=268)
+    # u.replay_mode(batch_idx=1, rollout_idx=0)

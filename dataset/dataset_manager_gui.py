@@ -60,7 +60,7 @@ class SkillDatasetManager(QMainWindow, form_class):
         # dataset
         self.data = AttrDict()
 
-        self.initialize_default_status(task="pouring_water_img")
+        self.initialize_default_status(task="")
 
     def initialize_default_status(self, task):
         # default mainframe size
@@ -69,7 +69,7 @@ class SkillDatasetManager(QMainWindow, form_class):
         # default root path
         folder_name = QtCore.QDir.currentPath()
         folder_name = os.path.dirname(folder_name)
-        folder_name = os.path.join(folder_name, "data", task)
+        folder_name = os.path.join(folder_name, "dataset", task)
         self.lineEdit_path.setText(folder_name)
         self.path = folder_name
         self.update_treeview()

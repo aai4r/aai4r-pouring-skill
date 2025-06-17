@@ -407,11 +407,12 @@ class DemoUR3Pouring(VRInteraction):
         cup_start_pose.p.y = 0.0
         cup_start_pose.p.z = self.cup_height * 0.55
 
+        rear_pos_stare = [[-0.15, 0.56, 0.81], [0.32, 0.0, 0.0]]
         third_person_top_pos_stare = [[0.78, 0.0, 0.5], [0.6, 0.0, 0.6]]
         third_person_view_pos_stare = [[0.9, 0.0, 0.6], [0.28, 0.0, 0.1]]
         first_person_view_pos_stare = [[-0.068866, -0.014887, 0.777630], [0.5, 0.0, 0.0]]
-        self.default_cam_pos = third_person_view_pos_stare[0]
-        self.default_cam_stare = third_person_view_pos_stare[1]
+        self.default_cam_pos = rear_pos_stare[0]
+        self.default_cam_stare = rear_pos_stare[1]
 
         # compute aggregate size
         num_bg_bodies = self.gym.get_asset_rigid_body_count(bg_asset)
@@ -827,11 +828,12 @@ class DemoUR3Pouring(VRInteraction):
                 camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, self.envs[i],
                                                                      self.camera_handles[i], gymapi.IMAGE_COLOR)
                 torch_camera_tensor = gymtorch.wrap_tensor(camera_tensor)[:, :, :3]
-                self.obs_buf[i, :] = torch_camera_tensor
+                bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
+                self.obs_buf[i, :] = torch.tensor(bgr_cam).to(self.device)
                 if self.debug_cam:
                     bgr_cam = cv2.cvtColor(torch_camera_tensor.cpu().numpy(), cv2.COLOR_RGB2BGR)
                     cv2.imshow("camera sensor", bgr_cam)
-                    k = cv2.waitKey(0)
+                    k = cv2.waitKey(1)
                     if k == 27:     # ESC
                         exit()
         else:

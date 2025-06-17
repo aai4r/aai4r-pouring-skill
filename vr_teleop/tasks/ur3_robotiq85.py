@@ -414,7 +414,7 @@ class IsaacUR3(BaseObject):
         if cont_status["btn_gripper"]: self.grip_toggle ^= 1
         goal[:, 7] = self.grip_toggle
 
-    def move(self):
+    def move(self, vr_st):
         self.compute_obs()
         # relX: [dx, dy, dz] + absR: [x, y, z, w] + absG: [g]
         goal = torch.zeros(1, 8, device=self.device)

@@ -1,91 +1,77 @@
-# aai4r-pouring-skill
-On-going project for learning pouring skill.
+# Learning manipulation skills from Human demonstration
+This is our on-going project for learning manipulation skills from human demonstration.
 
+## Overall System
+<img src="./assets/imgs/system.png"/>
+
+## Required Hardware
+* UR3
+* HTC-VIVE Pro2
+* RealSense D435 x 2
+* Robotiq 2F-85
+
+## Tested Environment
+* Ubuntu 20.04 and 22.04
+* python 3.8 >=
 
 ## Installation
+```commandline
+pip install -r requirements.txt
+```
+
 * steam: https://store.steampowered.com/about/
+* Isaac Gym preview-release 4 must be installed in advance ([Download](https://developer.nvidia.com/isaac-gym))
 * VR libs: https://github.com/ankurhanda/HTC-Vive-Setup-Ubuntu
-* steam
 * steamVR
 * openvr
 * triad_openvr (openvr wrapper)
 * sudo apt install libsdl2-dev
 
-## SPiRL on isaacgym environment
-* Main train code
-  - train.py
-    
 
-* Skill learning <br>
-  1) Prepare demonstration dataset
-  ```
-  Run: skill_rl/run.py --> task_demonstration()
-  ```
+## Manipulation Skill Learning Framework
+* Our learning framework is mainly based on SPiRL[[1]](#1) ([code](https://github.com/clvrai/spirl)).
+### Skill Learning Process from Human Demonstration
+1) Human Demonstration dataset collection using VR Teleoperation
+2) Skill Learning
+3) Skill Correction and Enhancement by Shared Autonomy Process
 
-  2) Train skill embedding space
-  ```
-  Run: spirl/train.py (for pycharm debugging)
-  Data Path: skill_rl/data/rollout_x.h5
-  
-  Logger: WandBLogger
-  Model: ClSPiRLMdl <-- SkillPriorMdl
-    * out = model(batch)
-    * out.q     @ infer Mult.Gaussian(BaseProcessingLSTM/Linear(batch))
-      -> BaseProcessingLSTM__CustomLSTM, CustomLSTMCell
-    * out.p     @ fixed prior, Gaussian(out.q.mu0, out.q.log_sig0)
-    * out.q_hat @ learned skill prior, prior_mdl(batch.states[:, 0])
-      -> prior_mdl: Predictor__BaseProcessingNet
-      -> List of FCBlock(Linear, Activation, Batchnorm)
-    * out.z     @ latent variable sampling, out.q.sample() 
-    * out.recon @ decoded action, decoder(out.z, learned_prior_input)
-      -> List of FCBlock(Linear, Activation, Batchnorm)
-  Train_Loader: RepeatedDataLoader
-    * batch: [states, actions, pad_mask]
-  ```
-  
-* Policy learning
-  - spirl/rl/train.py (for pycharm debugging)
-  - task_rl/run.py -> task_rl_train()
-  ```
-    warmup()    # gathering initial dataset and make replay buffer
-      * warmup_batch <- sampler: HierarchicalSampler__Sampler
-        ** out <- agent.act(obs) : FixedIntervalHierarchicalAgent__HierarchicalAgent__BaseAgent
-          *** out.hl <- agent.hl_agent.act(obs) : ActionPriorSACAgent__SACAgent__ACAgent
-            -> out.hl   @ hl_action(10-dim) & hl_log_prob(1-dim) 
-          *** out.ll <- agent.ll_agent.act(obs & hl_action) : SACAgent__ACAgent
-            -> out.ll   @ action(7-dim, motor) & log_prob(1-dim)
-      * agent.add_exp(warmup_batch) : 
-        ** replay_buffer.append(warmup_batch) : UniformReplayBuffer__ReplayBuffer
-    
-    train_epoch()
-    while epoch_loop:
-      * batch <- sampler: HierarchicalSampler__Sampler
-      * agent.update(batch) : HierarchicalAgent__BaseAgent
-        ** replay_buffer.append(batch) : UniformReplayBuffer__ReplayBuffer
-        ** batch <- replay_buffer.sample()
-        ** policy_out <- policy(batch.obs) : LearnedPriorAugmentedPIPolicy
-                                             __PriorInitializedPolicy & LearnedPriorAugmentedPolicy
-                                             __PriorAugmentedPolicy__Policy
-          
-          *** hl_policy_out <- hl_agent.update(batch.hl) : ActionPriorSACAgent__SACAgent__ACAgent
-          -> hl_policy_out = {action(10-dim), log_prob(1-dim), dist(m.gauss, 10-dim), 
-                              prior_dist(m.gauss, 10-dim), prior_divergence(1-dim)}
+## Dataset Generation from GPU-accelerated Parallel Environment
+<img src="./assets/imgs/parallel_env_dataset_gen.png">
 
-          # following ll policy out were not reached out during training...  
-          *** ll_policy_out <- ll_agent.update(batch.ll) : SACAgent__ACAgent
-          -> ll_policy_out = {action(7-dim), log_prob(1-dim), dist(m.gauss, 7-dim), 
-                              prior_dist(m.gauss, 10-dim), prior_divergence(1-dim)}
-        
-        ** alpha_loss <- update_alpha(policy_out)
-        ** policy_loss <- compute_policy_loss(batch, policy_out)
-        ** target_Q
-          *** policy_out_next <- policy(batch.obs_next)
-          *** value_next <- compute_next_value(batch, policy_out_next)
-          *** q_target <- batch.reward * scale + (1 - batch.done) * disc_fact * value_next 
-          *** critic_loss <- compute_critic_loss(batch, q_target)
-        
-        ** update policy network
-        ** update critic network
-        ** update target network
-  ```
-  
+* To generate the demonstration dataset, run following command
+```commandline
+cd task_rl/
+python collect_experience.py
+```
+* The generated demonstration dataset can be found in dataset/{TASK_NAME}
+
+
+## Dataset
+Our demonstration dataset is accessible via Google drive:
+https://drive.google.com/drive/folders/1lKXeFPIOF-kFaDk7mrzxcbKWtLMORgqx?usp=drive_link
+
+## Dataset Viewer UI
+<img src="./assets/imgs/dataset_viewer_ui.png">
+
+* We provide dataset viewer which is created by PyQt.
+* Run following command to open the dataset viewer and select rollout_N.h5 file in the batch folder.
+
+```commandline
+cd dataset/
+python dataset_manager_gui.py 
+```
+
+## VR Teleoperation Test using Isaac Gym
+<img src="./assets/imgs/vr_teleop_isaacgym.png">
+* Before run following command, HTC-VIVE controller must be activated.
+
+```commandline
+cd vr_teleop/
+python vr_teleop_main.py
+```
+
+## References
+<a id="1">[1]</a> 
+K. Pertsch, Y. Lee, and J. Lim, “Accelerating reinforcement learning
+with learned skill priors,” in Conference on robot learning. PMLR,
+2021, pp. 188–204.

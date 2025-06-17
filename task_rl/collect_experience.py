@@ -1,6 +1,13 @@
 """
 Collection of experience in isaacgym environment
 """
+import os
+import sys
+from pathlib import Path
+parent_dir = os.path.dirname(os.path.realpath(__file__))
+grandparent_dir = str(Path(parent_dir).parent)
+sys.path.append(grandparent_dir)
+
 import numpy as np
 from isaacgym import gymutil
 from task_rl.config import load_cfg
@@ -57,8 +64,8 @@ def task_demonstration(task):
     sim_params = parse_sim_params(args, cfg, None)
 
     # param customization
-    cfg['env']['numEnvs'] = 32
-    cfg['expert']['num_total_frames'] = 500000
+    cfg['env']['numEnvs'] = 30
+    cfg['expert']['num_total_frames'] = 2 ** 14
     cfg['expert']['desired_batch_size'] = 5 * (1000 * 1000 * 1000)  # GB
     cfg['expert']['save_data'] = True
     cfg['expert']['save_resume'] = True
@@ -68,11 +75,11 @@ def task_demonstration(task):
     if torch.cuda.device_count() > 1:
         args.task = task_list[task]['task']
         args.device = args.sim_device_type
-        args.compute_device_id = 0
+        args.compute_device_id = 1
         args.device_id = 0
-        args.graphics_device_id = 0
-        args.rl_device = 'cuda:0'
-        args.sim_device = 'cuda:0'
+        args.graphics_device_id = 1
+        args.rl_device = 'cuda:1'
+        args.sim_device = 'cuda:1'
         args.headless = False
         args.test = True
 
@@ -113,6 +120,6 @@ def task_demonstration(task):
 
 if __name__ == '__main__':
     print("Task Demonstration Dataset")
-    task = "UR3_POURING_IMG"
+    task = "UR3_POURING"
     # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     task_demonstration(task=task)
